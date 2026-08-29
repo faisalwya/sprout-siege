@@ -61,13 +61,22 @@
   .card.poor{opacity:.42}
   .card:active{transform:translateY(1px)}
 
-  #btnWave{
-    background:#4f9d4a;border:1px solid #82d17c!important;color:#fff;
-    padding:.55em .8em;border-radius:.5em;letter-spacing:.06em;font-weight:700;
-    box-shadow:0 3px 0 #2c5c2a;white-space:nowrap
+  #bAction{
+    min-width:3.1em;padding:.3em .55em;font-weight:700;letter-spacing:.06em;
+    box-shadow:0 3px 0 rgba(0,0,0,.45)
   }
-  #btnWave:active{transform:translateY(2px);box-shadow:0 1px 0 #2c5c2a}
-  #btnWave.hide{display:none}
+  #bAction:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+  .ico.send{
+    background:#4f9d4a;border-color:#82d17c!important;color:#fff;
+    box-shadow:0 3px 0 #2c5c2a;animation:wavePulse 1.8s ease-out infinite
+  }
+  .ico.send:active{box-shadow:0 1px 0 #2c5c2a;animation:none}
+  .ico.resume{background:#8a6a2e;border-color:#e2c06a!important;color:#fff}
+  @keyframes wavePulse{
+    0%   {box-shadow:0 3px 0 #2c5c2a, 0 0 0 0 rgba(130,209,124,.55)}
+    70%  {box-shadow:0 3px 0 #2c5c2a, 0 0 0 .5em rgba(130,209,124,0)}
+    100% {box-shadow:0 3px 0 #2c5c2a, 0 0 0 0 rgba(130,209,124,0)}
+  }
 
   /* ---------- tower panel ---------- */
   #pop,#confirm{
@@ -151,14 +160,13 @@
       <div class="chip"><span class="coin">&#9673;</span> <b id="tGold">130</b></div>
       <div class="chip" id="tWave">WAVE 1</div>
       <div class="grow"></div>
-      <button class="ico" id="bSpeed">1&times;</button>
       <button class="ico" id="bSound">&#9834;</button>
-      <button class="ico" id="bPause">&#10073;&#10073;</button>
+      <button class="ico" id="bSpeed">1&times;</button>
+      <button class="ico" id="bAction">&#10073;&#10073;</button>
     </div>
     <div id="bottom">
       <div id="dock"></div>
       <div id="confirm" class="hide"></div>
-      <button id="btnWave">SEND WAVE &#9654;</button>
     </div>
     <div id="pop" class="hide"></div>
     <div id="toast"></div>
@@ -166,10 +174,10 @@
   <div id="over">
     <h1>SPROUT SIEGE</h1>
     <p>Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
-    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span></p>
+    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V5</div>
+    <div id="ver">V7</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1173,7 +1181,7 @@ function cancelPlacing(){ G.placing=null; G.ghost=null; syncUI(); }
    14. UI
    ====================================================================== */
 const dock=document.getElementById('dock');
-const btnWave=document.getElementById('btnWave');
+const bAction=document.getElementById('bAction');
 
 function iconCanvas(key,px){
   const c=document.createElement('canvas'); c.width=16;c.height=16;
@@ -1199,7 +1207,28 @@ FAMS.forEach(fam=>{
   dock.appendChild(b);
 });
 
-btnWave.addEventListener('click',()=>{ if(G.phase==='idle') startWave(); });
+// Paused is checked first: if the tab lost focus between waves, the button has to
+// offer resume before it offers the next wave, or the wave starts into a frozen game.
+function actionState(){
+  if(!G.started) return 'pause';
+  if(G.paused) return 'resume';
+  if(G.phase==='idle') return 'send';
+  return 'pause';
+}
+function updateAction(){
+  const st=actionState();
+  bAction.classList.toggle('send',st==='send');
+  bAction.classList.toggle('resume',st==='resume');
+  bAction.innerHTML = st==='send' ? 'GO' : (st==='resume' ? '&#9654;' : '&#10073;&#10073;');
+  bAction.setAttribute('aria-label', st==='send'?'Send next wave':(st==='resume'?'Resume':'Pause'));
+}
+bAction.addEventListener('click',()=>{
+  if(!G.started) return;
+  const st=actionState();
+  if(st==='send') startWave();
+  else G.paused=(st==='pause');
+  syncUI();
+});
 
 document.getElementById('bSpeed').addEventListener('click',e=>{
   G.speed = G.speed===1?2:(G.speed===2?3:1);
@@ -1208,11 +1237,7 @@ document.getElementById('bSpeed').addEventListener('click',e=>{
 document.getElementById('bSound').addEventListener('click',e=>{
   sndOn=!sndOn; e.target.classList.toggle('off',!sndOn);
 });
-document.getElementById('bPause').addEventListener('click',e=>{
-  if(!G.started) return;
-  G.paused=!G.paused;
-  e.target.innerHTML=G.paused?'&#9654;':'&#10073;&#10073;';
-});
+
 
 function statLine(t){
   const st=statsOf(t);
@@ -1351,7 +1376,8 @@ function buildConfirm(){
 function syncUI(){
   document.getElementById('tLives').textContent=G.lives;
   document.getElementById('tGold').textContent=G.gold;
-  document.getElementById('tWave').textContent='WAVE '+Math.max(1,G.wave)+(G.wave>LAST_WAVE?'':'/'+LAST_WAVE);
+  const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
+  document.getElementById('tWave').textContent='WAVE '+shown+(shown>LAST_WAVE?'':'/'+LAST_WAVE);
 
   // dock affordability + selection
   [...dock.children].forEach(b=>{
@@ -1373,8 +1399,7 @@ function syncUI(){
     if(k!==confKey){ confKey=k; buildConfirm(); }
   } else confKey='';
 
-  btnWave.classList.toggle('hide',G.phase!=='idle'||showConf);
-  btnWave.innerHTML='SEND WAVE '+(G.wave+1)+' &#9654;';
+  updateAction();
 }
 
 /* ======================================================================
@@ -1413,7 +1438,6 @@ function reset(){
   G.gold=150; G.lives=20; G.wave=0; G.phase='idle'; G.endless=false;
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
   G.selected=null; G.placing=null; G.ghost=null; G.paused=false; G.shake=0; G.flash=0;
-  document.getElementById('bPause').innerHTML='&#10073;&#10073;';
   over.classList.add('hide'); syncUI();
 }
 (function homeScreenHint(){
@@ -1435,7 +1459,7 @@ document.getElementById('bStart').addEventListener('click',()=>{
   over.classList.add('hide'); syncUI();
 });
 
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; document.getElementById('bPause').innerHTML='&#9654;'; } });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; syncUI(); } });
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 
