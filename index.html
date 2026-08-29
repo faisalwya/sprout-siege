@@ -169,7 +169,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V4</div>
+    <div id="ver">V5</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1086,7 +1086,7 @@ requestAnimationFrame(frame);
    12. LAYOUT
    ====================================================================== */
 const stage=document.getElementById('stage');
-const MAX_SCALE=4;   // past 4x the art stops reading as art and starts reading as blur
+const MAX_SCALE=8;   // sanity ceiling for very large displays only; normally never reached
 
 function layout(){
   const cs=getComputedStyle(document.body);
@@ -1101,17 +1101,18 @@ function layout(){
   let raw=Math.min(vw/W, vh/H, MAX_SCALE);
 
   // Snap so one art pixel covers a whole number of DEVICE pixels — that is what
-  // keeps the edges hard. Only take the snap when it costs almost no size:
-  // on a phone (dpr 3, tight height) snapping would shrink the game noticeably,
-  // so there we fill instead and let the subpixel unevenness go unnoticed.
+  // keeps the edges hard. Size beats crispness though, so only take the snap when
+  // it is nearly free (within 5%). On a 2x display the snap costs ~2% and is taken;
+  // on a 3x phone it would cost 12%, so we fill and let the unevenness go unnoticed
+  // at that density.
   const snapped=Math.floor(raw*dpr)/dpr;
-  const s=(snapped>=0.5 && snapped>=raw*0.90) ? snapped : raw;
+  const s=(snapped>=0.5 && snapped>=raw*0.95) ? snapped : raw;
 
   const cw=W*s, ch=H*s;
   cv.style.width=cw+'px'; cv.style.height=ch+'px';
   stage.style.width=cw+'px'; stage.style.height=ch+'px';
-  stage.style.setProperty('--fs', Math.max(9,Math.min(22,Math.round(ch*0.044)))+'px');
-  document.body.classList.toggle('framed', vw-cw>28 || vh-ch>28);
+  stage.style.setProperty('--fs', Math.max(9,Math.min(18,Math.round(ch*0.046)))+'px');
+  document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
   if(typeof G!=='undefined' && G.selected && G.towers.indexOf(G.selected)>=0) positionPop(G.selected);
 }
 window.addEventListener('resize',layout);
