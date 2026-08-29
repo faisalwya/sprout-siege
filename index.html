@@ -173,11 +173,11 @@
   </div>
   <div id="over">
     <h1>SPROUT SIEGE</h1>
-    <p>Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
+    <p>Three plots, five waves each. Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V7</div>
+    <div id="ver">V8</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -397,29 +397,57 @@ const ENEMIES={
   slug  :{hp:1500,spd:13, bounty:90, art:'slug',   flip:true, r:7, armor:4, slowRes:.7, boss:true, lives:5, name:'Grand Slug'}
 };
 
-// [type, count, gap, delay]
-const WAVES=[
- {m:1.00,g:[['grub',8,0.85]]},
- {m:1.10,g:[['grub',12,0.60]]},
- {m:1.20,g:[['beetle',7,0.90],['grub',8,0.50,4]]},
- {m:1.30,g:[['moth',8,0.70],['grub',6,0.60,5]]},
- {m:1.20,g:[['slug',1,1,0],['grub',10,0.50,2]]},
- {m:1.45,g:[['beetle',10,0.70],['snail',2,1.50,5]]},
- {m:1.55,g:[['grub',17,0.30],['moth',6,0.60,7]]},
- {m:1.70,g:[['moth',12,0.50],['beetle',8,0.80,4]]},
- {m:1.85,g:[['snail',6,1.20],['beetle',10,0.60,3]]},
- {m:1.60,g:[['slug',2,3,0],['moth',10,0.50,3]]},
- {m:2.10,g:[['moth',16,0.40],['grub',15,0.30,6]]},
- {m:2.30,g:[['beetle',16,0.45],['snail',4,1.40,6]]},
- {m:2.55,g:[['grub',30,0.22],['moth',10,0.45,8]]},
- {m:2.80,g:[['snail',10,0.90],['beetle',14,0.50,4]]},
- {m:2.40,g:[['slug',3,2.5,0],['moth',12,0.40,4],['beetle',12,0.50,8]]}
+// [type, count, gap, delay] — five waves per map, boss on the fifth
+const WAVES_PER_MAP=5;
+const MAPS=[
+ {
+  name:'The Carrot Patch',
+  wp:[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]],
+  pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
+       dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
+       flowers:['#ffd452','#f58fbf','#ffffff','#a8ecff']},
+  waves:[
+   {m:1.00,g:[['grub',8,0.85]]},
+   {m:1.10,g:[['grub',12,0.60]]},
+   {m:1.20,g:[['beetle',7,0.90],['grub',8,0.50,4]]},
+   {m:1.30,g:[['moth',8,0.70],['grub',6,0.60,5]]},
+   {m:1.20,g:[['slug',1,1,0],['grub',10,0.50,2]]}
+  ]
+ },
+ {
+  name:'The Long Hedge',
+  wp:[[-2,1],[4,1],[4,6],[7,6],[7,2],[10,2],[10,7],[13,7],[13,2],[16,2],[16,6],[21,6]],
+  pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
+       dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
+       flowers:['#a8ecff','#ffffff','#c9a0ff','#ffd452']},
+  waves:[
+   {m:1.15,g:[['beetle',9,0.70]]},
+   {m:1.25,g:[['grub',16,0.35],['moth',4,0.70,6]]},
+   {m:1.40,g:[['snail',4,1.20],['beetle',10,0.60,3]]},
+   {m:1.50,g:[['moth',12,0.45],['beetle',9,0.70,4]]},
+   {m:1.35,g:[['slug',1,1,0],['moth',10,0.50,3],['grub',12,0.35,7]]}
+  ]
+ },
+ {
+  name:'The Bramble',
+  wp:[[-2,2],[2,2],[2,6],[5,6],[5,1],[8,1],[8,7],[11,7],[11,2],[14,2],[14,6],[21,6]],
+  pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
+       dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
+       flowers:['#ffd452','#ff9a3c','#ffffff','#f58fbf']},
+  waves:[
+   {m:1.30,g:[['beetle',10,0.50],['grub',10,0.35,4]]},
+   {m:1.45,g:[['moth',14,0.40],['grub',8,0.40,6]]},
+   {m:1.65,g:[['snail',5,1.00],['beetle',11,0.50,3]]},
+   {m:1.80,g:[['grub',26,0.24],['moth',10,0.45,6]]},
+   {m:1.55,g:[['slug',2,2.5,0],['moth',10,0.40,4],['beetle',10,0.50,8]]}
+  ]
+ }
 ];
-const LAST_WAVE=WAVES.length;
 function waveDef(n){
-  if(n<=LAST_WAVE) return WAVES[n-1];
-  const k=n-LAST_WAVE;
-  return {m:2.4+k*0.42, g:[
+  const M=MAPS[G.map-1];
+  if(n<=M.waves.length) return M.waves[n-1];
+  const k=n-M.waves.length;   // endless, once the last plot has been held
+  return {m:2.6+k*0.45, g:[
     ['slug',1+Math.floor(k/2),2.5,0],
     ['moth',10+k*2,0.35,3],
     ['snail',4+k,0.9,6],
@@ -428,10 +456,9 @@ function waveDef(n){
 }
 
 /* ======================================================================
-   3. PATH
+   3. MAP GEOMETRY — rebuilt at runtime, one map at a time
    ====================================================================== */
-const WP=[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]]
-  .map(p=>({x:(p[0]+0.5)*TILE, y:(p[1]+0.5)*TILE}));
+let WP=[], PTS=[], SEG=[], PATH_LEN=0, BUILD=[];
 
 // Centripetal Catmull-Rom through the waypoints: rounds the corners like a trail
 // worn in by feet rather than drawn with a ruler.
@@ -456,33 +483,47 @@ function spline(P,step){
   out.push({x:P[P.length-1].x,y:P[P.length-1].y});
   return out;
 }
-const PTS=spline(WP,3);
 
 // Gentle meander on top of the curve, faded out at both ends so the entry and
 // the garden gate still line up.
-(function meander(){
-  const src=PTS.map(q=>({x:q.x,y:q.y}));
+function meander(pts){
+  const src=pts.map(q=>({x:q.x,y:q.y}));
   let run=0; const off=[];
   for(let i=0;i<src.length;i++){
     if(i) run+=Math.hypot(src[i].x-src[i-1].x, src[i].y-src[i-1].y);
     off.push(Math.sin(run*0.085)*2.2 + Math.sin(run*0.031+2.1)*1.6 + Math.sin(run*0.19+0.7)*0.45);
   }
-  for(let i=0;i<PTS.length;i++){
+  for(let i=0;i<pts.length;i++){
     const a=src[Math.max(0,i-1)], b=src[Math.min(src.length-1,i+1)];
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
-    const fade=Math.min(1, Math.min(i,PTS.length-1-i)/12);
-    PTS[i].x=src[i].x + (-dy/L)*off[i]*fade;
-    PTS[i].y=src[i].y + ( dx/L)*off[i]*fade;
+    const fade=Math.min(1, Math.min(i,pts.length-1-i)/12);
+    pts[i].x=src[i].x + (-dy/L)*off[i]*fade;
+    pts[i].y=src[i].y + ( dx/L)*off[i]*fade;
   }
-})();
-
-const SEG=[]; let PATH_LEN=0;
-for(let i=0;i<PTS.length-1;i++){
-  const a=PTS[i], b=PTS[i+1];
-  const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1e-6;
-  SEG.push({a,b,dx:dx/len,dy:dy/len,len,s:PATH_LEN});
-  PATH_LEN+=len;
 }
+
+function buildGeometry(wpTiles){
+  WP=wpTiles.map(p=>({x:(p[0]+0.5)*TILE, y:(p[1]+0.5)*TILE}));
+  PTS=spline(WP,3);
+  meander(PTS);
+  SEG=[]; PATH_LEN=0;
+  for(let i=0;i<PTS.length-1;i++){
+    const a=PTS[i], b=PTS[i+1];
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1e-6;
+    SEG.push({a,b,dx:dx/len,dy:dy/len,len,s:PATH_LEN});
+    PATH_LEN+=len;
+  }
+  BUILD=[];
+  for(let r=0;r<ROWS;r++){ BUILD[r]=[];
+    for(let c=0;c<COLS;c++){
+      const cx=(c+.5)*TILE, cy=(r+.5)*TILE;
+      let ok = r>=1 && r<=7 && c<=17 && distToPath(cx,cy)>11.5;
+      if(c>=17 && r>=4 && r<=7) ok=false;  // the veggie patch
+      BUILD[r][c]=ok;
+    }
+  }
+}
+
 function posAt(d){
   if(d<=0){ const s=SEG[0]; return {x:s.a.x,y:s.a.y,dx:s.dx,dy:s.dy}; }
   if(d>=PATH_LEN){ const s=SEG[SEG.length-1]; return {x:s.b.x,y:s.b.y,dx:s.dx,dy:s.dy}; }
@@ -503,19 +544,8 @@ function distToPath(px,py){
   return Math.sqrt(best);
 }
 
-// buildable map
-const BUILD=[];
-for(let r=0;r<ROWS;r++){ BUILD[r]=[];
-  for(let c=0;c<COLS;c++){
-    const cx=(c+.5)*TILE, cy=(r+.5)*TILE;
-    let ok = r>=1 && r<=7 && c<=17 && distToPath(cx,cy)>11.5;
-    if(c>=17 && r>=4 && r<=7) ok=false;  // the veggie patch
-    BUILD[r][c]=ok;
-  }
-}
-
 /* ======================================================================
-   4. BACKGROUND (pre-rendered once)
+   4. BACKGROUND — repainted per map from that map's palette
    ====================================================================== */
 let seed=1337;
 function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
@@ -532,31 +562,32 @@ function disc(q,cx,cy,r,col){
   }
 }
 
-(function paintBG(){
+function paintBG(pal){
   const q=bg.getContext('2d');
+  q.clearRect(0,0,W,H);
   // grass
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
-    q.fillStyle=((r+c)&1)?'#6cc16b':'#66bb66';
+    q.fillStyle=((r+c)&1)?pal.g1:pal.g2;
     q.fillRect(c*TILE,r*TILE,TILE,TILE);
   }
   for(let i=0;i<900;i++){
     const px=Math.floor(rnd()*W), py=Math.floor(rnd()*H);
     if(distToPath(px,py)<9) continue;
     const k=rnd();
-    if(k<.72){ q.fillStyle='#5cb25d'; q.fillRect(px,py,1,1); }
-    else if(k<.86){ q.fillStyle='#7fd07c'; q.fillRect(px,py,1,1); }
-    else if(k<.95){ q.fillStyle='#3d8a4d'; q.fillRect(px,py,1,2); }
-    else { q.fillStyle=['#ffd452','#f58fbf','#ffffff','#a8ecff'][Math.floor(rnd()*4)]; q.fillRect(px,py,1,1); }
+    if(k<.72){ q.fillStyle=pal.speck; q.fillRect(px,py,1,1); }
+    else if(k<.86){ q.fillStyle=pal.bright; q.fillRect(px,py,1,1); }
+    else if(k<.95){ q.fillStyle=pal.dark; q.fillRect(px,py,1,2); }
+    else { q.fillStyle=pal.flowers[Math.floor(rnd()*pal.flowers.length)]; q.fillRect(px,py,1,1); }
   }
   // hedge along top and bottom
   for(let c=0;c<COLS;c++){
     for(let i=0;i<3;i++){
       const px=c*TILE+Math.floor(rnd()*TILE), py=Math.floor(rnd()*10);
-      q.fillStyle=i?'#2f6f3c':'#3d8a4d'; q.fillRect(px-2,py,5,4);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; q.fillRect(px-2,py,5,4);
     }
     for(let i=0;i<3;i++){
       const px=c*TILE+Math.floor(rnd()*TILE), py=H-8+Math.floor(rnd()*7);
-      q.fillStyle=i?'#2f6f3c':'#3d8a4d'; q.fillRect(px-2,py,5,4);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; q.fillRect(px-2,py,5,4);
     }
   }
 
@@ -566,38 +597,31 @@ function disc(q,cx,cy,r,col){
     if(i) run+=Math.hypot(PTS[i].x-PTS[i-1].x, PTS[i].y-PTS[i-1].y);
     widths.push(6.1 + Math.sin(run*0.105)*0.85 + Math.sin(run*0.047+1.7)*0.75 + Math.sin(run*0.29+0.4)*0.3);
   }
-  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i]+1.5,'#8f6a44'); // damp edge
-  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i],'#c9a06a');     // packed dirt
-  // sun-bleached inner track, wandering off-centre
+  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i]+1.5,pal.edge);
+  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i],pal.dirt);
   for(let i=0;i<PTS.length;i++){
     const a=PTS[Math.max(0,i-1)], b=PTS[Math.min(PTS.length-1,i+1)];
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
     const sway=Math.sin(i*0.06)*1.8+Math.sin(i*0.017+1)*1.2;
-    disc(q,PTS[i].x+(-dy/L)*sway, PTS[i].y+(dx/L)*sway, widths[i]*0.42, '#d8b482');
+    disc(q,PTS[i].x+(-dy/L)*sway, PTS[i].y+(dx/L)*sway, widths[i]*0.42, pal.inner);
   }
-  // grit, pebbles and grass creeping in at the verges
   for(let i=0;i<PTS.length;i+=1){
     const a=PTS[Math.max(0,i-1)], b=PTS[Math.min(PTS.length-1,i+1)];
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
     const nx=-dy/L, ny=dx/L, w=widths[i];
     for(let j=0;j<2;j++){
       const t=(rnd()*2-1)*w*0.85;
-      q.fillStyle=rnd()<.5?'#b58f60':'#dcb787';
+      q.fillStyle=rnd()<.5?pal.edge:pal.inner;
       q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,1);
     }
     if(rnd()<.30){
       const side=rnd()<.5?-1:1, t=(w+0.5+rnd()*1.2)*side;
-      q.fillStyle=rnd()<.5?'#5cb25d':'#3d8a4d';
+      q.fillStyle=rnd()<.5?pal.speck:pal.dark;
       q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,rnd()<.4?2:1);
-    }
-    if(rnd()<.05){
-      const t=(rnd()*2-1)*w*0.6;
-      q.fillStyle='#a87f52';
-      disc(q,PTS[i].x+nx*t,PTS[i].y+ny*t,1.6,'#b58f60');
     }
   }
 
-  // buildable plots: faint dashed squares
+  // buildable plots
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
     if(!BUILD[r][c]) continue;
     const bx=c*TILE+2, by=r*TILE+2, sz=TILE-4;
@@ -605,7 +629,7 @@ function disc(q,cx,cy,r,col){
     for(let i=0;i<sz;i+=3){ q.fillRect(bx+i,by,2,1); q.fillRect(bx+i,by+sz,2,1); q.fillRect(bx,by+i,1,2); q.fillRect(bx+sz,by+i,1,2); }
   }
 
-  // veggie patch + fence at the right edge
+  // veggie patch + fence: the goal looks the same on every map
   q.fillStyle='#8a6242'; q.fillRect(17*TILE+6,4*TILE+2,3*TILE,4*TILE-4);
   q.fillStyle='#734f34';
   for(let i=0;i<26;i++){ q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),1,1); }
@@ -615,12 +639,13 @@ function disc(q,cx,cy,r,col){
     q.fillStyle='#3d8a4d'; q.fillRect(px-1,py-4,1,3); q.fillRect(px+1,py-4,1,3); q.fillRect(px,py-5,1,4);
     q.fillStyle='#ff9a3c'; q.fillRect(px-1,py,3,2); q.fillRect(px,py+2,1,2);
   });
+  const gateY=posAt(PATH_LEN).y;
   for(let py=4*TILE; py<8*TILE; py+=6){
-    if(py>5*TILE+2 && py<6*TILE+10) continue; // gate where the trail enters
+    if(py>gateY-10 && py<gateY+10) continue; // gate where the trail enters
     q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+12,py,2,6);
   }
   q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+11,4*TILE+4,4,2); q.fillRect(19*TILE+11,7*TILE+2,4,2);
-})();
+}
 
 /* ======================================================================
    5. STATE
@@ -629,12 +654,29 @@ const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 cv.width=W; cv.height=H; ctx.imageSmoothingEnabled=false;
 
 const G={
-  gold:150, lives:20, wave:0, phase:'idle', // idle | wave | dead | won
+  gold:150, lives:20, map:1, wave:0, phase:'idle', // idle | wave | rift | dead | won
   speed:1, paused:true, started:false,
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
   placing:null, ghost:null, selected:null
 };
+
+// Lives carry across maps. Towers do not — the grid is a different shape on the
+// other side. Gold resets so each map stays its own clean puzzle, plus a bounty
+// on the hearts you kept, which is what makes protecting them matter.
+const RIFT_BONUS_PER_HEART=4;
+function loadMap(n){
+  G.map=n;
+  const M=MAPS[n-1];
+  seed=1337+n*7919;
+  buildGeometry(M.wp);
+  paintBG(M.pal);
+  G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
+  G.selected=null; G.placing=null; G.ghost=null;
+  G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
+  G.gold = (n===1) ? 150 : 130 + RIFT_BONUS_PER_HEART*G.lives;
+}
+loadMap(1);
 
 const BUTTERFLIES=[];
 for(let i=0;i<5;i++) BUTTERFLIES.push({x:rnd()*W,y:20+rnd()*(H-50),a:rnd()*6.28,sp:6+rnd()*8,c:['#ffd452','#f58fbf','#ffffff'][i%3]});
@@ -715,17 +757,19 @@ function startWave(){
 function spawn(type,m){
   const E=ENEMIES[type];
   G.foes.push({
-    type,E, hp:E.hp*m, max:E.hp*m, d:0, x:WP[0].x, y:WP[0].y,
+    type,E, hp:E.hp*m, max:E.hp*m, d:0, x:PTS[0].x, y:PTS[0].y,
     slow:0, slowT:0, stunT:0, bob:Math.random()*6.28, hit:0, dead:false
   });
 }
 function waveDone(){
-  const bonus=30+G.wave*7;
+  const bonus=30+G.wave*7+(G.map-1)*25;
   G.gold+=bonus;
   addFx({type:'txt',x:W/2,y:40,txt:'+'+bonus,color:'#ffd452',ttl:1.2,vy:-14});
   SFX.coin();
-  if(G.wave>=LAST_WAVE && !G.endless){ G.phase='won'; showOver('won'); }
-  else G.phase='idle';
+  if(G.wave>=WAVES_PER_MAP && !G.endless){
+    if(G.map<MAPS.length){ G.phase='rift'; showOver('rift'); }
+    else { G.phase='won'; showOver('won'); }
+  } else G.phase='idle';
   syncUI();
 }
 
@@ -1377,7 +1421,8 @@ function syncUI(){
   document.getElementById('tLives').textContent=G.lives;
   document.getElementById('tGold').textContent=G.gold;
   const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
-  document.getElementById('tWave').textContent='WAVE '+shown+(shown>LAST_WAVE?'':'/'+LAST_WAVE);
+  document.getElementById('tWave').textContent=
+    'MAP '+G.map+' \u00b7 W'+shown+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
 
   // dock affordability + selection
   [...dock.children].forEach(b=>{
@@ -1409,51 +1454,58 @@ const over=document.getElementById('over');
 function showOver(kind){
   G.paused=true;
   over.classList.remove('hide');
+  const M=MAPS[G.map-1];
+
+  if(kind==='rift'){
+    const nx=MAPS[G.map];
+    over.innerHTML='<h1>PLOT HELD</h1>'+
+      '<h2>'+M.name+' cleared &mdash; '+G.lives+' &#9829; carried</h2>'+
+      '<p>Towers stay behind, and the trail ahead runs a different shape. '+
+      'Every heart you kept is worth '+RIFT_BONUS_PER_HEART+' coins on the far side, '+
+      'so you arrive with '+(130+G.lives*RIFT_BONUS_PER_HEART)+'.</p>'+
+      '<button class="big" id="bNext">ON TO '+nx.name.toUpperCase()+' &#9654;</button>';
+    document.getElementById('bNext').addEventListener('click',()=>{
+      loadMap(G.map+1);
+      G.paused=false;
+      over.classList.add('hide');
+      SFX.wave(); syncUI();
+    });
+    SFX.up();
+    return;
+  }
+
   if(kind==='dead'){
     over.innerHTML='<h1 style="color:#ff7b7b;text-shadow:0 3px 0 #5c1f1f">PATCH EATEN</h1>'+
-      '<h2>You held out to wave '+G.wave+'</h2>'+
+      '<h2>'+M.name+', wave '+Math.max(1,G.wave)+'</h2>'+
       '<p>The bugs got through. Replant and try a different mix of specialties.</p>'+
       '<button class="big" id="bAgain">PLANT AGAIN</button>';
     document.getElementById('bAgain').addEventListener('click',reset);
     SFX.bad();
-  } else {
-    const hp=G.lives;
-    const line = hp>=20 ? 'Not one carrot lost.'
-               : hp>=13 ? 'Chewed at the edges, still standing.'
-               : hp>=6  ? 'More stem than carrot now, but it held.'
-               :          'Down to the last row. That was close.';
-    over.innerHTML='<h1>PATCH SAVED</h1>'+
-      '<h2>All '+LAST_WAVE+' waves held, '+hp+' &#9829; left</h2>'+
-      '<p>'+line+' Keep going and the swarm stops holding back.</p>'+
-      '<button class="big" id="bEndless">ENDLESS MODE</button>'+
-      '<button class="big" id="bAgain" style="background:#3d5f8f;border-color:#7aa6dd!important;box-shadow:0 4px 0 #23395a">START OVER</button>';
-    document.getElementById('bEndless').addEventListener('click',()=>{
-      G.endless=true; G.phase='idle'; G.paused=false; over.classList.add('hide'); syncUI();
-    });
-    document.getElementById('bAgain').addEventListener('click',reset);
-    SFX.up();
+    return;
   }
+
+  const hp=G.lives;
+  const line = hp>=20 ? 'Not one carrot lost.'
+             : hp>=13 ? 'Chewed at the edges, still standing.'
+             : hp>=6  ? 'More stem than carrot now, but it held.'
+             :          'Down to the last row. That was close.';
+  over.innerHTML='<h1>GARDEN HELD</h1>'+
+    '<h2>All '+MAPS.length+' plots held, '+hp+' &#9829; left</h2>'+
+    '<p>'+line+' Keep going and the swarm stops holding back.</p>'+
+    '<button class="big" id="bEndless">ENDLESS MODE</button>'+
+    '<button class="big" id="bAgain" style="background:#3d5f8f;border-color:#7aa6dd!important;box-shadow:0 4px 0 #23395a">START OVER</button>';
+  document.getElementById('bEndless').addEventListener('click',()=>{
+    G.endless=true; G.phase='idle'; G.paused=false; over.classList.add('hide'); syncUI();
+  });
+  document.getElementById('bAgain').addEventListener('click',reset);
+  SFX.up();
 }
 function reset(){
-  G.gold=150; G.lives=20; G.wave=0; G.phase='idle'; G.endless=false;
-  G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
-  G.selected=null; G.placing=null; G.ghost=null; G.paused=false; G.shake=0; G.flash=0;
+  G.lives=20; G.endless=false;
+  loadMap(1);
+  G.paused=false;
   over.classList.add('hide'); syncUI();
 }
-(function homeScreenHint(){
-  const el=document.getElementById('a2hs');
-  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
-  const standalone=window.navigator.standalone===true ||
-                   (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
-  if(standalone) return;
-  const lost=window.innerHeight<360;   // browser chrome is eating the play area
-  if(!lost) return;
-  el.style.display='block';
-  el.textContent = ios
-    ? 'The browser bar is shrinking the game. Share \u2192 Add to Home Screen, then open it from the icon.'
-    : 'The browser bar is shrinking the game. Full screen or a home-screen shortcut gives you the whole board.';
-})();
-
 document.getElementById('bStart').addEventListener('click',()=>{
   actx(); G.started=true; G.paused=false; G.phase='idle';
   over.classList.add('hide'); syncUI();
