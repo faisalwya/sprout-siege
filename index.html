@@ -177,7 +177,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V8</div>
+    <div id="ver">V9</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -405,7 +405,7 @@ const MAPS=[
   wp:[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]],
   pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
        dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
-       flowers:['#ffd452','#f58fbf','#ffffff','#a8ecff']},
+       flowers:['#ffd452','#f58fbf','#ffeedd','#a8ecff']},
   waves:[
    {m:1.00,g:[['grub',8,0.85]]},
    {m:1.10,g:[['grub',12,0.60]]},
@@ -419,7 +419,7 @@ const MAPS=[
   wp:[[-2,1],[4,1],[4,6],[7,6],[7,2],[10,2],[10,7],[13,7],[13,2],[16,2],[16,6],[21,6]],
   pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
        dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
-       flowers:['#a8ecff','#ffffff','#c9a0ff','#ffd452']},
+       flowers:['#a8ecff','#ffeedd','#c9a0ff','#ffd452']},
   waves:[
    {m:1.15,g:[['beetle',9,0.70]]},
    {m:1.25,g:[['grub',16,0.35],['moth',4,0.70,6]]},
@@ -433,7 +433,7 @@ const MAPS=[
   wp:[[-2,2],[2,2],[2,6],[5,6],[5,1],[8,1],[8,7],[11,7],[11,2],[14,2],[14,6],[21,6]],
   pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
        dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
-       flowers:['#ffd452','#ff9a3c','#ffffff','#f58fbf']},
+       flowers:['#ffd452','#ff9a3c','#ffeedd','#f58fbf']},
   waves:[
    {m:1.30,g:[['beetle',10,0.50],['grub',10,0.35,4]]},
    {m:1.45,g:[['moth',14,0.40],['grub',8,0.40,6]]},
@@ -545,8 +545,13 @@ function distToPath(px,py){
 }
 
 /* ======================================================================
-   4. BACKGROUND — repainted per map from that map's palette
+   4. BACKGROUND — the 320x144 playfield sits inside a larger decorated
+   canvas, so the garden runs to the edges of the screen instead of
+   floating in a letterbox. OX/OY are the margin; world coords are unchanged.
    ====================================================================== */
+let ARTW=W, ARTH=H, OX=0, OY=0;
+const MAX_PAD_X=72, MAX_PAD_Y=52;
+
 let seed=1337;
 function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
 
@@ -562,36 +567,93 @@ function disc(q,cx,cy,r,col){
   }
 }
 
+// ---- small bits of garden clutter, drawn in canvas space
+function stone(q,x,y,pal){
+  disc(q,x,y,2.2,'#9a9689'); disc(q,x,y-0.6,1.4,'#c2beb1');
+  q.fillStyle='rgba(0,0,0,.15)'; q.fillRect(Math.round(x-2),Math.round(y+2),5,1);
+}
+function mushroom(q,x,y){
+  q.fillStyle='#e0524f'; q.fillRect(x-2,y-3,5,2); q.fillRect(x-1,y-4,3,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x-1,y-3,1,1); q.fillRect(x+1,y-2,1,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x,y-1,1,2);
+}
+function tuft(q,x,y,col,col2){
+  q.fillStyle=col;  q.fillRect(x,y-3,1,3); q.fillRect(x-2,y-2,1,2); q.fillRect(x+2,y-2,1,2);
+  q.fillStyle=col2; q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-2,1,2);
+}
+function clover(q,x,y,col){
+  q.fillStyle=col; q.fillRect(x,y,1,1); q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-1,1,1); q.fillRect(x,y-2,1,1);
+}
+// a plus, not a block — a solid 3x3 at this scale reads as a floating blob
+function bloom(q,x,y,pet,mid){
+  q.fillStyle=pet;
+  q.fillRect(x,y-1,1,1); q.fillRect(x-1,y,1,1); q.fillRect(x+1,y,1,1); q.fillRect(x,y+1,1,1);
+  q.fillStyle=mid; q.fillRect(x,y,1,1);
+}
+
 function paintBG(pal){
   const q=bg.getContext('2d');
-  q.clearRect(0,0,W,H);
-  // grass
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
-    q.fillStyle=((r+c)&1)?pal.g1:pal.g2;
-    q.fillRect(c*TILE,r*TILE,TILE,TILE);
+  q.clearRect(0,0,ARTW,ARTH);
+
+  // ---- ground: mottled patches rather than a tile checker
+  q.fillStyle=pal.g1; q.fillRect(0,0,ARTW,ARTH);
+  for(let i=0;i<150;i++){
+    disc(q, rnd()*ARTW, rnd()*ARTH, 3+rnd()*8, rnd()<.5?pal.g2:pal.bright);
   }
-  for(let i=0;i<900;i++){
-    const px=Math.floor(rnd()*W), py=Math.floor(rnd()*H);
-    if(distToPath(px,py)<9) continue;
-    const k=rnd();
-    if(k<.72){ q.fillStyle=pal.speck; q.fillRect(px,py,1,1); }
-    else if(k<.86){ q.fillStyle=pal.bright; q.fillRect(px,py,1,1); }
-    else if(k<.95){ q.fillStyle=pal.dark; q.fillRect(px,py,1,2); }
-    else { q.fillStyle=pal.flowers[Math.floor(rnd()*pal.flowers.length)]; q.fillRect(px,py,1,1); }
-  }
-  // hedge along top and bottom
-  for(let c=0;c<COLS;c++){
-    for(let i=0;i<3;i++){
-      const px=c*TILE+Math.floor(rnd()*TILE), py=Math.floor(rnd()*10);
-      q.fillStyle=i?pal.hedgeB:pal.hedgeA; q.fillRect(px-2,py,5,4);
-    }
-    for(let i=0;i<3;i++){
-      const px=c*TILE+Math.floor(rnd()*TILE), py=H-8+Math.floor(rnd()*7);
-      q.fillStyle=i?pal.hedgeB:pal.hedgeA; q.fillRect(px-2,py,5,4);
-    }
+  for(let i=0;i<90;i++){
+    disc(q, rnd()*ARTW, rnd()*ARTH, 2+rnd()*5, pal.speck);
   }
 
-  // ---- the trail: stamped discs with a breathing width, so no edge is straight
+  const onPath=(x,y)=>distToPath(x-OX,y-OY)<10;
+
+  // ---- speckle, clover and blooms across the whole canvas
+  for(let i=0;i<1100;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py)) continue;
+    const k=rnd();
+    if(k<.55){ q.fillStyle=pal.speck; q.fillRect(px,py,1,1); }
+    else if(k<.78){ q.fillStyle=pal.bright; q.fillRect(px,py,1,1); }
+    else if(k<.94){ q.fillStyle=pal.dark; q.fillRect(px,py,1,2); }
+    else { clover(q,px,py,pal.dark); }
+  }
+  for(let i=0;i<44;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py)) continue;
+    bloom(q,px,py,pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+  }
+
+  // ---- clutter, kept to the margin and the two decorative rows so it never
+  // sits where a tower goes
+  const inField=(x,y)=>x>OX+TILE*0 && x<OX+W && y>OY+TILE && y<OY+H-TILE;
+  for(let i=0;i<130;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py) || inField(px,py)) continue;
+    const k=rnd();
+    if(k<.34) tuft(q,px,py,pal.dark,pal.bright);
+    else if(k<.58) stone(q,px,py,pal);
+    else if(k<.70) mushroom(q,px,py);
+    else { disc(q,px,py,1+rnd()*2,pal.dark); }
+  }
+
+  // ---- hedge runs along the true top and bottom of the canvas
+  for(let c=0;c<ARTW;c+=5){
+    for(let i=0;i<3;i++){
+      const px=c+Math.floor(rnd()*6), py=Math.floor(rnd()*9);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; disc(q,px,py,2.6,i?pal.hedgeB:pal.hedgeA);
+    }
+    for(let i=0;i<3;i++){
+      const px=c+Math.floor(rnd()*6), py=ARTH-1-Math.floor(rnd()*9);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; disc(q,px,py,2.6,i?pal.hedgeB:pal.hedgeA);
+    }
+  }
+  for(let i=0;i<34;i++){
+    const px=Math.floor(rnd()*ARTW);
+    bloom(q,px,2+Math.floor(rnd()*6),pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+    bloom(q,Math.floor(rnd()*ARTW),ARTH-8+Math.floor(rnd()*6),pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+  }
+
+  // ---- the trail, in world space
+  q.save(); q.translate(OX,OY);
   const widths=[]; let run=0;
   for(let i=0;i<PTS.length;i++){
     if(i) run+=Math.hypot(PTS[i].x-PTS[i-1].x, PTS[i].y-PTS[i-1].y);
@@ -605,7 +667,7 @@ function paintBG(pal){
     const sway=Math.sin(i*0.06)*1.8+Math.sin(i*0.017+1)*1.2;
     disc(q,PTS[i].x+(-dy/L)*sway, PTS[i].y+(dx/L)*sway, widths[i]*0.42, pal.inner);
   }
-  for(let i=0;i<PTS.length;i+=1){
+  for(let i=0;i<PTS.length;i++){
     const a=PTS[Math.max(0,i-1)], b=PTS[Math.min(PTS.length-1,i+1)];
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
     const nx=-dy/L, ny=dx/L, w=widths[i];
@@ -614,37 +676,37 @@ function paintBG(pal){
       q.fillStyle=rnd()<.5?pal.edge:pal.inner;
       q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,1);
     }
-    if(rnd()<.30){
-      const side=rnd()<.5?-1:1, t=(w+0.5+rnd()*1.2)*side;
+    if(rnd()<.34){
+      const side=rnd()<.5?-1:1, t=(w+0.5+rnd()*1.4)*side;
       q.fillStyle=rnd()<.5?pal.speck:pal.dark;
       q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,rnd()<.4?2:1);
     }
+    if(rnd()<.05){
+      const t=(rnd()*2-1)*w*0.6;
+      disc(q,PTS[i].x+nx*t,PTS[i].y+ny*t,1.6,pal.edge);
+    }
   }
 
-  // buildable plots
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
-    if(!BUILD[r][c]) continue;
-    const bx=c*TILE+2, by=r*TILE+2, sz=TILE-4;
-    q.fillStyle='rgba(255,255,255,.10)';
-    for(let i=0;i<sz;i+=3){ q.fillRect(bx+i,by,2,1); q.fillRect(bx+i,by+sz,2,1); q.fillRect(bx,by+i,1,2); q.fillRect(bx+sz,by+i,1,2); }
-  }
-
-  // veggie patch + fence: the goal looks the same on every map
+  // ---- veggie patch + fence: the goal reads the same on every map
   q.fillStyle='#8a6242'; q.fillRect(17*TILE+6,4*TILE+2,3*TILE,4*TILE-4);
   q.fillStyle='#734f34';
-  for(let i=0;i<26;i++){ q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),1,1); }
-  const carrots=[[18.2,4.6],[19.1,5.0],[18.4,7.2],[19.3,7.5],[18.0,5.6]];
+  for(let i=0;i<40;i++){ q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),1,1); }
+  for(let i=0;i<12;i++){ q.fillStyle='#9b7049'; q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),2,1); }
+  const carrots=[[18.2,4.6],[19.1,5.0],[18.4,7.2],[19.3,7.5],[18.0,5.6],[19.4,6.4]];
   carrots.forEach(cr=>{
     const px=Math.round(cr[0]*TILE), py=Math.round(cr[1]*TILE);
     q.fillStyle='#3d8a4d'; q.fillRect(px-1,py-4,1,3); q.fillRect(px+1,py-4,1,3); q.fillRect(px,py-5,1,4);
     q.fillStyle='#ff9a3c'; q.fillRect(px-1,py,3,2); q.fillRect(px,py+2,1,2);
+    q.fillStyle='#c97a2a'; q.fillRect(px+1,py,1,2);
   });
   const gateY=posAt(PATH_LEN).y;
   for(let py=4*TILE; py<8*TILE; py+=6){
-    if(py>gateY-10 && py<gateY+10) continue; // gate where the trail enters
+    if(py>gateY-10 && py<gateY+10) continue;
     q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+12,py,2,6);
+    q.fillStyle='#c9ab80'; q.fillRect(19*TILE+12,py+5,2,1);
   }
   q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+11,4*TILE+4,4,2); q.fillRect(19*TILE+11,7*TILE+2,4,2);
+  q.restore();
 }
 
 /* ======================================================================
@@ -665,9 +727,11 @@ const G={
 // other side. Gold resets so each map stays its own clean puzzle, plus a bounty
 // on the hearts you kept, which is what makes protecting them matter.
 const RIFT_BONUS_PER_HEART=4;
+let curPal=MAPS[0].pal;
 function loadMap(n){
   G.map=n;
   const M=MAPS[n-1];
+  curPal=M.pal;
   seed=1337+n*7919;
   buildGeometry(M.wp);
   paintBG(M.pal);
@@ -679,7 +743,7 @@ function loadMap(n){
 loadMap(1);
 
 const BUTTERFLIES=[];
-for(let i=0;i<5;i++) BUTTERFLIES.push({x:rnd()*W,y:20+rnd()*(H-50),a:rnd()*6.28,sp:6+rnd()*8,c:['#ffd452','#f58fbf','#ffffff'][i%3]});
+for(let i=0;i<7;i++) BUTTERFLIES.push({x:rnd()*W,y:10+rnd()*(H-20),a:rnd()*6.28,sp:6+rnd()*8,c:['#ffd452','#f58fbf','#ffffff'][i%3]});
 
 /* ======================================================================
    6. AUDIO
@@ -829,7 +893,7 @@ function step(dt){
   // butterflies
   for(const b of BUTTERFLIES){
     b.a+=(Math.random()-.5)*dt*4; b.x+=Math.cos(b.a)*b.sp*dt; b.y+=Math.sin(b.a)*b.sp*dt*.6;
-    if(b.x<4||b.x>W-4) b.a=Math.PI-b.a; if(b.y<10||b.y>H-10) b.a=-b.a;
+    if(b.x<-OX+3||b.x>W+OX-3) b.a=Math.PI-b.a; if(b.y<-OY+3||b.y>H+OY-3) b.a=-b.a;
   }
 
   // spawning
@@ -992,6 +1056,7 @@ function draw(){
   ctx.save();
   if(G.shake>0) ctx.translate(Math.round((Math.random()-.5)*G.shake), Math.round((Math.random()-.5)*G.shake));
   ctx.drawImage(bg,0,0);
+  ctx.translate(OX,OY);
 
   // butterflies (behind everything)
   for(const b of BUTTERFLIES){
@@ -1005,11 +1070,15 @@ function draw(){
   // placement preview
   if(G.placing){
     const pulse=(Math.sin(G.time*5)+1)*.5;
+    ctx.fillStyle='rgba(255,255,255,'+(0.30+pulse*0.28)+')';
     for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
       if(!BUILD[r][c]||towerAt(c,r)) continue;
       if(G.ghost&&G.ghost.c===c&&G.ghost.r===r) continue;
-      ctx.fillStyle='rgba(255,255,255,'+(0.08+pulse*0.10)+')';
-      ctx.fillRect(c*TILE+2,r*TILE+2,TILE-4,TILE-4);
+      const bx=c*TILE+3, by=r*TILE+3, e=TILE-6;
+      ctx.fillRect(bx,by,2,1);       ctx.fillRect(bx,by,1,2);
+      ctx.fillRect(bx+e-1,by,2,1);   ctx.fillRect(bx+e,by,1,2);
+      ctx.fillRect(bx,by+e,2,1);     ctx.fillRect(bx,by+e-1,1,2);
+      ctx.fillRect(bx+e-1,by+e,2,1); ctx.fillRect(bx+e,by+e-1,1,2);
     }
     if(G.ghost){
       const F=TOWERS[G.placing], st=F.lv[0];
@@ -1115,7 +1184,7 @@ function draw(){
     else if(e.type==='txt'){ ctx.globalAlpha=Math.min(1,(1-k)*2); drawText(Math.round(e.x-textW(e.txt)/2),Math.round(e.y),e.txt,e.color); ctx.globalAlpha=1; }
   }
 
-  if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(0,0,W,H); }
+  if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(-OX,-OY,ARTW,ARTH); }
   ctx.restore();
 }
 
@@ -1140,6 +1209,21 @@ requestAnimationFrame(frame);
 const stage=document.getElementById('stage');
 const MAX_SCALE=8;   // sanity ceiling for very large displays only; normally never reached
 
+function applyPad(vw,vh){
+  const want=vw/vh, px0=OX, py0=OY;
+  let px=0, py=0;
+  if(want > W/H) px=Math.min(MAX_PAD_X, Math.round((H*want-W)/2));
+  else           py=Math.min(MAX_PAD_Y, Math.round((W/want-H)/2));
+  if(px===px0 && py===py0 && cv.width===ARTW) return false;
+  OX=px; OY=py; ARTW=W+2*px; ARTH=H+2*py;
+  cv.width=ARTW; cv.height=ARTH;           // resizing clears context state
+  ctx.imageSmoothingEnabled=false;
+  bg.width=ARTW; bg.height=ARTH;
+  seed=1337+G.map*7919;
+  paintBG(curPal);
+  return true;
+}
+
 function layout(){
   const cs=getComputedStyle(document.body);
   const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
@@ -1148,9 +1232,10 @@ function layout(){
   const vw=(vv?vv.width:window.innerWidth)-padX;
   const vh=(vv?vv.height:window.innerHeight)-padY;
   const dpr=window.devicePixelRatio||1;
+  applyPad(Math.max(1,vw), Math.max(1,vh));
 
   // Fit, then cap.
-  let raw=Math.min(vw/W, vh/H, MAX_SCALE);
+  let raw=Math.min(vw/ARTW, vh/ARTH, MAX_SCALE);
 
   // Snap so one art pixel covers a whole number of DEVICE pixels — that is what
   // keeps the edges hard. Size beats crispness though, so only take the snap when
@@ -1160,7 +1245,7 @@ function layout(){
   const snapped=Math.floor(raw*dpr)/dpr;
   const s=(snapped>=0.5 && snapped>=raw*0.95) ? snapped : raw;
 
-  const cw=W*s, ch=H*s;
+  const cw=ARTW*s, ch=ARTH*s;
   cv.style.width=cw+'px'; cv.style.height=ch+'px';
   stage.style.width=cw+'px'; stage.style.height=ch+'px';
   stage.style.setProperty('--fs', Math.max(9,Math.min(18,Math.round(ch*0.046)))+'px');
@@ -1177,7 +1262,7 @@ layout();
    ====================================================================== */
 function toArt(ev){
   const r=cv.getBoundingClientRect();
-  return { x:(ev.clientX-r.left)/r.width*W, y:(ev.clientY-r.top)/r.height*H };
+  return { x:(ev.clientX-r.left)/r.width*ARTW-OX, y:(ev.clientY-r.top)/r.height*ARTH-OY };
 }
 function tileFrom(ev){ const p=toArt(ev); return {c:Math.floor(p.x/TILE), r:Math.floor(p.y/TILE)}; }
 function freePlot(c,r){ return r>=0&&r<ROWS&&c>=0&&c<COLS&&BUILD[r][c]&&!towerAt(c,r); }
@@ -1299,7 +1384,7 @@ const pop=document.getElementById('pop');
 function positionPop(t){
   pop.style.left='0px'; pop.style.top='0px';
   const sw=stage.clientWidth, sh=stage.clientHeight;
-  const px=(t.x/W)*sw, py=(t.y/H)*sh, half=(TILE/2/H)*sh;
+  const px=((t.x+OX)/ARTW)*sw, py=((t.y+OY)/ARTH)*sh, half=(TILE/2/ARTH)*sh;
   const pw=pop.offsetWidth, ph=pop.offsetHeight;
   let below=false, y=py-half-9-ph;
   if(y<4){ y=py+half+9; below=true; }
