@@ -177,7 +177,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V10</div>
+    <div id="ver">V11</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -713,7 +713,7 @@ const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 cv.width=W; cv.height=H; ctx.imageSmoothingEnabled=false;
 
 const G={
-  gold:150, lives:20, map:1, wave:0, phase:'idle', // idle | wave | rift | dead | won
+  gold:150, lives:20, map:1, pack:0, wave:0, phase:'idle', // idle | wave | rift | dead | won
   speed:1, paused:true, started:false,
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
@@ -723,7 +723,13 @@ const G={
 // Lives carry across maps. Towers do not — the grid is a different shape on the
 // other side. Gold resets so each map stays its own clean puzzle, plus a bounty
 // on the hearts you kept, which is what makes protecting them matter.
-const RIFT_BONUS_PER_HEART=4;
+// Two compounding levers, both tunable here.
+// Hearts are worth more the deeper you go, and you pack a slice of your kit
+// through the rift — so a strong earlier map actually pays for the next one.
+const HEART_BONUS=[0,0,6,8];      // by map number: map2 = 6/heart, map3 = 8/heart
+const PACK_REFUND=0.20;           // share of standing tower value carried over
+const MAP_BASE_GOLD=130;
+function heartRate(n){ return HEART_BONUS[n] || HEART_BONUS[HEART_BONUS.length-1]; }
 let curPal=MAPS[0].pal;
 function loadMap(n){
   G.map=n;
@@ -735,7 +741,8 @@ function loadMap(n){
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
   G.selected=null; G.placing=null; G.ghost=null;
   G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
-  G.gold = (n===1) ? 150 : 130 + RIFT_BONUS_PER_HEART*G.lives;
+  G.gold = (n===1) ? 150 : MAP_BASE_GOLD + heartRate(n)*G.lives + (G.pack||0);
+  G.pack=0;
 }
 loadMap(1);
 
@@ -1546,12 +1553,16 @@ function showOver(kind){
   const M=MAPS[G.map-1];
 
   if(kind==='rift'){
-    const nx=MAPS[G.map];
+    const nx=MAPS[G.map], nn=G.map+1;
+    const standing=G.towers.reduce((a,t)=>a+t.spent,0);
+    G.pack=Math.floor(standing*PACK_REFUND);
+    const rate=heartRate(nn);
+    const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack;
     over.innerHTML='<h1>PLOT HELD</h1>'+
       '<h2>'+M.name+' cleared &mdash; '+G.lives+' &#9829; carried</h2>'+
-      '<p>Towers stay behind, and the trail ahead runs a different shape. '+
-      'Every heart you kept is worth '+RIFT_BONUS_PER_HEART+' coins on the far side, '+
-      'so you arrive with '+(130+G.lives*RIFT_BONUS_PER_HEART)+'.</p>'+
+      '<p>You pack up the kit and step through: '+G.lives+' hearts at '+rate+
+      ' coins each, plus '+G.pack+' salvaged from '+G.towers.length+' tower'+(G.towers.length===1?'':'s')+
+      '. You arrive at '+nx.name+' with <b style="color:#ffd452">'+arrive+'</b>.</p>'+
       '<button class="big" id="bNext">ON TO '+nx.name.toUpperCase()+' &#9654;</button>';
     document.getElementById('bNext').addEventListener('click',()=>{
       loadMap(G.map+1);
@@ -1590,7 +1601,7 @@ function showOver(kind){
   SFX.up();
 }
 function reset(){
-  G.lives=20; G.endless=false;
+  G.lives=20; G.endless=false; G.pack=0;
   loadMap(1);
   G.paused=false;
   over.classList.add('hide'); syncUI();
