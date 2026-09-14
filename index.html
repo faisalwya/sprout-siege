@@ -196,7 +196,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V14</div>
+    <div id="ver">V15</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -220,12 +220,14 @@ const PAL={'.':null,
 };
 
 function mkSprite(rows){
+  // keep the source rows so a sprite can be re-derived with an outline later
   const w=rows[0].length, h=rows.length;
   const c=document.createElement('canvas'); c.width=w; c.height=h;
   const x=c.getContext('2d');
   for(let j=0;j<h;j++){ const row=rows[j];
     for(let i=0;i<w;i++){ const col=PAL[row[i]]; if(col){ x.fillStyle=col; x.fillRect(i,j,1,1); } }
   }
+  c._rows=rows;
   return c;
 }
 function flipped(src){
@@ -239,65 +241,65 @@ ART.gnome=mkSprite([
 "................","................",".......rr.......","......rrrr......",
 "......rRRr......",".....rrRRrr.....","....rrRRRRrr....","...rrrrrrrrrr...",
 ".....ssssss.....",".....skssks.....",".....wwwwww.....","....wwwwwwww....",
-"....bwwwwwwb....","....bbwwwwbb....","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"....bwwwwwwb....","....bbwwwwbb....","....nnnnnnnn....",".....NNNNNN....."]);
 ART.gnomeA=mkSprite([
 "................",".......b........","......bb........","......bBb.......",
 ".....bbBb.......",".....bBBbb......","....bbBBBb......","...bbbbbbbbb....",
 ".....ssssss.....",".....sksscs.....",".....wwwwww.....","....wwwwwwww....",
-"....cwwwwwwc....","....ccwwwwcc....","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"....cwwwwwwc....","....ccwwwwcc....","....nnnnnnnn....",".....NNNNNN....."]);
 ART.gnomeB=mkSprite([
 "................","................","................","......gggg......",
 ".....gggggg.....","....gGgggGgg....","...gggggggggg...",".....ssssss.....",
 ".....skssks.....",".....swwwws.....","....wwwwwwww....","...gwwwwwwwwg...",
-"...ggwwwwwwgg...","....wwwwwwww....","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"...ggwwwwwwgg...","....wwwwwwww....","....nnnnnnnn....",".....NNNNNN....."]);
 
 ART.sprink=mkSprite([
 "................","................","......cccc......",".....bCccCb.....",
 ".....cccccc.....","......cCCc......","......cCCc......","......cccc......",
 "......cCCc......","......cCCc......","......cCCc......",".....CccccC.....",
-"....ccCCCCcc....","...cccccccccc...","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"....ccCCCCcc....","...cccccccccc...","....nnnnnnnn....",".....NNNNNN....."]);
 ART.sprinkA=mkSprite([
 "................","....b......b....",".....bb..bb.....","....cccccccc....",
 "...cCcbbbbcCc...","....cccccccc....",".....cCCCCc.....","......cCCc......",
 "......cCCc......","......cCCc......",".....ccCCcc.....","....cCCCCCCc....",
-"....cccccccc....","...cccccccccc...","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"....cccccccc....","...cccccccccc...","....nnnnnnnn....",".....NNNNNN....."]);
 ART.sprinkB=mkSprite([
 "................",".....i....i.....","......iiii......",".....icccci.....",
 "...iiccccccii...","....cccccccc....",".....cCCCCc.....","......iCCi......",
 "......cCCc......","......cCCc......",".....ccCCcc.....","....cciiiicc....",
-"....cccccccc....","...cccccccccc...","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"....cccccccc....","...cccccccccc...","....nnnnnnnn....",".....NNNNNN....."]);
 
 ART.hive=mkSprite([
 "................","......yyyy......",".....yyyyyy.....","....yYyyyyYy....",
 "....yyyyyyyy....","...yyyyyyyyyy...","...yYyykkyyYy...","...yyyykkyyyy...",
 "...yyyyyyyyyy...","....yyyyyyyy....","....yYyyyyYy....",".....yyyyyy.....",
-"......yyyy......","................","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......yyyy......","................","....nnnnnnnn....",".....NNNNNN....."]);
 ART.hiveA=mkSprite([
 "................",".....CCCCCC.....","....CCCCCCCC....","...CCCkkkkCCC...",
 "...CCCCCCCCCC...","...CCkkkkkkCC...","...CCCCCCCCCC...","....CCkkkkCC....",
 "....CCCCCCCC....",".....CCCCCC.....","......CCCC......","......nnnn......",
-"......nnnn......","......nnnn......","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......nnnn......","......nnnn......","....nnnnnnnn....",".....NNNNNN....."]);
 ART.hiveB=mkSprite([
 "................",".....p....p.....","....ppp..ppp....","...pppppppppp...",
 "...pppyyyyppp...","...ppyYYYYypp...","...ppyYYYYypp...","...pppyyyyppp...",
 "...pppppppppp...","....ppp..ppp....",".....p.GG.p.....","......gGg.......",
-"......gGg.......","......gGg.......","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......gGg.......","......gGg.......","....nnnnnnnn....",".....NNNNNN....."]);
 
 ART.zap=mkSprite([
 "................",".......cc.......","......cccc......",".....cciicc.....",
 "....cciiiicc....","....ciiwwiic....","....ciwwwwic....","....ciiwwiic....",
 "....cciiiicc....",".....cciicc.....","......cccc......","......nnnn......",
-"......nnnn......","......nnnn......","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......nnnn......","......nnnn......","....nnnnnnnn....",".....NNNNNN....."]);
 ART.zapA=mkSprite([
 "................","..b....cc....b..","...b..cccc..b...",".....cciicc.....",
 "....ciiiiiic....","....ciwwwwic....","...ciiwwwwiic...","....ciwwwwic....",
 "....ciiiiiic....",".....cciicc.....","..b...cccc...b..","......nnnn......",
-"......nnnn......","......nnnn......","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......nnnn......","......nnnn......","....nnnnnnnn....",".....NNNNNN....."]);
 ART.zapB=mkSprite([
 "................",".......o........","......ooo.......",".......o........",
 "......CCCC......",".....CooooC.....","....CCooooCC....","....CoCooCoC....",
 "....CCooooCC....",".....CooooC.....","......CCCC......","......nnnn......",
-"......nnnn......","......nnnn......","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+"......nnnn......","......nnnn......","....nnnnnnnn....",".....NNNNNN....."]);
 
 ART.grub=mkSprite([
 "............","............","............","....gggg....",
@@ -320,6 +322,12 @@ ART.slug=mkSprite([
 ".....PPPPPPPP...","....PPPPPPPPPP..","...PPPwPPPPwPP..","..PPPPPPPPPPPP..",
 "..PPPPPPPPPPPP..",".PPPPiiiiPPPPPP.",".PPPPPPPPPPPPPP.",".PPPPPPPPPPPPPP.",
 "..PPPPPPPPPPPP..","...PPPPPPPPPP...","..iiiiiiiiiiii..","................"]);
+
+// Towers get a 1px dark contour: without it a flat sprite on flat grass reads
+// as a tile rather than as a thing standing in a garden. Enemies stay clean so
+// they keep reading as small and quick.
+['gnome','gnomeA','gnomeB','sprink','sprinkA','sprinkB','zap','zapA','zapB','hive','hiveA','hiveB']
+  .forEach(k=>{ ART[k]=mkOutlined(ART[k]._rows, PAL, '#241a10'); });
 
 const FLIP={}; ['gnome','gnomeA','gnomeB','grub','beetle','snail','moth','slug'].forEach(k=>FLIP[k]=flipped(ART[k]));
 function whiten(src){
@@ -1158,45 +1166,47 @@ function hitBtn(ax,ay){
 // rather than as pixels). One motif is authored for the top-left corner and
 // mirrored into the other three. Three frames of leaf rustle, since only the
 // leaves move — the branch stays put.
-const SEL_PAL={'.':null, g:'#3d8a4d', G:'#6cc16b', b:'#8a6242', l:'#a97a4f',
-               d:'#5c4433', o:'#ff9a3c', r:'#a03a12', w:'#ffeedd'};
-const SEL_BAD={'.':null, g:'#9e2f34', G:'#e0524f', b:'#7a2f24', l:'#a3503c',
-               d:'#5c1a1a', o:'#ff7b7b', r:'#7a1a1a', w:'#ffdede'};
+// Foliage has to be DARKER than the grass. The first pass used the grass colour
+// itself for leaf highlights, so the leaves vanished and only their outline showed.
+const SEL_PAL={'.':null, g:'#25562b', G:'#3d8043', H:'#6aa85c', b:'#8a6242',
+               l:'#a97a4f', d:'#5c4433', o:'#ff9a3c', r:'#a03a12', w:'#ffeedd'};
+const SEL_BAD={'.':null, g:'#5c1a1a', G:'#9e2f34', H:'#e0524f', b:'#7a2f24',
+               l:'#a3503c', d:'#5c1a1a', o:'#ff7b7b', r:'#7a1a1a', w:'#ffdede'};
 const SEL_OUTLINE='#241a10';
 const SEL_FRAMES=[
-["..GG.......",
- ".GGGg......",
- "..gGg..w...",
- "...gg.oo...",
- "......r.lll",
- ".....lbb...",
- ".....b.....",
- ".....d.....",
- "....b......",
- "....b......",
- "....d......"],
-["...GG......",
- "..GGGg.....",
- "...gGg.w...",
- "....ggoo...",
- "......r.lll",
- ".....lbb...",
- ".....b.....",
- ".....d.....",
- "....b......",
- "....b......",
- "....d......"],
-[".GGG.......",
- ".GGGg......",
- "..gGg..w...",
- "...g..oo...",
- "......r.lll",
- ".....lbb...",
- ".....b.....",
- ".....d.....",
- "....b......",
- "....b......",
- "....d......"]
+["...........",
+ "...........",
+ "...........",
+ "........G..",
+ ".....w.GHGH",
+ ".....o.g.bl",
+ "......dbb..",
+ "...GHgb....",
+ "......b....",
+ "...Ggb.....",
+ "...HGl....."],
+["...........",
+ "...........",
+ ".........GH",
+ "........G..",
+ ".....w.GGgG",
+ ".....o.gHbl",
+ "......dbb..",
+ "....Ggb....",
+ "...GH.b....",
+ "....gb.....",
+ "...GGl....."],
+["...........",
+ "...........",
+ "........G..",
+ "........HGH",
+ ".....w.G.gG",
+ ".....o.g.bl",
+ "......dbb..",
+ "....Ggb....",
+ "...G..b....",
+ "...Hgb.....",
+ "....Gl....."]
 ];
 // grow a 1px outline around the art, so it holds up on any background
 function mkOutlined(rows,pal,outline){
@@ -1264,8 +1274,8 @@ function shadow(x,y,w){
   ctx.fillRect(Math.round(x-w/2)+1,Math.round(y)+1,w-2,1);
 }
 function drawSprite(key,flip,x,y,w,h){
-  const img=flip===-1?FLIP[key]:ART[key];
-  ctx.drawImage(img||ART[key], Math.round(x-w/2), Math.round(y-h/2));
+  const img=(flip===-1?FLIP[key]:ART[key])||ART[key];
+  ctx.drawImage(img, Math.round(x-img.width/2), Math.round(y-img.height/2));
 }
 
 function draw(){
@@ -1320,8 +1330,8 @@ function draw(){
       const A=F.forks[keys[0]], B=F.forks[keys[1]];
       // tapping anywhere else already deselects, so no close button is needed
       G.btns=layoutBtns(t.x,t.y,[
-        {act:'forkA', side:'left',  w:18,h:18, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
-        {act:'forkB', side:'right', w:18,h:18, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
+        {act:'forkA', side:'left',  w:20,h:20, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
+        {act:'forkB', side:'right', w:20,h:20, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
         {act:'sell',  side:'up',    glyph:'coin', num:sell}
       ]);
     } else {
@@ -1587,8 +1597,9 @@ const dock=document.getElementById('dock');
 const bAction=document.getElementById('bAction');
 
 function iconCanvas(key,px){
-  const c=document.createElement('canvas'); c.width=16;c.height=16;
-  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(ART[key],0,0);
+  const src=ART[key];
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(src,0,0);
   return c;
 }
 FAMS.forEach(fam=>{
@@ -1666,8 +1677,9 @@ let confKey='';
 const _icons={};
 function spriteImg(key,cls){
   if(!_icons[key]){
-    const c=document.createElement('canvas'); c.width=16;c.height=16;
-    c.getContext('2d').drawImage(ART[key],0,0);
+    const src=ART[key];
+    const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+    c.getContext('2d').drawImage(src,0,0);
     _icons[key]=c.toDataURL();
   }
   return '<img class="pxi'+(cls?' '+cls:'')+'" src="'+_icons[key]+'" alt="">';
