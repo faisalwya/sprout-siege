@@ -51,13 +51,18 @@
   #dock{display:flex;gap:.3em}
   .card{
     pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:.05em;
-    background:rgba(24,28,24,.78);border:1px solid rgba(255,246,229,.2);
-    border-radius:.5em;padding:.25em .3em .2em;min-width:4.2em;
+    background:#3b2a1b;border:0!important;border-radius:0;padding:.28em .32em .22em;min-width:4.2em;
+    background-image:repeating-linear-gradient(0deg,rgba(255,238,221,.045) 0 1px,transparent 1px 3px);
+    box-shadow:0 0 0 1px #6b4a30, 0 0 0 2px #241a10, inset 0 1px 0 rgba(255,238,221,.14), 0 3px 0 #1a120b;
   }
   .card canvas{width:2.1em;height:2.1em;image-rendering:pixelated}
   .card .nm{font-size:.6em;letter-spacing:.04em;white-space:nowrap;color:#c2cfbe}
   .card .pr{font-size:.72em;color:#ffd452}
-  .card.sel{border-color:#ffd452;background:rgba(60,52,20,.9);box-shadow:0 0 0 2px rgba(255,212,82,.35)}
+  .card.sel{
+    background:#4a3617;
+    box-shadow:0 0 0 1px #ffd452, 0 0 0 2px #241a10, inset 0 1px 0 rgba(255,238,221,.2), 0 3px 0 #1a120b;
+  }
+  .card.sel .nm{color:#ffeedd}
   .card.poor{opacity:.42}
   .card:active{transform:translateY(1px)}
 
@@ -86,7 +91,23 @@
     box-shadow:0 5px 14px rgba(0,0,0,.5);
   }
   #pop{min-width:11.5em;max-width:min(22em,64%)}
-  #confirm{position:static;max-width:none;flex:0 1 auto;padding:.3em .5em;gap:.15em;max-width:26em}
+  #confirm{
+    position:static;flex:0 1 auto;max-width:27em;border:0!important;border-radius:0;
+    padding:.4em .6em;gap:.1em;background:#3b2a1b;
+    background-image:repeating-linear-gradient(0deg,rgba(255,238,221,.045) 0 1px,transparent 1px 3px);
+    box-shadow:
+      0 0 0 1px #6b4a30,
+      0 0 0 2px #241a10,
+      inset 0 1px 0 rgba(255,238,221,.14),
+      0 3px 0 #1a120b;
+  }
+  #confirm .pname{color:#ffeedd;text-shadow:0 1px 0 #241a10}
+  #confirm .pstat{color:#cbb495}
+  #confirm .forkhdr{color:#ffd452;text-shadow:0 1px 0 #241a10}
+  #confirm .prow{gap:.4em}
+  .pxi{width:1.9em;height:1.9em;image-rendering:pixelated;flex:none;
+       filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
+  .pxi.sm{width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.2em}
   #pop.hide,#confirm.hide{display:none}
   #pop .tail{
     position:absolute;width:0;height:0;pointer-events:none;
@@ -176,7 +197,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V12</div>
+    <div id="ver">V13</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1132,53 +1153,44 @@ function hitBtn(ax,ay){
   return null;
 }
 
-// The vine selector: a bracket at each corner so the silhouette still reads as
-// "this tile", grown out of vine rather than drawn as a tick. Arms peel inward
-// at the tip and finish in a tendril, and each has a dark contour on its
-// outboard edge so green stays legible against green.
-const VINE_ARM=[[0,0],[1,0],[2,0],[3,1]];
+// The selector: a short twig bracket at each corner, straight-armed like the
+// original ticks so it still reads as a frame, but made of wood with a couple of
+// leaves. Dark contour on the outboard edge keeps it legible on grass.
 function reticle(cx,cy,age,ok){
-  const grow=1-Math.pow(1-Math.min(1,age/0.24),3);
-  const t=G.ui, L=TILE/2-1;
-  const dark = ok?'#1d4227':'#55171b';
-  const mid  = ok?'#3d8a4d':'#9e2f34';
-  const lit  = ok?'#7fd07c':'#e0524f';
+  const grow=1-Math.pow(1-Math.min(1,age/0.22),3);
+  const t=G.ui, L=TILE/2-1, ARM=4;
+  const bark = ok?'#5c4433':'#4a1a1c';
+  const wood = ok?'#8a6242':'#9e2f34';
+  const lit  = ok?'#a97a4f':'#c94a48';
+  const leafA= ok?'#6cc16b':'#e0524f';
+  const leafB= ok?'#3d8a4d':'#9e2f34';
   [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],ci)=>{
     const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
-    const shown=VINE_ARM.length*grow;
-    ctx.fillStyle=dark;
-    for(let i=0;i<VINE_ARM.length;i++){
+    const shown=ARM*grow;
+    // contour first, one pixel outboard of each arm
+    ctx.fillStyle=bark;
+    for(let i=0;i<ARM;i++){
       if(i>shown) break;
-      const [al,pe]=VINE_ARM[i];
-      ctx.fillRect(vx-sx*al, vy-sy*(pe-1), 1,1);
-      ctx.fillRect(vx-sx*(pe-1), vy-sy*al, 1,1);
+      ctx.fillRect(vx-sx*i, vy+sy, 1,1);
+      ctx.fillRect(vx+sx,   vy-sy*i, 1,1);
     }
-    for(let i=0;i<VINE_ARM.length;i++){
+    ctx.fillRect(vx+sx, vy+sy, 1,1);
+    // the twig arms
+    for(let i=0;i<ARM;i++){
       if(i>shown) break;
-      const [al,pe]=VINE_ARM[i];
-      ctx.fillStyle = i>2?lit:mid;
-      ctx.fillRect(vx-sx*al, vy-sy*pe, 1,1);
-      ctx.fillRect(vx-sx*pe, vy-sy*al, 1,1);
+      ctx.fillStyle = i===0 ? lit : wood;
+      ctx.fillRect(vx-sx*i, vy, 1,1);
+      ctx.fillRect(vx,      vy-sy*i, 1,1);
     }
-    if(grow>0.72){                       // tendril curls off the tip and sways
-      const fl=Math.sin(t*2.3+ci*1.7)>0?1:0;
-      ctx.fillStyle=lit;
-      ctx.fillRect(vx-sx*4, vy-sy*(2+fl), 1,1);
-      ctx.fillRect(vx-sx*(2+fl), vy-sy*4, 1,1);
-    }
-    if(grow>0.55){                       // a leaf part way along each arm
-      ctx.fillStyle=mid;
-      ctx.fillRect(vx-sx*1, vy-sy*2, 1,1);
-      ctx.fillRect(vx-sx*2, vy-sy*1, 1,1);
-    }
-    if(grow>0.82){                       // bloom opens at the corner
-      const p=(Math.sin(t*2.6+ci*1.3)+1)*.5;
-      ctx.fillStyle = ok ? (p>.5?'#ffd452':'#f58fbf') : '#ff7b7b';
-      ctx.fillRect(vx,vy,1,1);
-      if(p>.45){
-        ctx.fillStyle=ok?'#ffeedd':'#ffffff';
-        ctx.fillRect(vx,vy,1,1);
-      }
+    // one leaf on each arm, fluttering on its own beat
+    if(grow>0.6){
+      const fl=Math.sin(t*2.2+ci*1.6)>0?0:1;
+      ctx.fillStyle=leafA;
+      ctx.fillRect(vx-sx*2, vy-sy*(1+fl), 1,1);
+      ctx.fillRect(vx-sx*(1+fl), vy-sy*2, 1,1);
+      ctx.fillStyle=leafB;
+      ctx.fillRect(vx-sx*3, vy-sy*1, 1,1);
+      ctx.fillRect(vx-sx*1, vy-sy*3, 1,1);
     }
   });
 }
@@ -1251,22 +1263,20 @@ function draw(){
   if(G.selected && G.towers.includes(G.selected)){
     const t=G.selected, F=TOWERS[t.fam], st=statsOf(t);
     ring(t.x,t.y,st.rng,'#ffd452',.7);
-    reticle(t.x,t.y,1,true);
     const sell=Math.floor(t.spent*.6);
     const atFork=!t.branch && t.level===3;
     if(atFork){
       const keys=Object.keys(F.forks);
       const A=F.forks[keys[0]], B=F.forks[keys[1]];
+      // tapping anywhere else already deselects, so no close button is needed
       G.btns=layoutBtns(t.x,t.y,[
         {act:'forkA', side:'left',  w:18,h:18, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
         {act:'forkB', side:'right', w:18,h:18, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
-        {act:'sell',  side:'up',    glyph:'coin', num:sell},
-        {act:'close', side:'down',  glyph:'cross'}
+        {act:'sell',  side:'up',    glyph:'coin', num:sell}
       ]);
     } else {
       const cost=nextCost(t);
-      const specs=[{act:'close', glyph:'cross', side:'left'},
-                   {act:'sell',  glyph:'coin',  side:'up', num:sell}];
+      const specs=[{act:'sell', glyph:'coin', side:'left', num:sell}];
       if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
       G.btns=layoutBtns(t.x,t.y,specs);
     }
@@ -1443,7 +1453,7 @@ function freePlot(c,r){ return r>=0&&r<ROWS&&c>=0&&c<COLS&&BUILD[r][c]&&!towerAt
 let dragging=false;
 function doAction(b){
   if(b.act==='ok'){ placeGhost(); return; }
-  if(b.act==='no'){ G.ghost=null; G.hover=null; G.hoverAge=0; syncUI(); return; }  // keeps the tower in hand
+  if(b.act==='no'){ cancelPlacing(); return; }   // cross leaves build mode entirely
   const t=G.selected;
   if(!t||!G.towers.includes(t)) return;
   if(b.act==='close'){ G.selected=null; syncUI(); return; }
@@ -1515,8 +1525,7 @@ function placeGhost(){
   G.gold-=cost;
   G.towers.push({fam,c,r,x:(c+.5)*TILE,y:(r+.5)*TILE,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost});
   addFx({type:'ring',x:(c+.5)*TILE,y:(r+.5)*TILE,r:2,rmax:14,ttl:.35,color:'#ffd452'});
-  SFX.place(); G.ghost=null; G.hover=null; G.hoverAge=0;
-  if(G.gold<cost) G.placing=null;   // stay armed while it is still affordable
+  SFX.place(); G.placing=null; G.ghost=null; G.hover=null; G.hoverAge=0; G.btnHover=null;
   syncUI();
 }
 function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=null; G.btnHover=null; syncUI(); }
@@ -1606,11 +1615,20 @@ function statBar(t){
 
 const conf=document.getElementById('confirm');
 let confKey='';
+const _icons={};
+function spriteImg(key,cls){
+  if(!_icons[key]){
+    const c=document.createElement('canvas'); c.width=16;c.height=16;
+    c.getContext('2d').drawImage(ART[key],0,0);
+    _icons[key]=c.toDataURL();
+  }
+  return '<img class="pxi'+(cls?' '+cls:'')+'" src="'+_icons[key]+'" alt="">';
+}
 // slim read-out only: every action now lives on the plot itself
 function infoBar(){
   if(G.placing){
     const F=TOWERS[G.placing], st=F.lv[0];
-    return '<div class="prow"><div><div class="pname">'+F.name.toUpperCase()+
+    return '<div class="prow">'+spriteImg(F.art)+'<div><div class="pname">'+F.name.toUpperCase()+
       '</div><div class="pstat">DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+
       '  DPS '+Math.round(st.dmg*st.rate)+'  &#9673;'+F.cost+'</div></div></div>';
   }
@@ -1620,10 +1638,12 @@ function infoBar(){
   if(!t.branch && t.level===3){
     const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
     return '<div class="forkhdr">PICK A PATH &mdash; PERMANENT</div>'+
-      '<div class="pstat">&#9664; '+A.name.toUpperCase()+' &#9673;'+A.lv[0].cost+' &mdash; '+A.desc+'</div>'+
-      '<div class="pstat">&#9654; '+B.name.toUpperCase()+' &#9673;'+B.lv[0].cost+' &mdash; '+B.desc+'</div>';
+      '<div class="pstat">&#9664; '+spriteImg(A.art,'sm')+A.name.toUpperCase()+
+        ' &#9673;'+A.lv[0].cost+' &mdash; '+A.desc+'</div>'+
+      '<div class="pstat">&#9654; '+spriteImg(B.art,'sm')+B.name.toUpperCase()+
+        ' &#9673;'+B.lv[0].cost+' &mdash; '+B.desc+'</div>';
   }
-  return '<div class="prow"><div><div class="pname">'+nameOf(t).toUpperCase()+
+  return '<div class="prow">'+spriteImg(artOf(t))+'<div><div class="pname">'+nameOf(t).toUpperCase()+
     ' <span class="plvl">LV '+t.level+'</span></div><div class="pstat">'+statBar(t)+'</div></div></div>';
 }
 
