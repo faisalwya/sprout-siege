@@ -86,7 +86,7 @@
     box-shadow:0 5px 14px rgba(0,0,0,.5);
   }
   #pop{min-width:11.5em;max-width:min(22em,64%)}
-  #confirm{position:static;max-width:none;flex:0 1 auto}
+  #confirm{position:static;max-width:none;flex:0 1 auto;padding:.3em .5em;gap:.15em;max-width:26em}
   #pop.hide,#confirm.hide{display:none}
   #pop .tail{
     position:absolute;width:0;height:0;pointer-events:none;
@@ -168,16 +168,15 @@
       <div id="dock"></div>
       <div id="confirm" class="hide"></div>
     </div>
-    <div id="pop" class="hide"></div>
     <div id="toast"></div>
   </div>
   <div id="over">
     <h1>SPROUT SIEGE</h1>
     <p>Three plots, five waves each. Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
-    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Green GO sends the next wave</span></p>
+    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V11</div>
+    <div id="ver">V12</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -717,7 +716,8 @@ const G={
   speed:1, paused:true, started:false,
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
-  placing:null, ghost:null, hover:null, selected:null
+  placing:null, ghost:null, hover:null, hoverAge:0, selected:null,
+  btns:[], btnHover:null, ui:0
 };
 
 // Lives carry across maps. Towers do not — the grid is a different shape on the
@@ -1033,6 +1033,156 @@ function ring(cx,cy,rad,color,alpha){
   }
   ctx.globalAlpha=1;
 }
+/* ---------- in-world pixel UI: plates, glyphs, and the vine selector ---------- */
+const GL={
+  check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
+  cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
+  up:["..x..",".xxx.","xxxxx",".xxx.","..x.."],
+  coin:[".xxx.","x...x","x.x.x","x...x",".xxx."]
+};
+function glyph(rows,x,y,col){
+  ctx.fillStyle=col;
+  for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+    if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
+}
+function plate(x,y,w,h,fill,edge){
+  ctx.fillStyle='rgba(0,0,0,.28)'; ctx.fillRect(x+1,y+h,w-2,2);
+  ctx.fillStyle=edge; ctx.fillRect(x+1,y,w-2,h); ctx.fillRect(x,y+1,w,h-2);
+  ctx.fillStyle=fill; ctx.fillRect(x+2,y+1,w-4,h-2); ctx.fillRect(x+1,y+2,w-2,h-4);
+}
+const BTN_SKIN={
+  ok   :['#4f9d4a','#82d17c'], no   :['#3a3f3a','#6a706a'],
+  up   :['#3d5f8f','#7aa6dd'], sell :['#8a5a3d','#c99a76'],
+  close:['#3a3f3a','#6a706a'], fork :['#2f4a3a','#6fb98a']
+};
+// Place each action around the plot: try its preferred side, then the others,
+// rejecting anything off-frame, overlapping the plot, or overlapping a button
+// already placed. Falls back to sliding along the free axis.
+function rectsHit(a,b){
+  return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+}
+function layoutBtns(cx,cy,specs){
+  const gap=2, minX=-OX+1, maxX=W+OX-1, minY=-OY+1, maxY=H+OY-1;
+  const tile={x:cx-TILE/2,y:cy-TILE/2,w:TILE,h:TILE};
+  const placed=[], out=[];
+  const posFor=(side,w,h)=>{
+    if(side==='right') return {x:cx+TILE/2+gap, y:cy-h/2};
+    if(side==='left')  return {x:cx-TILE/2-gap-w, y:cy-h/2};
+    if(side==='up')    return {x:cx-w/2, y:cy-TILE/2-gap-h};
+    return {x:cx-w/2, y:cy+TILE/2+gap};
+  };
+  const okAt=(x,y,w,h)=>{
+    if(x<minX||x+w>maxX||y<minY||y+h>maxY) return false;
+    const r={x,y,w,h};
+    if(rectsHit(r,tile)) return false;
+    return !placed.some(q=>rectsHit(r,q));
+  };
+  const ORDER=['right','left','up','down'];
+  specs.forEach(sp=>{
+    const w=sp.w||11, h=sp.h||11;
+    const sides=[sp.side].concat(ORDER.filter(x=>x!==sp.side));
+    let found=null;
+    for(const side of sides){
+      const p=posFor(side,w,h);
+      const x=Math.round(p.x), y=Math.round(p.y);
+      if(okAt(x,y,w,h)){ found={x,y}; break; }
+      // slide along the axis this side leaves free
+      const vertical = (side==='right'||side==='left');
+      for(let k=1;k<=3&&!found;k++){
+        for(const dir of [-1,1]){
+          const nx=vertical? x : x+dir*k*(w+gap);
+          const ny=vertical? y+dir*k*(h+gap) : y;
+          if(okAt(nx,ny,w,h)){ found={x:nx,y:ny}; break; }
+        }
+      }
+      if(found) break;
+    }
+    if(!found){   // last resort: clamp the preferred side into frame
+      const p=posFor(sp.side,w,h);
+      found={x:Math.max(minX,Math.min(maxX-w,Math.round(p.x))),
+             y:Math.max(minY,Math.min(maxY-h,Math.round(p.y)))};
+    }
+    placed.push({x:found.x,y:found.y,w,h});
+    out.push(Object.assign({},sp,{x:found.x,y:found.y,w,h}));
+  });
+  return out;
+}
+function drawBtn(b){
+  const press=(G.btnHover===b.act)?1:0;
+  const y=b.y+press;
+  if(b.sprite){
+    plate(b.x,y,b.w,b.h,BTN_SKIN.fork[0],BTN_SKIN.fork[1]);
+    ctx.globalAlpha=b.dis?.45:1;
+    ctx.drawImage(ART[b.sprite], b.x+1, y+1);
+    ctx.globalAlpha=1;
+  } else {
+    const sk=BTN_SKIN[b.act]||BTN_SKIN.no;
+    plate(b.x,y,b.w,b.h,sk[0],sk[1]);
+    glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':'#ffffff');
+  }
+  if(b.num!==undefined){
+    const t=String(b.num);
+    ctx.fillStyle='rgba(18,22,18,.65)';
+    ctx.fillRect(Math.round(b.x+b.w/2-textW(t)/2)-1, y+b.h+3, textW(t)+2, 7);
+    drawText(Math.round(b.x+b.w/2-textW(t)/2), y+b.h+4, t, b.dis?'#8d92a8':'#ffd452');
+  }
+}
+function hitBtn(ax,ay){
+  for(const b of G.btns) if(ax>=b.x-3&&ax<=b.x+b.w+3&&ay>=b.y-3&&ay<=b.y+b.h+3) return b;
+  return null;
+}
+
+// The vine selector: a bracket at each corner so the silhouette still reads as
+// "this tile", grown out of vine rather than drawn as a tick. Arms peel inward
+// at the tip and finish in a tendril, and each has a dark contour on its
+// outboard edge so green stays legible against green.
+const VINE_ARM=[[0,0],[1,0],[2,0],[3,1]];
+function reticle(cx,cy,age,ok){
+  const grow=1-Math.pow(1-Math.min(1,age/0.24),3);
+  const t=G.ui, L=TILE/2-1;
+  const dark = ok?'#1d4227':'#55171b';
+  const mid  = ok?'#3d8a4d':'#9e2f34';
+  const lit  = ok?'#7fd07c':'#e0524f';
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],ci)=>{
+    const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
+    const shown=VINE_ARM.length*grow;
+    ctx.fillStyle=dark;
+    for(let i=0;i<VINE_ARM.length;i++){
+      if(i>shown) break;
+      const [al,pe]=VINE_ARM[i];
+      ctx.fillRect(vx-sx*al, vy-sy*(pe-1), 1,1);
+      ctx.fillRect(vx-sx*(pe-1), vy-sy*al, 1,1);
+    }
+    for(let i=0;i<VINE_ARM.length;i++){
+      if(i>shown) break;
+      const [al,pe]=VINE_ARM[i];
+      ctx.fillStyle = i>2?lit:mid;
+      ctx.fillRect(vx-sx*al, vy-sy*pe, 1,1);
+      ctx.fillRect(vx-sx*pe, vy-sy*al, 1,1);
+    }
+    if(grow>0.72){                       // tendril curls off the tip and sways
+      const fl=Math.sin(t*2.3+ci*1.7)>0?1:0;
+      ctx.fillStyle=lit;
+      ctx.fillRect(vx-sx*4, vy-sy*(2+fl), 1,1);
+      ctx.fillRect(vx-sx*(2+fl), vy-sy*4, 1,1);
+    }
+    if(grow>0.55){                       // a leaf part way along each arm
+      ctx.fillStyle=mid;
+      ctx.fillRect(vx-sx*1, vy-sy*2, 1,1);
+      ctx.fillRect(vx-sx*2, vy-sy*1, 1,1);
+    }
+    if(grow>0.82){                       // bloom opens at the corner
+      const p=(Math.sin(t*2.6+ci*1.3)+1)*.5;
+      ctx.fillStyle = ok ? (p>.5?'#ffd452':'#f58fbf') : '#ff7b7b';
+      ctx.fillRect(vx,vy,1,1);
+      if(p>.45){
+        ctx.fillStyle=ok?'#ffeedd':'#ffffff';
+        ctx.fillRect(vx,vy,1,1);
+      }
+    }
+  });
+}
+
 function pxLine(x0,y0,x1,y1,col){
   x0=Math.round(x0); y0=Math.round(y0); x1=Math.round(x1); y1=Math.round(y1);
   const dx=Math.abs(x1-x0), sx=x0<x1?1:-1, dy=-Math.abs(y1-y0), sy=y0<y1?1:-1;
@@ -1071,42 +1221,56 @@ function draw(){
     ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)-f,1,1);
   }
 
-  // placement preview
+  G.btns=[];
+
+  // placement: vine selector on the cell under the pointer, then the armed plot
   if(G.placing){
-    const pulse=(Math.sin(G.time*5)+1)*.5;
-    // corner ticks on the cell under the pointer only — a board full of markers
-    // is noise, and the one cell you are aiming at is the only one that matters
+    const F=TOWERS[G.placing];
     if(G.hover && !(G.ghost&&G.ghost.c===G.hover.c&&G.ghost.r===G.hover.r)){
-      const bx=G.hover.c*TILE+3, by=G.hover.r*TILE+3, e=TILE-6;
-      ctx.fillStyle='rgba(255,255,255,'+(0.55+pulse*0.30)+')';
-      ctx.fillRect(bx,by,2,1);       ctx.fillRect(bx,by,1,2);
-      ctx.fillRect(bx+e-1,by,2,1);   ctx.fillRect(bx+e,by,1,2);
-      ctx.fillRect(bx,by+e,2,1);     ctx.fillRect(bx,by+e-1,1,2);
-      ctx.fillRect(bx+e-1,by+e,2,1); ctx.fillRect(bx+e,by+e-1,1,2);
-      if(!G.ghost){
-        const st=TOWERS[G.placing].lv[0];
-        ring((G.hover.c+.5)*TILE,(G.hover.r+.5)*TILE,st.rng,'#ffffff',.30);
-      }
+      const hx=(G.hover.c+.5)*TILE, hy=(G.hover.r+.5)*TILE;
+      reticle(hx,hy,G.hoverAge,true);
+      ring(hx,hy,F.lv[0].rng,'#ffffff',.28);
     }
     if(G.ghost){
-      const F=TOWERS[G.placing], st=F.lv[0];
-      const gx=(G.ghost.c+.5)*TILE, gy=(G.ghost.r+.5)*TILE;
-      ring(gx,gy,st.rng,'#ffd452',.9);
-      ctx.fillStyle='rgba(255,212,82,.18)';
-      ctx.fillRect(G.ghost.c*TILE+1,G.ghost.r*TILE+1,TILE-2,TILE-2);
-      ctx.fillStyle='#ffd452';
-      const bx=G.ghost.c*TILE, by=G.ghost.r*TILE;
-      [[0,0,1],[TILE-4,0,1],[0,TILE-1,1],[TILE-4,TILE-1,1]].forEach(k=>ctx.fillRect(bx+k[0],by+k[1],4,1));
-      [[0,0],[TILE-1,0],[0,TILE-4],[TILE-1,TILE-4]].forEach(k=>ctx.fillRect(bx+k[0],by+k[1],1,4));
-      ctx.globalAlpha=.55+pulse*.2;
-      drawSprite(F.art,1,gx,gy-1,16,16);
+      const cx=(G.ghost.c+.5)*TILE, cy=(G.ghost.r+.5)*TILE;
+      ring(cx,cy,F.lv[0].rng,'#ffd452',.85);
+      reticle(cx,cy,G.ghost.age||0,true);
+      const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
+      ctx.globalAlpha=.55+drop*.3;
+      drawSprite(F.art,1,cx,cy-1+Math.round((1-drop)*-4),16,16);
       ctx.globalAlpha=1;
+      G.btns=layoutBtns(cx,cy,[
+        {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
+        {act:'no', glyph:'cross', side:'left'}
+      ]);
+      G.btns.forEach(drawBtn);
     }
   }
-  // selected range
-  if(G.selected){
-    const st=statsOf(G.selected);
-    ring(G.selected.x,G.selected.y,st.rng,'#ffd452',.7);
+
+  // selected tower: range ring plus its actions, arranged around the plot
+  if(G.selected && G.towers.includes(G.selected)){
+    const t=G.selected, F=TOWERS[t.fam], st=statsOf(t);
+    ring(t.x,t.y,st.rng,'#ffd452',.7);
+    reticle(t.x,t.y,1,true);
+    const sell=Math.floor(t.spent*.6);
+    const atFork=!t.branch && t.level===3;
+    if(atFork){
+      const keys=Object.keys(F.forks);
+      const A=F.forks[keys[0]], B=F.forks[keys[1]];
+      G.btns=layoutBtns(t.x,t.y,[
+        {act:'forkA', side:'left',  w:18,h:18, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
+        {act:'forkB', side:'right', w:18,h:18, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
+        {act:'sell',  side:'up',    glyph:'coin', num:sell},
+        {act:'close', side:'down',  glyph:'cross'}
+      ]);
+    } else {
+      const cost=nextCost(t);
+      const specs=[{act:'close', glyph:'cross', side:'left'},
+                   {act:'sell',  glyph:'coin',  side:'up', num:sell}];
+      if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
+      G.btns=layoutBtns(t.x,t.y,specs);
+    }
+    G.btns.forEach(drawBtn);
   }
 
   // towers
@@ -1202,6 +1366,8 @@ function draw(){
 let last=performance.now();
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000); last=now;
+  G.ui+=raw; G.hoverAge+=raw;
+  if(G.ghost) G.ghost.age=(G.ghost.age||0)+raw;
   if(!G.paused && G.phase!=='dead' && G.phase!=='won'){
     let t=raw*G.speed;
     while(t>0){ const d=Math.min(1/60,t); step(d); t-=d; }
@@ -1258,7 +1424,6 @@ function layout(){
   stage.style.width=cw+'px'; stage.style.height=ch+'px';
   stage.style.setProperty('--fs', Math.max(9,Math.min(18,Math.round(ch*0.046)))+'px');
   document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
-  if(typeof G!=='undefined' && G.selected && G.towers.indexOf(G.selected)>=0) positionPop(G.selected);
 }
 window.addEventListener('resize',layout);
 window.addEventListener('orientationchange',()=>setTimeout(layout,250));
@@ -1276,15 +1441,46 @@ function tileFrom(ev){ const p=toArt(ev); return {c:Math.floor(p.x/TILE), r:Math
 function freePlot(c,r){ return r>=0&&r<ROWS&&c>=0&&c<COLS&&BUILD[r][c]&&!towerAt(c,r); }
 
 let dragging=false;
+function doAction(b){
+  if(b.act==='ok'){ placeGhost(); return; }
+  if(b.act==='no'){ G.ghost=null; G.hover=null; G.hoverAge=0; syncUI(); return; }  // keeps the tower in hand
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return;
+  if(b.act==='close'){ G.selected=null; syncUI(); return; }
+  if(b.act==='sell'){
+    const val=Math.floor(t.spent*.6);
+    G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
+    addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
+    SFX.coin(); syncUI(); return;
+  }
+  if(b.act==='up'){
+    const cost=nextCost(t);
+    if(cost===null) return;
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=cost; t.spent+=cost; t.level++; SFX.up(); syncUI(); return;
+  }
+  if(b.act==='forkA'||b.act==='forkB'){
+    const F=TOWERS[t.fam], B=F.forks[b.branch], c0=B.lv[0].cost;
+    if(G.gold<c0){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=c0; t.spent+=c0; t.branch=b.branch; t.level=4;
+    SFX.up(); G.shake=2;
+    addFx({type:'ring',x:t.x,y:t.y,r:2,rmax:22,ttl:.5,color:'#ffd452'});
+    syncUI(); return;
+  }
+}
 cv.addEventListener('pointerdown',ev=>{
   ev.preventDefault();
   if(!G.started) return;
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  if(b){ if(b.dis){ toast('Not enough coins'); SFX.bad(); } else doAction(b); return; }
+
   const {c,r}=tileFrom(ev);
-  if(r<0||r>=ROWS||c<0||c>=COLS) return;
+  if(r<0||r>=ROWS||c<0||c>=COLS){ G.selected=null; syncUI(); return; }
 
   if(G.placing){
     if(freePlot(c,r)){
-      if(!G.ghost||G.ghost.c!==c||G.ghost.r!==r){ G.ghost={c,r}; SFX.tick(); syncUI(); }
+      if(!G.ghost||G.ghost.c!==c||G.ghost.r!==r){ G.ghost={c,r,age:0}; SFX.tick(); syncUI(); }
       dragging=true;
     } else toast(towerAt(c,r)?'Plot taken':'No room there');
     return;
@@ -1295,13 +1491,19 @@ cv.addEventListener('pointerdown',ev=>{
 },{passive:false});
 
 cv.addEventListener('pointermove',ev=>{
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  G.btnHover=b?b.act:null;
+  if(b){ G.hover=null; return; }
   if(!G.placing){ G.hover=null; return; }
   const {c,r}=tileFrom(ev);
   const ok=freePlot(c,r);
+  const same=G.hover&&G.hover.c===c&&G.hover.r===r;
+  if(!same) G.hoverAge=0;
   G.hover = ok ? {c,r} : null;
-  if(dragging && ok && (!G.ghost||G.ghost.c!==c||G.ghost.r!==r)){ G.ghost={c,r}; SFX.tick(); syncUI(); }
+  if(dragging && ok && (!G.ghost||G.ghost.c!==c||G.ghost.r!==r)){ G.ghost={c,r,age:0}; SFX.tick(); syncUI(); }
 });
-cv.addEventListener('pointerleave',()=>{ G.hover=null; });
+cv.addEventListener('pointerleave',()=>{ G.hover=null; G.btnHover=null; });
 window.addEventListener('pointerup',()=>{ dragging=false; });
 window.addEventListener('pointercancel',()=>{ dragging=false; });
 
@@ -1313,9 +1515,11 @@ function placeGhost(){
   G.gold-=cost;
   G.towers.push({fam,c,r,x:(c+.5)*TILE,y:(r+.5)*TILE,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost});
   addFx({type:'ring',x:(c+.5)*TILE,y:(r+.5)*TILE,r:2,rmax:14,ttl:.35,color:'#ffd452'});
-  SFX.place(); G.placing=null; G.ghost=null; G.hover=null; syncUI();
+  SFX.place(); G.ghost=null; G.hover=null; G.hoverAge=0;
+  if(G.gold<cost) G.placing=null;   // stay armed while it is still affordable
+  syncUI();
 }
-function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=null; syncUI(); }
+function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=null; G.btnHover=null; syncUI(); }
 
 /* ======================================================================
    14. UI
@@ -1390,127 +1594,37 @@ function statLine(t){
   return s;
 }
 
-const pop=document.getElementById('pop');
-
-function positionPop(t){
-  pop.style.left='0px'; pop.style.top='0px';
-  const sw=stage.clientWidth, sh=stage.clientHeight;
-  const px=((t.x+OX)/ARTW)*sw, py=((t.y+OY)/ARTH)*sh, half=(TILE/2/ARTH)*sh;
-  const pw=pop.offsetWidth, ph=pop.offsetHeight;
-  let below=false, y=py-half-9-ph;
-  if(y<4){ y=py+half+9; below=true; }
-  y=Math.max(4,Math.min(sh-ph-4,y));
-  const x=Math.max(4,Math.min(sw-pw-4,px-pw/2));
-  pop.style.left=Math.round(x)+'px';
-  pop.style.top=Math.round(y)+'px';
-  const tail=document.createElement('div'); tail.className='tail';
-  tail.style.left=Math.round(Math.max(9,Math.min(pw-9,px-x))-6)+'px';
-  if(below){ tail.style.top='-.72em'; tail.style.borderBottom='.4em solid rgba(255,246,229,.4)'; }
-  else { tail.style.bottom='-.72em'; tail.style.borderTop='.4em solid rgba(18,22,18,.96)'; }
-  pop.appendChild(tail);
-}
-
-let popKey='', confKey='';
-function popSignature(t){
-  const F=TOWERS[t.fam], cost=nextCost(t);
-  let k=G.towers.indexOf(t)+'|'+t.fam+'|'+t.level+'|'+t.branch+'|'+t.spent+'|'+(cost!==null&&G.gold>=cost);
-  if(!t.branch&&t.level===3) Object.keys(F.forks).forEach(key=>{ k+='|'+(G.gold>=F.forks[key].lv[0].cost); });
-  return k;
-}
-function buildPop(t){
-  const F=TOWERS[t.fam];
-  const cost=nextCost(t), atFork=!t.branch && t.level===3;
-  pop.innerHTML='';
-
-  const head=document.createElement('div'); head.className='prow';
-  const ic=iconCanvas(artOf(t)); ic.style.width='2.1em'; ic.style.height='2.1em'; ic.style.imageRendering='pixelated';
-  head.appendChild(ic);
-  const info=document.createElement('div');
-  info.innerHTML='<div class="pname">'+nameOf(t).toUpperCase()+' <span class="plvl">LV '+t.level+'</span></div>'+
-                 '<div class="pstat">'+statLine(t)+'</div>';
-  head.appendChild(info);
-  pop.appendChild(head);
-
-  if(atFork){
-    const h=document.createElement('div'); h.className='forkhdr'; h.textContent='PICK A PATH \u2014 PERMANENT';
-    pop.appendChild(h);
-    Object.keys(F.forks).forEach(key=>{
-      const B=F.forks[key], c0=B.lv[0].cost;
-      const fb=document.createElement('button'); fb.className='fork';
-      fb.appendChild(iconCanvas(B.art));
-      const tx=document.createElement('div');
-      tx.innerHTML='<div class="ft">'+B.name.toUpperCase()+' <span class="fc">&#9673;'+c0+'</span></div>'+
-                   '<div class="fd">'+B.desc+'</div>';
-      fb.appendChild(tx);
-      if(G.gold<c0) fb.classList.add('dis');
-      fb.addEventListener('click',()=>{
-        if(G.gold<c0){ toast('Not enough coins'); SFX.bad(); return; }
-        G.gold-=c0; t.spent+=c0; t.branch=key; t.level=4;
-        SFX.up(); G.shake=2;
-        addFx({type:'ring',x:t.x,y:t.y,r:2,rmax:22,ttl:.5,color:'#ffd452'});
-        syncUI();
-      });
-      pop.appendChild(fb);
-    });
-  }
-
-  const row=document.createElement('div'); row.className='prow2';
-  if(!atFork){
-    const up=document.createElement('button'); up.className='btn';
-    if(cost===null){ up.textContent='MAX LEVEL'; up.classList.add('dis'); }
-    else {
-      up.innerHTML='UPGRADE &#9650; <span style="color:#ffd452">&#9673;'+cost+'</span>';
-      if(G.gold<cost) up.classList.add('dis');
-      up.addEventListener('click',()=>{
-        if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
-        G.gold-=cost; t.spent+=cost; t.level++; SFX.up(); syncUI();
-      });
-    }
-    row.appendChild(up);
-  }
-  const val=Math.floor(t.spent*.6);
-  const sell=document.createElement('button'); sell.className='btn sell';
-  sell.innerHTML='SELL <span style="color:#ffd452">&#9673;'+val+'</span>';
-  sell.addEventListener('click',()=>{
-    G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
-    addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
-    SFX.coin(); syncUI();
-  });
-  row.appendChild(sell);
-  const x=document.createElement('button'); x.className='btn x'; x.innerHTML='&#10005;';
-  x.addEventListener('click',()=>{ G.selected=null; syncUI(); });
-  row.appendChild(x);
-  pop.appendChild(row);
-
-  positionPop(t);
+function statBar(t){
+  const st=statsOf(t), dps=st.aura?st.dmg:Math.round(st.dmg*st.rate);
+  let x='DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+'  '+(st.aura?'AURA':'DPS '+dps);
+  if(st.chain) x+='  CHAIN '+(st.chain+1);
+  if(st.stun) x+='  STUN';
+  if(st.splash) x+='  SPLASH';
+  if(st.slow) x+='  SLOW '+Math.round(st.slow*100)+'%';
+  return x;
 }
 
 const conf=document.getElementById('confirm');
-function buildConfirm(){
-  const F=TOWERS[G.placing], st=F.lv[0];
-  conf.innerHTML='';
-  const row=document.createElement('div'); row.className='prow';
-  const ic=iconCanvas(F.art); ic.style.width='2.4em'; ic.style.height='2.4em'; ic.style.imageRendering='pixelated';
-  row.appendChild(ic);
-  const info=document.createElement('div');
-  let extra='';
-  if(st.chain) extra+='  CHAIN '+(st.chain+1);
-  if(st.splash) extra+='  SPLASH';
-  if(st.slow) extra+='  SLOW '+Math.round(st.slow*100)+'%';
-  info.innerHTML='<div class="pname">'+F.name.toUpperCase()+'</div>'+
-                 '<div class="pstat">DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+'  DPS '+Math.round(st.dmg*st.rate)+extra+'</div>';
-  row.appendChild(info);
-  const btns=document.createElement('div'); btns.className='pbtns';
-  const ok=document.createElement('button'); ok.className='btn';
-  ok.innerHTML='BUILD HERE <span style="color:#ffd452">&#9673;'+F.cost+'</span>';
-  if(G.gold<F.cost) ok.classList.add('dis');
-  ok.addEventListener('click',placeGhost);
-  btns.appendChild(ok);
-  const x=document.createElement('button'); x.className='btn x'; x.innerHTML='&#10005;';
-  x.addEventListener('click',cancelPlacing);
-  btns.appendChild(x);
-  row.appendChild(btns);
-  conf.appendChild(row);
+let confKey='';
+// slim read-out only: every action now lives on the plot itself
+function infoBar(){
+  if(G.placing){
+    const F=TOWERS[G.placing], st=F.lv[0];
+    return '<div class="prow"><div><div class="pname">'+F.name.toUpperCase()+
+      '</div><div class="pstat">DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+
+      '  DPS '+Math.round(st.dmg*st.rate)+'  &#9673;'+F.cost+'</div></div></div>';
+  }
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return '';
+  const F=TOWERS[t.fam];
+  if(!t.branch && t.level===3){
+    const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
+    return '<div class="forkhdr">PICK A PATH &mdash; PERMANENT</div>'+
+      '<div class="pstat">&#9664; '+A.name.toUpperCase()+' &#9673;'+A.lv[0].cost+' &mdash; '+A.desc+'</div>'+
+      '<div class="pstat">&#9654; '+B.name.toUpperCase()+' &#9673;'+B.lv[0].cost+' &mdash; '+B.desc+'</div>';
+  }
+  return '<div class="prow"><div><div class="pname">'+nameOf(t).toUpperCase()+
+    ' <span class="plvl">LV '+t.level+'</span></div><div class="pstat">'+statBar(t)+'</div></div></div>';
 }
 
 function syncUI(){
@@ -1527,18 +1641,9 @@ function syncUI(){
     b.classList.toggle('sel',G.placing===b.dataset.fam);
   });
 
-  const showPop=!!G.selected && G.towers.includes(G.selected);
-  const showConf=!!G.placing && !!G.ghost;
-  pop.classList.toggle('hide',!showPop);
-  conf.classList.toggle('hide',!showConf);
-  if(showPop){
-    const k=popSignature(G.selected);
-    if(k!==popKey){ popKey=k; buildPop(G.selected); }
-  } else popKey='';
-  if(showConf){
-    const k=G.placing+'|'+G.ghost.c+'|'+G.ghost.r+'|'+(G.gold>=TOWERS[G.placing].cost);
-    if(k!==confKey){ confKey=k; buildConfirm(); }
-  } else confKey='';
+  const html=infoBar();
+  conf.classList.toggle('hide',!html);
+  if(html!==confKey){ confKey=html; conf.innerHTML=html; }
 
   updateAction();
 }
