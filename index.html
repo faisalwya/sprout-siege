@@ -50,21 +50,20 @@
   #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;padding:.45em .5em;align-items:flex-end}
   #dock{display:flex;gap:.3em}
   .card{
-    pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:.05em;
-    background:#3b2a1b;border:0!important;border-radius:0;padding:.28em .32em .22em;min-width:4.2em;
-    background-image:repeating-linear-gradient(0deg,rgba(255,238,221,.045) 0 1px,transparent 1px 3px);
-    box-shadow:0 0 0 1px #6b4a30, 0 0 0 2px #241a10, inset 0 1px 0 rgba(255,238,221,.14), 0 3px 0 #1a120b;
+    pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:0;
+    background:none;border:0!important;border-radius:0;box-shadow:none;
+    padding:.15em .3em 0;min-width:0;transition:transform .08s
   }
-  .card canvas{width:2.1em;height:2.1em;image-rendering:pixelated}
-  .card .nm{font-size:.6em;letter-spacing:.04em;white-space:nowrap;color:#c2cfbe}
-  .card .pr{font-size:.72em;color:#ffd452}
-  .card.sel{
-    background:#4a3617;
-    box-shadow:0 0 0 1px #ffd452, 0 0 0 2px #241a10, inset 0 1px 0 rgba(255,238,221,.2), 0 3px 0 #1a120b;
-  }
-  .card.sel .nm{color:#ffeedd}
+  .card canvas{width:2.7em;height:2.7em;image-rendering:pixelated;
+    filter:drop-shadow(0 1px 0 rgba(0,0,0,.55)) drop-shadow(1px 0 0 rgba(0,0,0,.35))}
+  .card .nm{display:none}
+  .card .pr{font-size:.74em;color:#ffd452;font-weight:700;margin-top:-.15em;
+    text-shadow:0 1px 0 #1a120b, 0 0 3px rgba(0,0,0,.75)}
+  .card.sel{transform:translateY(-3px)}
+  .card.sel canvas{filter:drop-shadow(0 0 2px #ffd452) drop-shadow(0 2px 0 rgba(0,0,0,.5))}
+  .card.sel .pr{color:#ffeedd}
   .card.poor{opacity:.42}
-  .card:active{transform:translateY(1px)}
+  .card:active{transform:translateY(-1px)}
 
   #bAction{
     min-width:3.1em;padding:.3em .55em;font-weight:700;letter-spacing:.06em;
@@ -197,7 +196,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V13</div>
+    <div id="ver">V14</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1153,45 +1152,96 @@ function hitBtn(ax,ay){
   return null;
 }
 
-// The selector: a short twig bracket at each corner, straight-armed like the
-// original ticks so it still reads as a frame, but made of wood with a couple of
-// leaves. Dark contour on the outboard edge keeps it legible on grass.
+// ---------------- the selector ----------------
+// A hand-drawn corner motif: a stepped branch with a leaf cluster and a berry,
+// wrapped in a hard dark outline (the outline is what makes it read as drawn
+// rather than as pixels). One motif is authored for the top-left corner and
+// mirrored into the other three. Three frames of leaf rustle, since only the
+// leaves move — the branch stays put.
+const SEL_PAL={'.':null, g:'#3d8a4d', G:'#6cc16b', b:'#8a6242', l:'#a97a4f',
+               d:'#5c4433', o:'#ff9a3c', r:'#a03a12', w:'#ffeedd'};
+const SEL_BAD={'.':null, g:'#9e2f34', G:'#e0524f', b:'#7a2f24', l:'#a3503c',
+               d:'#5c1a1a', o:'#ff7b7b', r:'#7a1a1a', w:'#ffdede'};
+const SEL_OUTLINE='#241a10';
+const SEL_FRAMES=[
+["..GG.......",
+ ".GGGg......",
+ "..gGg..w...",
+ "...gg.oo...",
+ "......r.lll",
+ ".....lbb...",
+ ".....b.....",
+ ".....d.....",
+ "....b......",
+ "....b......",
+ "....d......"],
+["...GG......",
+ "..GGGg.....",
+ "...gGg.w...",
+ "....ggoo...",
+ "......r.lll",
+ ".....lbb...",
+ ".....b.....",
+ ".....d.....",
+ "....b......",
+ "....b......",
+ "....d......"],
+[".GGG.......",
+ ".GGGg......",
+ "..gGg..w...",
+ "...g..oo...",
+ "......r.lll",
+ ".....lbb...",
+ ".....b.....",
+ ".....d.....",
+ "....b......",
+ "....b......",
+ "....d......"]
+];
+// grow a 1px outline around the art, so it holds up on any background
+function mkOutlined(rows,pal,outline){
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w+2; c.height=h+2;
+  const x=c.getContext('2d');
+  const on=(i,j)=> i>=0&&j>=0&&i<w&&j<h && !!pal[rows[j][i]];
+  x.fillStyle=outline;
+  for(let j=-1;j<=h;j++) for(let i=-1;i<=w;i++){
+    if(on(i,j)) continue;
+    if(on(i-1,j)||on(i+1,j)||on(i,j-1)||on(i,j+1)) x.fillRect(i+1,j+1,1,1);
+  }
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){
+    const col=pal[rows[j][i]];
+    if(col){ x.fillStyle=col; x.fillRect(i+1,j+1,1,1); }
+  }
+  return c;
+}
+function flipVert(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d'); x.translate(0,src.height); x.scale(1,-1); x.drawImage(src,0,0);
+  return c;
+}
+// SEL[state][frame][corner] — corner order: TL, TR, BL, BR
+const SEL={ok:[],bad:[]};
+SEL_FRAMES.forEach(rows=>{
+  [['ok',SEL_PAL],['bad',SEL_BAD]].forEach(([k,pal])=>{
+    const tl=mkOutlined(rows,pal,SEL_OUTLINE);
+    const tr=flipped(tl);
+    SEL[k].push([tl,tr,flipVert(tl),flipVert(tr)]);
+  });
+});
+const SEL_MID=Math.floor(SEL.ok[0][0].width/2);   // the branch vertex sits centre
+
 function reticle(cx,cy,age,ok){
-  const grow=1-Math.pow(1-Math.min(1,age/0.22),3);
-  const t=G.ui, L=TILE/2-1, ARM=4;
-  const bark = ok?'#5c4433':'#4a1a1c';
-  const wood = ok?'#8a6242':'#9e2f34';
-  const lit  = ok?'#a97a4f':'#c94a48';
-  const leafA= ok?'#6cc16b':'#e0524f';
-  const leafB= ok?'#3d8a4d':'#9e2f34';
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],ci)=>{
-    const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
-    const shown=ARM*grow;
-    // contour first, one pixel outboard of each arm
-    ctx.fillStyle=bark;
-    for(let i=0;i<ARM;i++){
-      if(i>shown) break;
-      ctx.fillRect(vx-sx*i, vy+sy, 1,1);
-      ctx.fillRect(vx+sx,   vy-sy*i, 1,1);
-    }
-    ctx.fillRect(vx+sx, vy+sy, 1,1);
-    // the twig arms
-    for(let i=0;i<ARM;i++){
-      if(i>shown) break;
-      ctx.fillStyle = i===0 ? lit : wood;
-      ctx.fillRect(vx-sx*i, vy, 1,1);
-      ctx.fillRect(vx,      vy-sy*i, 1,1);
-    }
-    // one leaf on each arm, fluttering on its own beat
-    if(grow>0.6){
-      const fl=Math.sin(t*2.2+ci*1.6)>0?0:1;
-      ctx.fillStyle=leafA;
-      ctx.fillRect(vx-sx*2, vy-sy*(1+fl), 1,1);
-      ctx.fillRect(vx-sx*(1+fl), vy-sy*2, 1,1);
-      ctx.fillStyle=leafB;
-      ctx.fillRect(vx-sx*3, vy-sy*1, 1,1);
-      ctx.fillRect(vx-sx*1, vy-sy*3, 1,1);
-    }
+  const set = ok?SEL.ok:SEL.bad;
+  const tx=cx-TILE/2, ty=cy-TILE/2, r=TILE-1;
+  const spots=[[tx,ty,0],[tx+r,ty,1],[tx,ty+r,2],[tx+r,ty+r,3]];
+  spots.forEach((sp,i)=>{
+    const a=age-i*0.05;                 // corners unfurl one after another
+    if(a<=0) return;
+    const fr=Math.floor(G.ui*3.1+i*1.7)%SEL_FRAMES.length;
+    ctx.globalAlpha=Math.min(1,a/0.12);
+    ctx.drawImage(set[fr][sp[2]], Math.round(sp[0]-SEL_MID), Math.round(sp[1]-SEL_MID));
+    ctx.globalAlpha=1;
   });
 }
 
@@ -1546,10 +1596,8 @@ FAMS.forEach(fam=>{
   const b=document.createElement('button');
   b.className='card'; b.dataset.fam=fam;
   b.appendChild(iconCanvas(F.art));
-  const d=document.createElement('div');
-  d.innerHTML='<div class="nm">'+F.name.toUpperCase()+'</div>';
-  const pr=document.createElement('div'); pr.className='pr'; pr.innerHTML='&#9673; '+F.cost;
-  b.appendChild(d); b.appendChild(pr);
+  const pr=document.createElement('div'); pr.className='pr'; pr.innerHTML='&#9673;'+F.cost;
+  b.appendChild(pr);
   b.addEventListener('click',()=>{
     if(G.gold<F.cost && G.placing!==fam){ toast('Not enough coins'); SFX.bad(); return; }
     if(G.placing===fam){ cancelPlacing(); return; }
