@@ -181,7 +181,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V17</div>
+    <div id="ver">V18</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1134,10 +1134,12 @@ function drawBtn(b){
     glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':'#ffffff');
   }
   if(b.num!==undefined){
-    const t=String(b.num);
+    const t=String(b.num), tw=textW(t);
+    const bx=Math.round(b.x+b.w/2-tw/2);
+    const by=(b.side==='up') ? y-8 : y+b.h+3;
     ctx.fillStyle='rgba(18,22,18,.65)';
-    ctx.fillRect(Math.round(b.x+b.w/2-textW(t)/2)-1, y+b.h+3, textW(t)+2, 7);
-    drawText(Math.round(b.x+b.w/2-textW(t)/2), y+b.h+4, t, b.dis?'#8d92a8':'#ffd452');
+    ctx.fillRect(bx-1, by, tw+2, 7);
+    drawText(bx, by+1, t, b.dis?'#8d92a8':'#ffd452');
   }
 }
 // The dock used to be <button> elements. Native button rendering, focus rings
@@ -1184,53 +1186,45 @@ function hitBtn(ax,ay){
 }
 
 // ---------------- the selector ----------------
-// A hand-drawn corner motif: a stepped branch with a leaf cluster and a berry,
-// wrapped in a hard dark outline (the outline is what makes it read as drawn
-// rather than as pixels). One motif is authored for the top-left corner and
-// mirrored into the other three. Three frames of leaf rustle, since only the
-// leaves move — the branch stays put.
-// Foliage has to be DARKER than the grass. The first pass used the grass colour
-// itself for leaf highlights, so the leaves vanished and only their outline showed.
-const SEL_PAL={'.':null, g:'#25562b', G:'#3d8043', H:'#6aa85c', b:'#8a6242',
-               l:'#a97a4f', d:'#5c4433', o:'#ff9a3c', r:'#a03a12', w:'#ffeedd'};
-const SEL_BAD={'.':null, g:'#5c1a1a', G:'#9e2f34', H:'#e0524f', b:'#7a2f24',
-               l:'#a3503c', d:'#5c1a1a', o:'#ff7b7b', r:'#7a1a1a', w:'#ffdede'};
-const SEL_OUTLINE='#241a10';
-const SEL_FRAMES=[
-["...........",
- "...........",
- "...........",
- "........G..",
- ".....w.GHGH",
- ".....o.g.bl",
- "......dbb..",
- "...GHgb....",
- "......b....",
- "...Ggb.....",
- "...HGl....."],
-["...........",
- "...........",
- ".........GH",
- "........G..",
- ".....w.GGgG",
- ".....o.gHbl",
- "......dbb..",
- "....Ggb....",
- "...GH.b....",
- "....gb.....",
- "...GGl....."],
-["...........",
- "...........",
- "........G..",
- "........HGH",
- ".....w.G.gG",
- ".....o.g.bl",
- "......dbb..",
- "....Ggb....",
- "...G..b....",
- "...Hgb.....",
- "....Gl....."]
-];
+// Four corner brackets. The arms run straight along the tile edges so the shape
+// reads as a frame; short arms with inward leaves read as a ring instead. The
+// dark contour sits only on the outboard edge, which keeps each bracket 2px
+// thick rather than 3 and stops it looking chunky at this size.
+const SEL_LEAF=[[2,1],[3,2],[1,2]];
+function reticle(cx,cy,age,ok){
+  const grow=1-Math.pow(1-Math.min(1,age/0.20),3);
+  const L=TILE/2-1, ARM=5;
+  const dark = ok?'#241a10':'#3d0f12';
+  const wood = ok?'#8a6242':'#9e2f34';
+  const lit  = ok?'#a97a4f':'#c94a48';
+  const leafA= ok?'#3d8043':'#e0524f';
+  const leafB= ok?'#25562b':'#7a2226';
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],ci)=>{
+    const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
+    const n=Math.max(1,Math.round(ARM*grow));
+    ctx.fillStyle=dark;
+    for(let i=0;i<n;i++){
+      ctx.fillRect(vx-sx*i, vy+sy, 1,1);
+      ctx.fillRect(vx+sx,   vy-sy*i, 1,1);
+    }
+    ctx.fillRect(vx+sx, vy+sy, 1,1);
+    for(let i=0;i<n;i++){
+      ctx.fillStyle = i===0 ? lit : wood;
+      ctx.fillRect(vx-sx*i, vy, 1,1);
+      ctx.fillRect(vx,      vy-sy*i, 1,1);
+    }
+    if(grow>0.6){                       // a couple of small leaves, rustling
+      const f=Math.floor(G.ui*2.6+ci)%3;
+      const A=SEL_LEAF[f], B=SEL_LEAF[(f+1)%3];
+      ctx.fillStyle=leafA;
+      ctx.fillRect(vx-sx*A[0], vy-sy*A[1], 1,1);
+      ctx.fillRect(vx-sx*A[1], vy-sy*A[0], 1,1);
+      ctx.fillStyle=leafB;
+      ctx.fillRect(vx-sx*B[0], vy-sy*(B[1]+1), 1,1);
+    }
+  });
+}
+
 // grow a 1px outline around the art, so it holds up on any background
 function mkOutlined(rows,pal,outline){
   const w=rows[0].length, h=rows.length;
@@ -1253,31 +1247,6 @@ function flipVert(src){
   const x=c.getContext('2d'); x.translate(0,src.height); x.scale(1,-1); x.drawImage(src,0,0);
   return c;
 }
-// SEL[state][frame][corner] — corner order: TL, TR, BL, BR
-const SEL={ok:[],bad:[]};
-SEL_FRAMES.forEach(rows=>{
-  [['ok',SEL_PAL],['bad',SEL_BAD]].forEach(([k,pal])=>{
-    const tl=mkOutlined(rows,pal,SEL_OUTLINE);
-    const tr=flipped(tl);
-    SEL[k].push([tl,tr,flipVert(tl),flipVert(tr)]);
-  });
-});
-const SEL_MID=Math.floor(SEL.ok[0][0].width/2);   // the branch vertex sits centre
-
-function reticle(cx,cy,age,ok){
-  const set = ok?SEL.ok:SEL.bad;
-  const tx=cx-TILE/2, ty=cy-TILE/2, r=TILE-1;
-  const spots=[[tx,ty,0],[tx+r,ty,1],[tx,ty+r,2],[tx+r,ty+r,3]];
-  spots.forEach((sp,i)=>{
-    const a=age-i*0.05;                 // corners unfurl one after another
-    if(a<=0) return;
-    const fr=Math.floor(G.ui*3.1+i*1.7)%SEL_FRAMES.length;
-    ctx.globalAlpha=Math.min(1,a/0.12);
-    ctx.drawImage(set[fr][sp[2]], Math.round(sp[0]-SEL_MID), Math.round(sp[1]-SEL_MID));
-    ctx.globalAlpha=1;
-  });
-}
-
 function pxLine(x0,y0,x1,y1,col){
   x0=Math.round(x0); y0=Math.round(y0); x1=Math.round(x1); y1=Math.round(y1);
   const dx=Math.abs(x1-x0), sx=x0<x1?1:-1, dy=-Math.abs(y1-y0), sy=y0<y1?1:-1;
@@ -1302,6 +1271,7 @@ function drawSprite(key,flip,x,y,w,h){
 }
 
 function draw(){
+  let pending=[];      // in-world buttons, drawn last so nothing covers them
   ctx.save();
   if(G.shake>0) ctx.translate(Math.round((Math.random()-.5)*G.shake), Math.round((Math.random()-.5)*G.shake));
   ctx.drawImage(bg,0,0);
@@ -1338,7 +1308,7 @@ function draw(){
         {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
         {act:'no', glyph:'cross', side:'left'}
       ]);
-      bs.forEach(drawBtn); G.btns=G.btns.concat(bs);
+      G.btns=G.btns.concat(bs); pending=pending.concat(bs);
     }
   }
 
@@ -1363,7 +1333,7 @@ function draw(){
       if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
       var bs=layoutBtns(t.x,t.y,specs);
     }
-    bs.forEach(drawBtn); G.btns=G.btns.concat(bs);
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
   }
 
   // towers
@@ -1448,6 +1418,8 @@ function draw(){
     }
     else if(e.type==='txt'){ ctx.globalAlpha=Math.min(1,(1-k)*2); drawText(Math.round(e.x-textW(e.txt)/2),Math.round(e.y),e.txt,e.color); ctx.globalAlpha=1; }
   }
+
+  pending.forEach(drawBtn);
 
   // dock last so it paints over the field, but appended last so in-world
   // buttons keep hit priority where they overlap
