@@ -93,6 +93,7 @@
   .pxi{width:1.9em;height:1.9em;image-rendering:pixelated;flex:none;
        filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
   .pxi.sm{width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.2em}
+  .pxi.hud{width:1.05em;height:1.35em;vertical-align:-.3em;margin-right:.3em}
   #pop.hide,#confirm.hide{display:none}
   #pop .tail{
     position:absolute;width:0;height:0;pointer-events:none;
@@ -162,7 +163,7 @@
   <canvas id="cv"></canvas>
   <div id="ui">
     <div id="top">
-      <div class="chip"><span class="heart">&#9829;</span> <b id="tLives">20</b></div>
+      <div class="chip"><span id="tLivesIcon"></span><b id="tLives">20</b></div>
       <div class="chip"><span class="coin">&#9673;</span> <b id="tGold">130</b></div>
       <div class="chip" id="tWave">WAVE 1</div>
       <div class="grow"></div>
@@ -181,7 +182,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V19</div>
+    <div id="ver">V20</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -285,6 +286,9 @@ ART.zapB=mkSprite([
 "......CCCC......",".....CooooC.....","....CCooooCC....","....CoCooCoC....",
 "....CCooooCC....",".....CooooC.....","......CCCC......","......nnnn......",
 "......nnnn......",".......nn.......",".......nn.......","................"]);
+
+ART.carrot=mkSprite([
+"..g.g..","..ggg..","...G...","..ooo..","..ooo..","...oo..","...o..."]);
 
 ART.grub=mkSprite([
 "............","............","............","....gggg....",
@@ -696,26 +700,85 @@ function paintBG(pal){
     }
   }
 
-  // ---- veggie patch + fence: the goal reads the same on every map
-  q.fillStyle='#8a6242'; q.fillRect(17*TILE+6,4*TILE+2,3*TILE,4*TILE-4);
-  q.fillStyle='#734f34';
-  for(let i=0;i<40;i++){ q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),1,1); }
-  for(let i=0;i<12;i++){ q.fillStyle='#9b7049'; q.fillRect(17*TILE+6+Math.floor(rnd()*(3*TILE)), 4*TILE+2+Math.floor(rnd()*(4*TILE-4)),2,1); }
-  const carrots=[[18.2,4.6],[19.1,5.0],[18.4,7.2],[19.3,7.5],[18.0,5.6],[19.4,6.4]];
-  carrots.forEach(cr=>{
-    const px=Math.round(cr[0]*TILE), py=Math.round(cr[1]*TILE);
-    q.fillStyle='#3d8a4d'; q.fillRect(px-1,py-4,1,3); q.fillRect(px+1,py-4,1,3); q.fillRect(px,py-5,1,4);
-    q.fillStyle='#ff9a3c'; q.fillRect(px-1,py,3,2); q.fillRect(px,py+2,1,2);
-    q.fillStyle='#c97a2a'; q.fillRect(px+1,py,1,2);
-  });
-  const gateY=posAt(PATH_LEN).y;
-  for(let py=4*TILE; py<8*TILE; py+=6){
-    if(py>gateY-10 && py<gateY+10) continue;
-    q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+12,py,2,6);
-    q.fillStyle='#c9ab80'; q.fillRect(19*TILE+12,py+5,2,1);
+  // ---- The carrot bed. Soil, stones, sprouts and fence are static so they stay
+  // baked here; the carrots themselves are live state and draw every frame.
+  const bx0=17*TILE+6, by0=4*TILE+2, bw=3*TILE, bh=4*TILE-4;
+  q.fillStyle='#6b4630'; q.fillRect(bx0,by0,bw,bh);
+  for(let i=0;i<bw;i+=3){                       // chewed edge, not a clean rectangle
+    if(rnd()<.55) q.fillRect(bx0+i,by0-1,3,1);
+    if(rnd()<.55) q.fillRect(bx0+i,by0+bh,3,1);
   }
-  q.fillStyle='#e2c9a0'; q.fillRect(19*TILE+11,4*TILE+4,4,2); q.fillRect(19*TILE+11,7*TILE+2,4,2);
+  for(let i=0;i<(bw*bh)/7;i++){                 // three soil tones, dithered
+    const px=bx0+Math.floor(rnd()*bw), py=by0+Math.floor(rnd()*bh), k=rnd();
+    q.fillStyle = k<.45?'#7d5238':(k<.85?'#5a3a27':'#8a6242');
+    q.fillRect(px,py,1,1);
+  }
+  [[6,15],[33,22],[4,44],[30,52]].forEach(st=>{
+    q.fillStyle='#8e9285'; q.fillRect(bx0+st[0],by0+st[1],3,2);
+    q.fillStyle='#b3b8a8'; q.fillRect(bx0+st[0],by0+st[1],2,1);
+  });
+  [[19,20],[20,38],[3,26],[36,33],[17,54]].forEach(sp=>{
+    q.fillStyle='#4f9d4a'; q.fillRect(bx0+sp[0],by0+sp[1],1,1);
+    q.fillStyle='#2f6b36'; q.fillRect(bx0+sp[0]-1,by0+sp[1]-1,1,1);
+    q.fillStyle='#7fd07c'; q.fillRect(bx0+sp[0]+1,by0+sp[1]-1,1,1);
+  });
+  const fx0=19*TILE+12, gateY=posAt(PATH_LEN).y;
+  for(let py=by0-4; py<by0+bh+4; py++){
+    if(py>gateY-9 && py<gateY+9) continue;      // leave the gate open
+    q.fillStyle='#e2c9a0'; q.fillRect(fx0,py,2,1);
+    q.fillStyle='#a88d63'; q.fillRect(fx0+2,py,1,1);
+  }
+  for(let by=by0+2; by<by0+bh; by+=14){
+    if(by>gateY-9 && by<gateY+9) continue;
+    q.fillStyle='#c9ab80'; q.fillRect(fx0-1,by,5,3);
+    q.fillStyle='#e2c9a0'; q.fillRect(fx0-1,by,5,1);
+  }
+  [by0+8, by0+50].forEach(vy=>{
+    if(vy>gateY-9 && vy<gateY+9) return;
+    q.fillStyle='#2f6b36'; q.fillRect(fx0-1,vy,1,1);
+    q.fillStyle='#4f9d4a'; q.fillRect(fx0-2,vy+1,1,1);
+    q.fillStyle='#7fd07c'; q.fillRect(fx0-3,vy+1,1,1); q.fillRect(fx0-2,vy-1,1,1);
+  });
   q.restore();
+}
+
+/* ======================================================================
+   4b. THE CARROTS — one per life, eaten from the gate inward
+   ====================================================================== */
+const MAX_CARROTS=20;
+const CARROT_SLOTS=[];
+(function(){                     // 4 x 5 grid with a fixed jitter
+  let sd=7777;
+  const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
+  for(let row=0;row<5;row++) for(let col=0;col<4;col++)
+    CARROT_SLOTS.push({x:281+col*10+Math.round(r()*2-1), y:74+row*11+Math.round(r()*2-1)});
+})();
+function sortCarrots(){          // nearest the gate is eaten first, so the damage
+  const g=posAt(PATH_LEN);       // visibly advances inward from where bugs break in
+  CARROT_SLOTS.sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y));
+}
+function drawCarrot(x,y,s){
+  ctx.fillStyle='#3f2a1c'; ctx.fillRect(x-1,y+3,4,1);      // the hole it sits in
+  if(s<=0) return;
+  if(s<0.55){                                              // half eaten: a stub
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y+1,2,1);
+    ctx.fillStyle='#e07a22'; ctx.fillRect(x,y+2,1,1);
+    return;
+  }
+  ctx.fillStyle='#ff9a3c'; ctx.fillRect(x,y+1,2,2);
+  ctx.fillStyle='#e07a22'; ctx.fillRect(x+1,y+1,1,2); ctx.fillRect(x,y+3,1,1);
+  ctx.fillStyle='#ffc27a'; ctx.fillRect(x,y+1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-1,y,4,1);
+  ctx.fillStyle='#2f6b36'; ctx.fillRect(x,y-1,2,1);
+  ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
+}
+function drawCarrots(){
+  const eaten=Math.max(0,MAX_CARROTS-G.lives);
+  for(let i=eaten;i<MAX_CARROTS;i++){
+    const sl=CARROT_SLOTS[i];
+    drawCarrot(sl.x, sl.y+Math.round(Math.sin(G.ui*1.1+i)*0.4), 1);
+  }
 }
 
 /* ======================================================================
@@ -750,6 +813,7 @@ function loadMap(n){
   curPal=M.pal;
   seed=1337+n*7919;
   buildGeometry(M.wp);
+  sortCarrots();
   paintBG(M.pal);
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
   G.selected=null; G.placing=null; G.ghost=null;
@@ -931,8 +995,19 @@ function step(dt){
     const p=posAt(f.d); f.x=p.x; f.y=p.y; f.face=p.dx<0?-1:1;
     if(f.d>=PATH_LEN){
       f.dead=true; f.leaked=true;
-      G.lives-=(f.E.lives||1); G.shake=5; G.flash=1; SFX.hurt();
-      addFx({type:'txt',x:W-40,y:H/2-10,txt:'-'+(f.E.lives||1),color:'#ff7b7b',ttl:1,vy:-14});
+      const loss=(f.E.lives||1);
+      const from=Math.max(0,MAX_CARROTS-G.lives);
+      G.lives=Math.max(0,G.lives-loss);
+      const to=Math.max(0,MAX_CARROTS-G.lives);
+      for(let ci=from; ci<to && ci<MAX_CARROTS; ci++){      // show each one go
+        const sl=CARROT_SLOTS[ci];
+        addFx({type:'eaten',x:sl.x,y:sl.y,ttl:.45});
+        for(let k=0;k<5;k++) addFx({type:'bit',x:sl.x+1,y:sl.y,
+          vx:(Math.random()-.5)*34, vy:-16-Math.random()*16, ttl:.5,
+          color:k<3?'#ff9a3c':'#4f9d4a'});
+      }
+      G.shake=5; G.flash=1; SFX.hurt();
+      addFx({type:'txt',x:W-40,y:H/2-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
       if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
       syncUI();
     }
@@ -1311,6 +1386,8 @@ function draw(){
     ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)-f,1,1);
   }
 
+  drawCarrots();
+
   G.btns=[];
 
   // placement: vine selector on the cell under the pointer, then the armed plot
@@ -1434,6 +1511,7 @@ function draw(){
     const k=e.life/e.ttl;
     if(e.type==='bit'){ ctx.globalAlpha=1-k; ctx.fillStyle=e.color; ctx.fillRect(Math.round(e.x),Math.round(e.y),1,1); ctx.globalAlpha=1; }
     else if(e.type==='ring'){ ring(e.x,e.y,e.r+(e.rmax-e.r)*k,e.color,1-k); }
+    else if(e.type==='eaten'){ drawCarrot(e.x,e.y,1-e.life/e.ttl); }
     else if(e.type==='bolt'){
       ctx.globalAlpha=Math.min(1,(1-k)*2.2);
       for(let i=1;i<e.pts.length;i++) pxLine(e.pts[i-1].x,e.pts[i-1].y+1,e.pts[i].x,e.pts[i].y+1,'#3b8fd4');
@@ -1743,8 +1821,8 @@ function showOver(kind){
     const rate=heartRate(nn);
     const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack;
     over.innerHTML='<h1>PLOT HELD</h1>'+
-      '<h2>'+M.name+' cleared &mdash; '+G.lives+' &#9829; carried</h2>'+
-      '<p>You pack up the kit and step through: '+G.lives+' hearts at '+rate+
+      '<h2>'+M.name+' cleared &mdash; '+G.lives+' carrots carried</h2>'+
+      '<p>You pack up the kit and step through: '+G.lives+' carrots at '+rate+
       ' coins each, plus '+G.pack+' salvaged from '+G.towers.length+' tower'+(G.towers.length===1?'':'s')+
       '. You arrive at '+nx.name+' with <b style="color:#ffd452">'+arrive+'</b>.</p>'+
       '<button class="big" id="bNext">ON TO '+nx.name.toUpperCase()+' &#9654;</button>';
@@ -1774,7 +1852,7 @@ function showOver(kind){
              : hp>=6  ? 'More stem than carrot now, but it held.'
              :          'Down to the last row. That was close.';
   over.innerHTML='<h1>GARDEN HELD</h1>'+
-    '<h2>All '+MAPS.length+' plots held, '+hp+' &#9829; left</h2>'+
+    '<h2>All '+MAPS.length+' plots held, '+hp+' carrots left</h2>'+
     '<p>'+line+' Keep going and the swarm stops holding back.</p>'+
     '<button class="big" id="bEndless">ENDLESS MODE</button>'+
     '<button class="big" id="bAgain" style="background:#3d5f8f;border-color:#7aa6dd!important;box-shadow:0 4px 0 #23395a">START OVER</button>';
@@ -1799,6 +1877,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 
+document.getElementById('tLivesIcon').innerHTML=spriteImg('carrot','hud');
 syncUI();
 })();
 </script>
