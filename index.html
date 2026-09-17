@@ -29,43 +29,16 @@
   #ui{position:absolute;inset:0;line-height:1.25;pointer-events:none;font-size:var(--fs)}
   #ui button{font:inherit;color:inherit;pointer-events:auto;cursor:pointer;border:0}
 
-  /* ---------- top bar ---------- */
-  #top{position:absolute;top:0;left:0;right:0;display:flex;gap:.4em;padding:.45em .5em;align-items:center}
-  .chip{
-    background:rgba(24,28,24,.72);border:1px solid rgba(255,246,229,.18);
-    padding:.25em .5em;border-radius:.4em;letter-spacing:.04em;white-space:nowrap;
-    backdrop-filter:blur(2px);
-  }
-  .chip b{font-weight:700}
-  .heart{color:#ff7b7b}.coin{color:#ffd452}
-  .grow{flex:1}
-  .ico{
-    background:rgba(24,28,24,.72);border:1px solid rgba(255,246,229,.18)!important;
-    border-radius:.4em;padding:.25em .5em;min-width:2.4em;text-align:center
-  }
-  .ico:active{transform:translateY(1px)}
-  .ico.off{opacity:.45}
+  /* ---------- bottom dock ---------- */
+  /* the tower dock is painted into the canvas; --dockw reserves its width */
+  #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;align-items:flex-end;
+    padding:.45em .5em .45em calc(var(--dockw, 0px) + .6em)}
 
   /* ---------- bottom dock ---------- */
   /* the tower dock is painted into the canvas; --dockw reserves its width */
   #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;align-items:flex-end;
     padding:.45em .5em .45em calc(var(--dockw, 0px) + .6em)}
 
-  #bAction{
-    min-width:3.1em;padding:.3em .55em;font-weight:700;letter-spacing:.06em;
-    box-shadow:0 3px 0 rgba(0,0,0,.45)
-  }
-  #bAction:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
-  .ico.send{
-    background:#4f9d4a;border-color:#82d17c!important;color:#fff;
-    box-shadow:0 3px 0 #2c5c2a;animation:wavePulse 1.8s ease-out infinite
-  }
-  .ico.send:active{box-shadow:0 1px 0 #2c5c2a;animation:none}
-  .ico.resume{background:#8a6a2e;border-color:#e2c06a!important;color:#fff}
-  @keyframes wavePulse{
-    0%   {box-shadow:0 3px 0 #2c5c2a, 0 0 0 0 rgba(130,209,124,.55)}
-    70%  {box-shadow:0 3px 0 #2c5c2a, 0 0 0 .5em rgba(130,209,124,0)}
-    100% {box-shadow:0 3px 0 #2c5c2a, 0 0 0 0 rgba(130,209,124,0)}
   }
 
   /* ---------- tower panel ---------- */
@@ -162,15 +135,6 @@
 <div id="stage">
   <canvas id="cv"></canvas>
   <div id="ui">
-    <div id="top">
-      <div class="chip"><span id="tLivesIcon"></span><b id="tLives">20</b></div>
-      <div class="chip"><span class="coin">&#9673;</span> <b id="tGold">130</b></div>
-      <div class="chip" id="tWave">WAVE 1</div>
-      <div class="grow"></div>
-      <button class="ico" id="bSound">&#9834;</button>
-      <button class="ico" id="bSpeed">1&times;</button>
-      <button class="ico" id="bAction">&#10073;&#10073;</button>
-    </div>
     <div id="bottom">
       <div id="confirm" class="hide"></div>
     </div>
@@ -182,7 +146,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V20</div>
+    <div id="ver">V21</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -335,7 +299,9 @@ const GLYPH={
  '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
  '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
  '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
- '+':['000','010','111','010','000'],'-':['000','000','111','000','000']
+ '+':['000','010','111','010','000'],'-':['000','000','111','000','000'],
+ 'M':['101','111','111','101','101'],'W':['101','101','111','111','101'],
+ 'X':['101','101','010','101','101'],'/':['001','001','010','100','100']
 };
 function drawText(x,y,txt,color){
   ctx.fillStyle=color; let cx=x;
@@ -1126,7 +1092,10 @@ const GL={
   check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
   cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
   up:["..x..",".xxx.","xxxxx",".xxx.","..x.."],
-  coin:[".xxx.","x...x","x.x.x","x...x",".xxx."]
+  coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
+  note:["...xx","..xxx","..x..","xxx..","xxx.."],
+  pause:["x.x","x.x","x.x","x.x","x.x"],
+  play:["x..","xx.","xxx","xx.","x.."]
 };
 function glyph(rows,x,y,col){
   ctx.fillStyle=col;
@@ -1253,6 +1222,58 @@ function drawDock(){
     drawText(px+6,py,t, sel?'#ffeedd':(poor?'#8d92a8':'#ffd452'));
   });
   return slots;
+}
+
+// The HUD used to be HTML chips. Painted here instead, it shares the dock's
+// language exactly: sprites and pixel digits sitting on the grass for the
+// read-outs, plates only for the things you can actually tap.
+function drawHUD(){
+  const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
+  const car=ART.carrot;
+  ctx.drawImage(car, x0, y0+1);
+  let x=x0+car.width+1;
+  drawText(x, y0+3, String(G.lives), '#ffeedd');
+  x+=textW(String(G.lives))+7;
+  glyph(GL.coin, x, y0+3, '#c98f2b');
+  x+=7;
+  drawText(x, y0+3, String(G.gold), '#ffd452');
+  x+=textW(String(G.gold))+8;
+  drawText(x, y0+3, 'M'+G.map, '#cbb495');
+  x+=textW('M'+G.map)+4;
+  const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
+  const wv='W'+shown+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
+  drawText(x, y0+3, wv, '#ffeedd');
+
+  // controls, right to left. Taller than the read-outs so they stay thumb-sized.
+  const bh=13, by=y0-2;
+  const st=actionState();
+  const out=[];
+  let rx=Math.round(W+OX-3);
+  const aw=(st==='send') ? textW('GO')+8 : 13;
+  rx-=aw; out.push({act:'hud_action', x:rx, y:by, w:aw, h:bh, state:st});
+  const sl=String(G.speed)+'X', sw=textW(sl)+8;
+  rx-=sw+3; out.push({act:'hud_speed', x:rx, y:by, w:sw, h:bh, label:sl});
+  rx-=13+3; out.push({act:'hud_sound', x:rx, y:by, w:13, h:bh});
+
+  out.forEach(b=>{
+    const hot=(G.btnHover===b.act)?1:0;
+    const y=b.y+hot;
+    if(b.act==='hud_action' && b.state==='send'){
+      plate(b.x,y,b.w,b.h,'#4f9d4a','#82d17c');
+      drawText(b.x+4, y+4, 'GO', '#ffffff');
+    } else {
+      plate(b.x,y,b.w,b.h,'#2f3329','#5d6455');
+      if(b.act==='hud_action'){
+        const g = b.state==='resume' ? GL.play : GL.pause;
+        glyph(g, b.x+5, y+4, b.state==='resume' ? '#e2c06a' : '#c2cfbe');
+      } else if(b.act==='hud_speed'){
+        drawText(b.x+4, y+4, b.label, '#c2cfbe');
+      } else {
+        glyph(GL.note, b.x+4, y+4, sndOn ? '#c2cfbe' : '#5d6455');
+      }
+    }
+  });
+  return out;
 }
 
 function hitBtn(ax,ay){
@@ -1527,6 +1548,7 @@ function draw(){
   // dock last so it paints over the field, but appended last so in-world
   // buttons keep hit priority where they overlap
   G.btns=G.btns.concat(drawDock());
+  G.btns=G.btns.concat(drawHUD());
 
   if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(-OX,-OY,ARTW,ARTH); }
   ctx.restore();
@@ -1615,6 +1637,13 @@ function freePlot(c,r){ return r>=0&&r<ROWS&&c>=0&&c<COLS&&BUILD[r][c]&&!towerAt
 
 let dragging=false;
 function doAction(b){
+  if(b.act==='hud_sound'){ sndOn=!sndOn; SFX.tick(); return; }
+  if(b.act==='hud_speed'){ G.speed = G.speed===1?2:(G.speed===2?3:1); SFX.tick(); return; }
+  if(b.act==='hud_action'){
+    const st=actionState();
+    if(st==='send') startWave(); else G.paused=(st==='pause');
+    syncUI(); return;
+  }
   if(b.act==='card'){
     const F=TOWERS[b.fam];
     if(G.placing===b.fam){ cancelPlacing(); return; }
@@ -1704,45 +1733,21 @@ function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=null; G.btnHover
 /* ======================================================================
    14. UI
    ====================================================================== */
-const bAction=document.getElementById('bAction');
-
-function iconCanvas(key,px){
-  const src=ART[key];
-  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
-  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(src,0,0);
-  return c;
-}
-
-// Paused is checked first: if the tab lost focus between waves, the button has to
-// offer resume before it offers the next wave, or the wave starts into a frozen game.
+// state of the single action control: paused is checked before idle, so a tab
+// that lost focus between waves offers resume before it offers the next wave
 function actionState(){
   if(!G.started) return 'pause';
   if(G.paused) return 'resume';
   if(G.phase==='idle') return 'send';
   return 'pause';
 }
-function updateAction(){
-  const st=actionState();
-  bAction.classList.toggle('send',st==='send');
-  bAction.classList.toggle('resume',st==='resume');
-  bAction.innerHTML = st==='send' ? 'GO' : (st==='resume' ? '&#9654;' : '&#10073;&#10073;');
-  bAction.setAttribute('aria-label', st==='send'?'Send next wave':(st==='resume'?'Resume':'Pause'));
-}
-bAction.addEventListener('click',()=>{
-  if(!G.started) return;
-  const st=actionState();
-  if(st==='send') startWave();
-  else G.paused=(st==='pause');
-  syncUI();
-});
 
-document.getElementById('bSpeed').addEventListener('click',e=>{
-  G.speed = G.speed===1?2:(G.speed===2?3:1);
-  e.target.innerHTML=G.speed+'&times;';
-});
-document.getElementById('bSound').addEventListener('click',e=>{
-  sndOn=!sndOn; e.target.classList.toggle('off',!sndOn);
-});
+function iconCanvas(key){
+  const src=ART[key];
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(src,0,0);
+  return c;
+}
 
 function statBar(t){
   const st=statsOf(t), dps=st.aura?st.dmg:Math.round(st.dmg*st.rate);
@@ -1789,20 +1794,11 @@ function infoBar(){
     ' <span class="plvl">LV '+t.level+'</span></div><div class="pstat">'+statBar(t)+'</div></div></div>';
 }
 
+// Read-outs are painted in drawHUD now; the only DOM left in play is the plaque.
 function syncUI(){
-  document.getElementById('tLives').textContent=G.lives;
-  document.getElementById('tGold').textContent=G.gold;
-  const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
-  document.getElementById('tWave').textContent=
-    'MAP '+G.map+' \u00b7 W'+shown+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
-
-  // dock affordability + selection
-
   const html=infoBar();
   conf.classList.toggle('hide',!html);
   if(html!==confKey){ confKey=html; conf.innerHTML=html; }
-
-  updateAction();
 }
 
 /* ======================================================================
@@ -1877,7 +1873,6 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 
-document.getElementById('tLivesIcon').innerHTML=spriteImg('carrot','hud');
 syncUI();
 })();
 </script>
