@@ -146,7 +146,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Plots are the tilled beds</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V25</div>
+    <div id="ver">V26</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -745,25 +745,25 @@ function drawCarrot(x,y,s){
   ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
   ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
 }
-// Sizing this properly: a tower's art is up to 14px tall and the auto-generated
-// outline adds a pixel on every side, so the real footprint is 16x16. Anything
-// smaller and the dark contour hangs past the bed, which is what read as the
-// tower floating rather than sitting in it.
+// Back to a 12x12 bed. The tower's silhouette overhangs it slightly, which is
+// fine so long as the overhang is even: what made towers look wrong before was
+// the sprite being drawn a pixel high, plus a shadow and level pips stacked
+// underneath the bed. All three are gone, so the sprite sits dead centre.
 function drawPlot(p){
   const x=Math.round(p.x), y=Math.round(p.y);
   if(p.blocked){                                  // a stump: pay to clear it
-    ctx.fillStyle='#4a3122'; ctx.fillRect(x-8,y-8,16,16);
-    ctx.fillStyle='#5c4433'; ctx.fillRect(x-7,y-7,14,14);
+    ctx.fillStyle='#4a3122'; ctx.fillRect(x-6,y-6,12,12);
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-5,y-5,10,10);
     ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-4,8,8);
     ctx.fillStyle='#a97a4f'; ctx.fillRect(x-3,y-3,6,6);
     ctx.fillStyle='#5c4433'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+1,y+2,1,1);
     return;
   }
-  ctx.fillStyle='#7a5636'; ctx.fillRect(x-8,y-8,16,16);
-  ctx.fillStyle='#9c7048'; ctx.fillRect(x-7,y-7,14,14);
+  ctx.fillStyle='#7a5636'; ctx.fillRect(x-6,y-6,12,12);
+  ctx.fillStyle='#9c7048'; ctx.fillRect(x-5,y-5,10,10);
   ctx.fillStyle='#7a5636';
-  for(let k=0;k<3;k++) ctx.fillRect(x-6,y-3+k*3,12,1);
-  ctx.fillStyle='#b08454'; ctx.fillRect(x-7,y-7,14,1);
+  for(let k=0;k<3;k++) ctx.fillRect(x-4,y-3+k*3,8,1);
+  ctx.fillStyle='#b08454'; ctx.fillRect(x-5,y-5,10,1);
 }
 function drawPlots(){
   for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
@@ -1474,7 +1474,7 @@ function draw(){
       reticle(cx,cy,G.ghost.age||0,true);
       const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
       ctx.globalAlpha=.55+drop*.3;
-      drawSprite(F.art,1,cx,cy-1+Math.round((1-drop)*-4),16,16);
+      drawSprite(F.art,1,cx,cy+Math.round((1-drop)*-4),16,16);
       ctx.globalAlpha=1;
       const bs=layoutBtns(cx,cy,[
         {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
@@ -1524,12 +1524,12 @@ function draw(){
     // bed edge underneath, which is what made towers look like they sat high
     const kick=t.kick>0?1:0;
     const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
-    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y-1+bob+kick, 16,16);
-    // level pips ride the bed's bottom edge: the only row no sprite reaches
+    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+bob+kick, 16,16);
+    // level pips sit on the bed's bottom inner row, inside the frame
     const lv=t.level;
     for(let i=0;i<lv;i++){
       ctx.fillStyle = i>=3 ? '#a8ecff' : '#ffd452';
-      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+7), 2,1);
+      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+5), 2,1);
     }
     if(st.aura){
       const a=(Math.sin(G.time*3)+1)*.5;
