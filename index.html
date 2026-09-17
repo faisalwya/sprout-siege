@@ -146,7 +146,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V21</div>
+    <div id="ver">V22</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -279,7 +279,7 @@ ART.slug=mkSprite([
 // Towers get a 1px dark contour: without it a flat sprite on flat grass reads
 // as a tile rather than as a thing standing in a garden. Enemies stay clean so
 // they keep reading as small and quick.
-['gnome','gnomeA','gnomeB','sprink','sprinkA','sprinkB','zap','zapA','zapB','hive','hiveA','hiveB']
+['gnome','gnomeA','gnomeB','sprink','sprinkA','sprinkB','zap','zapA','zapB','hive','hiveA','hiveB','carrot']
   .forEach(k=>{ ART[k]=mkOutlined(ART[k]._rows, PAL, '#241a10'); });
 
 const FLIP={}; ['gnome','gnomeA','gnomeB','grub','beetle','snail','moth','slug'].forEach(k=>FLIP[k]=flipped(ART[k]));
@@ -301,9 +301,18 @@ const GLYPH={
  '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
  '+':['000','010','111','010','000'],'-':['000','000','111','000','000'],
  'M':['101','111','111','101','101'],'W':['101','101','111','111','101'],
- 'X':['101','101','010','101','101'],'/':['001','001','010','100','100']
+ 'X':['101','101','010','101','101'],'/':['001','001','010','100','100'],
+ 'G':['111','100','101','101','111'],'O':['111','101','101','101','111'],
+ 'A':['111','101','111','101','101'],'P':['111','101','111','100','100'],
+ 'V':['101','101','101','101','010'],'E':['111','100','110','100','111']
 };
-function drawText(x,y,txt,color){
+function drawText(x,y,txt,color,shadow){
+  if(shadow){                       // offset copy first, so light text reads on any ground
+    ctx.fillStyle=shadow; let sx=x;
+    for(const ch of txt){ const g=GLYPH[ch]; if(g){
+      for(let j=0;j<5;j++) for(let i=0;i<3;i++) if(g[j][i]==='1') ctx.fillRect(sx+i+1,y+j+1,1,1);
+    } sx+=4; }
+  }
   ctx.fillStyle=color; let cx=x;
   for(const ch of txt){ const g=GLYPH[ch]; if(g){
     for(let j=0;j<5;j++) for(let i=0;i<3;i++) if(g[j][i]==='1') ctx.fillRect(cx+i,y+j,1,1);
@@ -1097,7 +1106,12 @@ const GL={
   pause:["x.x","x.x","x.x","x.x","x.x"],
   play:["x..","xx.","xxx","xx.","x.."]
 };
-function glyph(rows,x,y,col){
+function glyph(rows,x,y,col,shadow){
+  if(shadow){
+    ctx.fillStyle=shadow;
+    for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+      if(rows[j][i]==='x') ctx.fillRect(x+i+1,y+j+1,1,1);
+  }
   ctx.fillStyle=col;
   for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
     if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
@@ -1228,21 +1242,22 @@ function drawDock(){
 // language exactly: sprites and pixel digits sitting on the grass for the
 // read-outs, plates only for the things you can actually tap.
 function drawHUD(){
+  const SH='#17200f';                         // the shadow every read-out carries
   const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
   const car=ART.carrot;
   ctx.drawImage(car, x0, y0+1);
   let x=x0+car.width+1;
-  drawText(x, y0+3, String(G.lives), '#ffeedd');
+  drawText(x, y0+3, String(G.lives), '#ffffff', SH);
   x+=textW(String(G.lives))+7;
-  glyph(GL.coin, x, y0+3, '#c98f2b');
+  glyph(GL.coin, x, y0+3, '#ffd452', SH);
   x+=7;
-  drawText(x, y0+3, String(G.gold), '#ffd452');
+  drawText(x, y0+3, String(G.gold), '#ffd452', SH);
   x+=textW(String(G.gold))+8;
-  drawText(x, y0+3, 'M'+G.map, '#cbb495');
+  drawText(x, y0+3, 'M'+G.map, '#e8dcc4', SH);
   x+=textW('M'+G.map)+4;
   const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
   const wv='W'+shown+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
-  drawText(x, y0+3, wv, '#ffeedd');
+  drawText(x, y0+3, wv, '#ffffff', SH);
 
   // controls, right to left. Taller than the read-outs so they stay thumb-sized.
   const bh=13, by=y0-2;
@@ -1260,14 +1275,14 @@ function drawHUD(){
     const y=b.y+hot;
     if(b.act==='hud_action' && b.state==='send'){
       plate(b.x,y,b.w,b.h,'#4f9d4a','#82d17c');
-      drawText(b.x+4, y+4, 'GO', '#ffffff');
+      drawText(b.x+4, y+4, 'GO', '#ffffff', '#2c5c2a');
     } else {
       plate(b.x,y,b.w,b.h,'#2f3329','#5d6455');
       if(b.act==='hud_action'){
         const g = b.state==='resume' ? GL.play : GL.pause;
         glyph(g, b.x+5, y+4, b.state==='resume' ? '#e2c06a' : '#c2cfbe');
       } else if(b.act==='hud_speed'){
-        drawText(b.x+4, y+4, b.label, '#c2cfbe');
+        drawText(b.x+4, y+4, b.label, '#dfe8db', '#181c14');
       } else {
         glyph(GL.note, b.x+4, y+4, sndOn ? '#c2cfbe' : '#5d6455');
       }
