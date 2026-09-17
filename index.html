@@ -143,10 +143,10 @@
   <div id="over">
     <h1>SPROUT SIEGE</h1>
     <p>Three plots, five waves each. Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
-    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
+    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Plots are the tilled beds</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V22</div>
+    <div id="ver">V23</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -393,6 +393,8 @@ const WAVES_PER_MAP=5;
 const MAPS=[
  {
   name:'The Carrot Patch',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[8,42,0],[86,42,1],[222,94,0],[178,75,0],[162,45,0],[240,21,0],[222,123,0],[270,34,0],[206,28,0],[108,70,0],[8,105,0]],
   wp:[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]],
   pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
        dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
@@ -407,6 +409,8 @@ const MAPS=[
  },
  {
   name:'The Long Hedge',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[183,100,1],[8,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[96,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
   wp:[[-2,1],[4,1],[4,6],[7,6],[7,2],[10,2],[10,7],[13,7],[13,2],[16,2],[16,6],[21,6]],
   pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
        dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
@@ -421,6 +425,8 @@ const MAPS=[
  },
  {
   name:'The Bramble',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[121,60,1],[202,56,1],[16,68,0],[148,105,0],[259,92,0],[58,91,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[109,89,0],[161,50,0],[65,25,0],[156,20,0],[110,123,0],[220,121,0]],
   wp:[[-2,2],[2,2],[2,6],[5,6],[5,1],[8,1],[8,7],[11,7],[11,2],[14,2],[14,6],[21,6]],
   pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
        dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
@@ -449,7 +455,7 @@ function waveDef(n){
 /* ======================================================================
    3. MAP GEOMETRY — rebuilt at runtime, one map at a time
    ====================================================================== */
-let WP=[], PTS=[], SEG=[], PATH_LEN=0, BUILD=[];
+let WP=[], PTS=[], SEG=[], PATH_LEN=0;
 
 // Centripetal Catmull-Rom through the waypoints: rounds the corners like a trail
 // worn in by feet rather than drawn with a ruler.
@@ -503,15 +509,6 @@ function buildGeometry(wpTiles){
     const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1e-6;
     SEG.push({a,b,dx:dx/len,dy:dy/len,len,s:PATH_LEN});
     PATH_LEN+=len;
-  }
-  BUILD=[];
-  for(let r=0;r<ROWS;r++){ BUILD[r]=[];
-    for(let c=0;c<COLS;c++){
-      const cx=(c+.5)*TILE, cy=(r+.5)*TILE;
-      let ok = r>=1 && r<=7 && c<=17 && distToPath(cx,cy)>11.5;
-      if(c>=17 && r>=4 && r<=7) ok=false;  // the veggie patch
-      BUILD[r][c]=ok;
-    }
   }
 }
 
@@ -748,6 +745,33 @@ function drawCarrot(x,y,s){
   ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
   ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
 }
+function drawPlot(p,lit){
+  const x=Math.round(p.x), y=Math.round(p.y);
+  if(p.blocked){                                  // a stump: pay to clear it
+    ctx.fillStyle='#4a3122'; ctx.fillRect(x-6,y-6,12,12);
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-5,y-5,10,10);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-4,8,8);
+    ctx.fillStyle='#a97a4f'; ctx.fillRect(x-3,y-3,6,6);
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+1,y+2,1,1);
+    return;
+  }
+  ctx.fillStyle = lit ? '#8f6540' : '#7a5636';     // tilled bed
+  ctx.fillRect(x-6,y-6,12,12);
+  ctx.fillStyle = lit ? '#b8834f' : '#9c7048';
+  ctx.fillRect(x-5,y-5,10,10);
+  ctx.fillStyle = lit ? '#8f6540' : '#7a5636';
+  for(let k=0;k<3;k++) ctx.fillRect(x-4,y-3+k*3,8,1);
+  ctx.fillStyle = lit ? '#d2a069' : '#b08454';
+  ctx.fillRect(x-5,y-5,10,1);
+}
+function drawPlots(){
+  const pulse=(Math.sin(G.ui*4)+1)*.5;
+  for(let i=0;i<G.plots.length;i++){
+    const p=G.plots[i];
+    const lit = !!G.placing && !p.blocked && !p.tower && pulse>0.35;
+    drawPlot(p,lit);
+  }
+}
 function drawCarrots(){
   const eaten=Math.max(0,MAX_CARROTS-G.lives);
   for(let i=eaten;i<MAX_CARROTS;i++){
@@ -767,7 +791,7 @@ const G={
   speed:1, paused:true, started:false,
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
-  placing:null, ghost:null, hover:null, hoverAge:0, selected:null,
+  plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
   btns:[], btnHover:null, ui:0
 };
 
@@ -790,8 +814,9 @@ function loadMap(n){
   buildGeometry(M.wp);
   sortCarrots();
   paintBG(M.pal);
+  G.plots=M.plots.map(q=>({x:q[0],y:q[1],blocked:!!q[2],tower:null}));
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
-  G.selected=null; G.placing=null; G.ghost=null;
+  G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null;
   G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
   G.gold = (n===1) ? 150 : MAP_BASE_GOLD + heartRate(n)*G.lives + (G.pack||0);
   G.pack=0;
@@ -850,7 +875,19 @@ function nextCost(t){
   if(t.level<3) return F.lv[t.level].cost;
   return null; // fork point
 }
-function towerAt(c,r){ return G.towers.find(t=>t.c===c&&t.r===r); }
+// ---- plots ----------------------------------------------------------------
+const PLOT_HIT=11;          // tap radius; the bed itself is 12px across
+const CLEAR_COST=60;
+function plotAt(ax,ay){
+  let best=-1, bd=PLOT_HIT*PLOT_HIT;
+  for(let i=0;i<G.plots.length;i++){
+    const p=G.plots[i], dx=ax-p.x, dy=ay-p.y, d=dx*dx+dy*dy;
+    if(d<=bd){ bd=d; best=i; }
+  }
+  return best;
+}
+function freePlot(i){ const p=G.plots[i]; return !!p && !p.blocked && !p.tower; }
+function towerAt(i){ const p=G.plots[i]; return p ? p.tower : null; }
 function addFx(o){ G.fx.push(Object.assign({life:0,ttl:.6},o)); }
 function toast(msg){
   const el=document.getElementById('toast');
@@ -1422,6 +1459,7 @@ function draw(){
     ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)-f,1,1);
   }
 
+  drawPlots();
   drawCarrots();
 
   G.btns=[];
@@ -1429,13 +1467,13 @@ function draw(){
   // placement: vine selector on the cell under the pointer, then the armed plot
   if(G.placing){
     const F=TOWERS[G.placing];
-    if(G.hover && !(G.ghost&&G.ghost.c===G.hover.c&&G.ghost.r===G.hover.r)){
-      const hx=(G.hover.c+.5)*TILE, hy=(G.hover.r+.5)*TILE;
-      reticle(hx,hy,G.hoverAge,true);
-      ring(hx,hy,F.lv[0].rng,'#ffffff',.28);
+    if(G.hover>=0 && !(G.ghost && G.ghost.i===G.hover)){
+      const hp=G.plots[G.hover];
+      reticle(hp.x,hp.y,G.hoverAge,true);
+      ring(hp.x,hp.y,F.lv[0].rng,'#ffffff',.28);
     }
     if(G.ghost){
-      const cx=(G.ghost.c+.5)*TILE, cy=(G.ghost.r+.5)*TILE;
+      const gp=G.plots[G.ghost.i], cx=gp.x, cy=gp.y;
       ring(cx,cy,F.lv[0].rng,'#ffd452',.85);
       reticle(cx,cy,G.ghost.age||0,true);
       const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
@@ -1448,6 +1486,14 @@ function draw(){
       ]);
       G.btns=G.btns.concat(bs); pending=pending.concat(bs);
     }
+  }
+
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    const pl=G.plots[G.selPlot];
+    const bs=layoutBtns(pl.x,pl.y,[
+      {act:'clear', glyph:'coin', side:'right', num:CLEAR_COST, dis:G.gold<CLEAR_COST, plot:G.selPlot}
+    ]);
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
   }
 
   // selected tower: range ring plus its actions, arranged around the plot
@@ -1647,10 +1693,7 @@ function toArt(ev){
   const r=cv.getBoundingClientRect();
   return { x:(ev.clientX-r.left)/r.width*ARTW-OX, y:(ev.clientY-r.top)/r.height*ARTH-OY };
 }
-function tileFrom(ev){ const p=toArt(ev); return {c:Math.floor(p.x/TILE), r:Math.floor(p.y/TILE)}; }
-function freePlot(c,r){ return r>=0&&r<ROWS&&c>=0&&c<COLS&&BUILD[r][c]&&!towerAt(c,r); }
 
-let dragging=false;
 function doAction(b){
   if(b.act==='hud_sound'){ sndOn=!sndOn; SFX.tick(); return; }
   if(b.act==='hud_speed'){ G.speed = G.speed===1?2:(G.speed===2?3:1); SFX.tick(); return; }
@@ -1663,17 +1706,28 @@ function doAction(b){
     const F=TOWERS[b.fam];
     if(G.placing===b.fam){ cancelPlacing(); return; }
     if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
-    G.placing=b.fam; G.ghost=null; G.hover=null; G.hoverAge=0; G.selected=null;
+    G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverAge=0; G.selected=null;
     toast(F.name+' \u2014 tap a plot to preview');
     SFX.tick(); syncUI(); return;
   }
   if(b.act==='ok'){ placeGhost(); return; }
   if(b.act==='no'){ cancelPlacing(); return; }   // cross leaves build mode entirely
+  if(b.act==='clear'){
+    if(G.gold<CLEAR_COST){ toast('Not enough coins'); SFX.bad(); return; }
+    const pl=G.plots[b.plot];
+    G.gold-=CLEAR_COST; pl.blocked=false; G.selPlot=-1;
+    G.shake=3; SFX.up();
+    addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:18,ttl:.45,color:'#a97a4f'});
+    for(let k=0;k<8;k++) addFx({type:'bit',x:pl.x,y:pl.y,
+      vx:(Math.random()-.5)*40, vy:-14-Math.random()*20, ttl:.5, color:k<5?'#8a6242':'#5c4433'});
+    syncUI(); return;
+  }
   const t=G.selected;
   if(!t||!G.towers.includes(t)) return;
   if(b.act==='close'){ G.selected=null; syncUI(); return; }
   if(b.act==='sell'){
     const val=Math.floor(t.spent*.6);
+    if(G.plots[t.plot]) G.plots[t.plot].tower=null;
     G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
     addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
     SFX.coin(); syncUI(); return;
@@ -1700,18 +1754,24 @@ cv.addEventListener('pointerdown',ev=>{
   const b=hitBtn(p.x,p.y);
   if(b){ if(b.dis){ toast('Not enough coins'); SFX.bad(); } else doAction(b); return; }
 
-  const {c,r}=tileFrom(ev);
-  if(r<0||r>=ROWS||c<0||c>=COLS){ G.selected=null; syncUI(); return; }
+  const i=plotAt(p.x,p.y);
 
   if(G.placing){
-    if(freePlot(c,r)){
-      if(!G.ghost||G.ghost.c!==c||G.ghost.r!==r){ G.ghost={c,r,age:0}; SFX.tick(); syncUI(); }
-      dragging=true;
-    } else toast(towerAt(c,r)?'Plot taken':'No room there');
+    if(i<0){ cancelPlacing(); return; }          // tapping open ground puts it away
+    if(freePlot(i)){
+      if(!G.ghost||G.ghost.i!==i){ G.ghost={i,age:0}; SFX.tick(); syncUI(); }
+    } else toast(G.plots[i].tower ? 'Plot taken' : 'Cleared stumps only');
     return;
   }
-  const hit=towerAt(c,r)||null;
-  G.selected=(hit&&hit===G.selected)?null:hit;
+  if(i<0){ G.selected=null; G.selPlot=-1; syncUI(); return; }
+  const p2=G.plots[i];
+  if(p2.tower){
+    G.selPlot=-1;
+    G.selected=(p2.tower===G.selected)?null:p2.tower;
+  } else if(p2.blocked){
+    G.selected=null;
+    G.selPlot=(G.selPlot===i)?-1:i;
+  } else { G.selected=null; G.selPlot=-1; }
   syncUI();
 },{passive:false});
 
@@ -1719,31 +1779,28 @@ cv.addEventListener('pointermove',ev=>{
   const p=toArt(ev);
   const b=hitBtn(p.x,p.y);
   G.btnHover=b?b.act:null;
-  if(b){ G.hover=null; return; }
-  if(!G.placing){ G.hover=null; return; }
-  const {c,r}=tileFrom(ev);
-  const ok=freePlot(c,r);
-  const same=G.hover&&G.hover.c===c&&G.hover.r===r;
-  if(!same) G.hoverAge=0;
-  G.hover = ok ? {c,r} : null;
-  if(dragging && ok && (!G.ghost||G.ghost.c!==c||G.ghost.r!==r)){ G.ghost={c,r,age:0}; SFX.tick(); syncUI(); }
+  if(b){ G.hover=-1; return; }
+  if(!G.placing){ G.hover=-1; return; }
+  const i=plotAt(p.x,p.y);
+  const ok = i>=0 && freePlot(i);
+  if(G.hover!==(ok?i:-1)) G.hoverAge=0;
+  G.hover = ok ? i : -1;
 });
-cv.addEventListener('pointerleave',()=>{ G.hover=null; G.btnHover=null; });
-window.addEventListener('pointerup',()=>{ dragging=false; });
-window.addEventListener('pointercancel',()=>{ dragging=false; });
+cv.addEventListener('pointerleave',()=>{ G.hover=-1; G.btnHover=null; });
 
 function placeGhost(){
   if(!G.placing||!G.ghost) return;
-  const fam=G.placing, cost=TOWERS[fam].cost, {c,r}=G.ghost;
-  if(!freePlot(c,r)){ toast('No room there'); return; }
+  const fam=G.placing, cost=TOWERS[fam].cost, i=G.ghost.i, pl=G.plots[i];
+  if(!freePlot(i)){ toast('No room there'); return; }
   if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
   G.gold-=cost;
-  G.towers.push({fam,c,r,x:(c+.5)*TILE,y:(r+.5)*TILE,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost});
-  addFx({type:'ring',x:(c+.5)*TILE,y:(r+.5)*TILE,r:2,rmax:14,ttl:.35,color:'#ffd452'});
-  SFX.place(); G.placing=null; G.ghost=null; G.hover=null; G.hoverAge=0; G.btnHover=null;
+  const t={fam,plot:i,x:pl.x,y:pl.y,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost};
+  G.towers.push(t); pl.tower=t;
+  addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:14,ttl:.35,color:'#ffd452'});
+  SFX.place(); G.placing=null; G.ghost=null; G.hover=-1; G.hoverAge=0; G.btnHover=null;
   syncUI();
 }
-function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=null; G.btnHover=null; syncUI(); }
+function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=-1; G.btnHover=null; syncUI(); }
 
 /* ======================================================================
    14. UI
@@ -1793,6 +1850,10 @@ function infoBar(){
     return '<div class="prow">'+spriteImg(F.art)+'<div><div class="pname">'+F.name.toUpperCase()+
       '</div><div class="pstat">DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+
       '  DPS '+Math.round(st.dmg*st.rate)+'  &#9673;'+F.cost+'</div></div></div>';
+  }
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    return '<div class="prow"><div><div class="pname">OVERGROWN PLOT</div>'+
+      '<div class="pstat">Clear the stump for &#9673;'+CLEAR_COST+' to open this ground</div></div></div>';
   }
   const t=G.selected;
   if(!t||!G.towers.includes(t)) return '';
