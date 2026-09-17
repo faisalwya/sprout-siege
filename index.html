@@ -181,7 +181,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Drag to reposition, then BUILD</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V18</div>
+    <div id="ver">V19</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -1186,43 +1186,68 @@ function hitBtn(ax,ay){
 }
 
 // ---------------- the selector ----------------
-// Four corner brackets. The arms run straight along the tile edges so the shape
-// reads as a frame; short arms with inward leaves read as a ring instead. The
-// dark contour sits only on the outboard edge, which keeps each bracket 2px
-// thick rather than 3 and stops it looking chunky at this size.
-const SEL_LEAF=[[2,1],[3,2],[1,2]];
+// Four vines growing out of a knot at the plot's centre, unfurling when a plot
+// is hovered and then rustling while it is held. Arm lengths are deliberately
+// uneven: four matching arms read as a spider, uneven ones read as a plant.
+// The leading pixel of a growing arm stays light so the eye tracks it outward,
+// and each arm eases slightly past its length before settling, which is what
+// makes it look grown rather than drawn.
+const SEL_ARMS=[
+  [-1,-1,6,[0,0,1,1,1,0,0,-1,-1,0,0],[3,5]],
+  [ 1,-1,8,[0,1,1,0,0,-1,-1,-1,0,0,1],[3,6,7]],
+  [-1, 1,7,[0,0,-1,-1,0,1,1,1,0,0,-1],[4,6]],
+  [ 1, 1,6,[0,-1,-1,0,1,1,0,0,-1,0,0],[2,5]]
+];
+const SEL_GROW=0.52, SEL_STAGGER=0.085;
+function easeOutBack(t,k){ k=k||1.9; t=t<0?0:(t>1?1:t);
+  return 1+(k+1)*Math.pow(t-1,3)+k*Math.pow(t-1,2); }
+
 function reticle(cx,cy,age,ok){
-  const grow=1-Math.pow(1-Math.min(1,age/0.20),3);
-  const L=TILE/2-1, ARM=5;
-  const dark = ok?'#241a10':'#3d0f12';
-  const wood = ok?'#8a6242':'#9e2f34';
+  if(age<=0) return;
+  const bark = ok?'#8a6242':'#9e2f34';
+  const dark = ok?'#5c4433':'#6e1f22';
   const lit  = ok?'#a97a4f':'#c94a48';
-  const leafA= ok?'#3d8043':'#e0524f';
-  const leafB= ok?'#25562b':'#7a2226';
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy],ci)=>{
-    const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
-    const n=Math.max(1,Math.round(ARM*grow));
-    ctx.fillStyle=dark;
-    for(let i=0;i<n;i++){
-      ctx.fillRect(vx-sx*i, vy+sy, 1,1);
-      ctx.fillRect(vx+sx,   vy-sy*i, 1,1);
+  const lfm  = ok?'#4f9d4a':'#e0524f';
+  const lfl  = ok?'#7fd07c':'#ff9a8f';
+  const lfd  = ok?'#2f6b36':'#7a2226';
+  const ox=Math.round(cx-TILE/2), oy=Math.round(cy-TILE/2);
+  const put=(x,y,c)=>{ ctx.fillStyle=c; ctx.fillRect(ox+x,oy+y,1,1); };
+  put(7,7,lit); put(8,8,lit); put(8,7,bark); put(7,8,bark);
+  for(let n=0;n<SEL_ARMS.length;n++){
+    const A=SEL_ARMS[n], dx=A[0], dy=A[1], ln=A[2], wob=A[3], leaves=A[4];
+    const t=(age-n*SEL_STAGGER)/SEL_GROW;
+    if(t<=0) continue;
+    const e=t<1?easeOutBack(t):1;
+    let reach=Math.round(ln*e); if(reach<0) reach=0; if(reach>ln+1) reach=ln+1;
+    if(reach<=0) continue;
+    const bx = dx<0?7:8, by = dy<0?7:8;
+    const fat=Math.max(1,Math.round(ln*0.45));
+    const pts=[];
+    for(let i=1;i<=reach;i++){
+      const w=wob[Math.min(i,wob.length-1)];
+      const x=bx+dx*i+(-dy)*w, y=by+dy*i+dx*w;
+      pts.push([x,y]);
+      const tip=(i===reach && t<1);
+      put(x,y, tip?lit:(i>ln-2?dark:bark));
+      if(i<=fat && !tip) put(x+(-dy), y+dx, i>ln-2?dark:bark);
     }
-    ctx.fillRect(vx+sx, vy+sy, 1,1);
-    for(let i=0;i<n;i++){
-      ctx.fillStyle = i===0 ? lit : wood;
-      ctx.fillRect(vx-sx*i, vy, 1,1);
-      ctx.fillRect(vx,      vy-sy*i, 1,1);
+    if(reach>=ln && t>=1){
+      const tp=pts[Math.min(ln,pts.length)-1];
+      put(tp[0]+(-dy), tp[1]+dx, dark);
     }
-    if(grow>0.6){                       // a couple of small leaves, rustling
-      const f=Math.floor(G.ui*2.6+ci)%3;
-      const A=SEL_LEAF[f], B=SEL_LEAF[(f+1)%3];
-      ctx.fillStyle=leafA;
-      ctx.fillRect(vx-sx*A[0], vy-sy*A[1], 1,1);
-      ctx.fillRect(vx-sx*A[1], vy-sy*A[0], 1,1);
-      ctx.fillStyle=leafB;
-      ctx.fillRect(vx-sx*B[0], vy-sy*(B[1]+1), 1,1);
+    const rust=Math.floor(G.ui*2.2);
+    for(let k=0;k<leaves.length;k++){
+      const li=leaves[k];
+      if(li>reach || li>pts.length) continue;
+      const lp=pts[li-1];
+      const sw=[[0,0],[1,0],[0,1]][(rust+n+k)%3];
+      const side=(k%2===0)?1:-1;
+      const lx=(-dy)*side, ly=dx*side;
+      put(lp[0]+lx, lp[1]+ly, lfm);
+      put(lp[0]+lx*2+sw[0]*dx, lp[1]+ly*2+sw[1]*dy, lfl);
+      if(k===leaves.length-1) put(lp[0]+lx*2-dx, lp[1]+ly*2-dy, lfd);
     }
-  });
+  }
 }
 
 // grow a 1px outline around the art, so it holds up on any background
