@@ -146,7 +146,7 @@
     <p class="legend"><span>TAP a card, then a plot to preview</span><span>Plots are the tilled beds</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
     <button class="big" id="bStart">START</button>
     <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V23</div>
+    <div id="ver">V24</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -745,32 +745,26 @@ function drawCarrot(x,y,s){
   ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
   ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
 }
-function drawPlot(p,lit){
+// A tower's visible art is 13px tall, so a 12px bed could never contain it.
+// The bed is 14x14 and the sprite sits 1px lower, feet flush with the bottom.
+function drawPlot(p){
   const x=Math.round(p.x), y=Math.round(p.y);
   if(p.blocked){                                  // a stump: pay to clear it
-    ctx.fillStyle='#4a3122'; ctx.fillRect(x-6,y-6,12,12);
-    ctx.fillStyle='#5c4433'; ctx.fillRect(x-5,y-5,10,10);
+    ctx.fillStyle='#4a3122'; ctx.fillRect(x-7,y-7,14,14);
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-6,y-6,12,12);
     ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-4,8,8);
     ctx.fillStyle='#a97a4f'; ctx.fillRect(x-3,y-3,6,6);
     ctx.fillStyle='#5c4433'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+1,y+2,1,1);
     return;
   }
-  ctx.fillStyle = lit ? '#8f6540' : '#7a5636';     // tilled bed
-  ctx.fillRect(x-6,y-6,12,12);
-  ctx.fillStyle = lit ? '#b8834f' : '#9c7048';
-  ctx.fillRect(x-5,y-5,10,10);
-  ctx.fillStyle = lit ? '#8f6540' : '#7a5636';
-  for(let k=0;k<3;k++) ctx.fillRect(x-4,y-3+k*3,8,1);
-  ctx.fillStyle = lit ? '#d2a069' : '#b08454';
-  ctx.fillRect(x-5,y-5,10,1);
+  ctx.fillStyle='#7a5636'; ctx.fillRect(x-7,y-7,14,14);
+  ctx.fillStyle='#9c7048'; ctx.fillRect(x-6,y-6,12,12);
+  ctx.fillStyle='#7a5636';
+  for(let k=0;k<3;k++) ctx.fillRect(x-5,y-3+k*3,10,1);
+  ctx.fillStyle='#b08454'; ctx.fillRect(x-6,y-6,12,1);
 }
 function drawPlots(){
-  const pulse=(Math.sin(G.ui*4)+1)*.5;
-  for(let i=0;i<G.plots.length;i++){
-    const p=G.plots[i];
-    const lit = !!G.placing && !p.blocked && !p.tower && pulse>0.35;
-    drawPlot(p,lit);
-  }
+  for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
 }
 function drawCarrots(){
   const eaten=Math.max(0,MAX_CARROTS-G.lives);
@@ -1478,7 +1472,7 @@ function draw(){
       reticle(cx,cy,G.ghost.age||0,true);
       const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
       ctx.globalAlpha=.55+drop*.3;
-      drawSprite(F.art,1,cx,cy-1+Math.round((1-drop)*-4),16,16);
+      drawSprite(F.art,1,cx,cy+Math.round((1-drop)*-4),16,16);
       ctx.globalAlpha=1;
       const bs=layoutBtns(cx,cy,[
         {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
@@ -1524,15 +1518,16 @@ function draw(){
   const sorted=G.towers.slice().sort((a,b)=>a.y-b.y);
   for(const t of sorted){
     const st=statsOf(t);
-    shadow(t.x,t.y+5,10);
+    // no ground shadow: it stands on a bed now, and the shadow read as extra
+    // bed edge underneath, which is what made towers look like they sat high
     const kick=t.kick>0?1:0;
     const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
-    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y-1+bob+kick, 16,16);
-    // level pips
+    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+bob+kick, 16,16);
+    // level pips ride the bed's top edge, clear of the tower and the ground
     const lv=t.level;
     for(let i=0;i<lv;i++){
       ctx.fillStyle = i>=3 ? '#a8ecff' : '#ffd452';
-      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+7), 2,2);
+      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y-7), 2,1);
     }
     if(st.aura){
       const a=(Math.sin(G.time*3)+1)*.5;
