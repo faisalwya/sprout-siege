@@ -13,7 +13,7 @@ tuning, new towers or enemies.
 
 ---
 
-## v30: Cleanup [ ]
+## v30: Cleanup [x]
 
 No gameplay or look changes except the text and glyph fixes listed.
 
@@ -56,6 +56,8 @@ Brings play back in line with settled decision 1 (no DOM over the playfield).
 3. **Info plaque** drawn on the canvas. It must not cover the trail: in v29
    it hides part of map 1's bottom loop. Mock two placements, compare
    screenshots on all three maps, pick the one that never overlaps the trail.
+   The fork text also runs to the plaque's right edge in v30 ("short reach."
+   touches it); size the canvas plaque to its longest line.
 4. **Action icons:** upgrade is an up arrow, sell is a coin with a plus.
    Refund numbers green, costs yellow.
 

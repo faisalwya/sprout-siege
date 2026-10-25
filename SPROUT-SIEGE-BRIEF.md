@@ -1,7 +1,7 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Written at the end of the session
-that produced v28. Read this first; it replaces re-reading the chat.
+Working document for continuing the build. Last updated with v30. Read this
+first; it replaces re-reading the chat.
 
 ---
 
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v29** |
+| Current version | **v30** |
 | Live | `sprout-siege.netlify.app`, still serving **V3**. See section 9. |
 
 ### Campaign
@@ -30,9 +30,9 @@ specialisations at level 3, reaching level 5.
 | Family | Cost | Role | Forks |
 |---|---|---|---|
 | Gnome Post | 45 | Workhorse single target | Deadeye (sniper) / Rascal (fast, short) |
-| Sprinkler | 70 | Splash plus slow | Geyser (heavy splash) / Mist (deep slow) |
-| Zap Lamp | 95 | Chain lightning | Storm (more chains) / Bolt (single-target stun) |
-| Beehive | 85 | Swarm | Wasp (fast swarm) / Hive aura (damage field) |
+| Sprinkler | 70 | Splash plus slow | Geyser (heavy splash) / Frostmist (deep slow) |
+| Zap Lamp | 95 | Chain lightning | Storm Lamp (more chains) / Jolt Post (single-target stun) |
+| Beehive | 85 | Swarm | Wasp Nest (fast single target) / Pollen Bloom (damage aura) |
 
 ### Lives
 20 carrots in a patch on the right edge. Each life lost eats one carrot,
@@ -64,7 +64,8 @@ This is a standing requirement, not a one-off.
 | v24 to v26 | Plot sizing and tower centring, iterated. |
 | **v27** | Wide bed (18x10). Single source of truth for plot geometry. Vines retired. Stump redrawn. |
 | v28 | Open placement behind a flag. No-build shade mask. |
-| **v29** | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
+| v29 | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
+| **v30** | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 
 ---
 
@@ -90,6 +91,10 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    built as a swappable `THEME` object when it happens, not a fork.
 8. **Every version kept as a numbered file.**
 9. **No em dashes** in written output.
+10. **HUD map and wave use icons, not letters.** A 3px-wide M and W both read
+    as H at phone size, and 5px-wide versions blur under the drop shadow
+    (rendered and compared in v30). Map is a flag then the number, wave is a
+    small wave then `1/5`.
 
 ---
 
