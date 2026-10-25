@@ -1,7 +1,7 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Written at the end of the session
-that produced v28. Read this first; it replaces re-reading the chat.
+Working document for continuing the build. Last updated with v30. Read this
+first; it replaces re-reading the chat.
 
 ---
 
@@ -15,8 +15,8 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v29** |
-| Live | `sprout-siege.netlify.app`, still serving **V3**. See section 9. |
+| Current version | **v30** |
+| Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
 Three maps, five waves each. Lives carry between maps, towers do not. Gold
@@ -30,9 +30,9 @@ specialisations at level 3, reaching level 5.
 | Family | Cost | Role | Forks |
 |---|---|---|---|
 | Gnome Post | 45 | Workhorse single target | Deadeye (sniper) / Rascal (fast, short) |
-| Sprinkler | 70 | Splash plus slow | Geyser (heavy splash) / Mist (deep slow) |
-| Zap Lamp | 95 | Chain lightning | Storm (more chains) / Bolt (single-target stun) |
-| Beehive | 85 | Swarm | Wasp (fast swarm) / Hive aura (damage field) |
+| Sprinkler | 70 | Splash plus slow | Geyser (heavy splash) / Frostmist (deep slow) |
+| Zap Lamp | 95 | Chain lightning | Storm Lamp (more chains) / Jolt Post (single-target stun) |
+| Beehive | 85 | Swarm | Wasp Nest (fast single target) / Pollen Bloom (damage aura) |
 
 ### Lives
 20 carrots in a patch on the right edge. Each life lost eats one carrot,
@@ -50,7 +50,7 @@ This is a standing requirement, not a one-off.
 |---|---|
 | v1 | First playable. Single map. |
 | v2 | Confirm-before-place preview. Catmull-Rom spline trail with perpendicular meander. Text scaling fix. |
-| **v3** | **Deployed to Netlify. Still the live build.** |
+| **v3** | Deployed to Netlify. That site is retired; GitHub Pages replaced it. |
 | v4 | Scaling pass. Initially a regression: scale was capped at 4x and framed, losing 13%. Fixed by raising the cap to 8 and tightening snap tolerance to 95%. |
 | v6 | Wave button folded into the top-right play/pause control. Static size, green, labelled GO. |
 | v8 | Campaign: three maps, map-to-map transition. |
@@ -64,7 +64,8 @@ This is a standing requirement, not a one-off.
 | v24 to v26 | Plot sizing and tower centring, iterated. |
 | **v27** | Wide bed (18x10). Single source of truth for plot geometry. Vines retired. Stump redrawn. |
 | v28 | Open placement behind a flag. No-build shade mask. |
-| **v29** | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
+| v29 | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
+| **v30** | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 
 ---
 
@@ -90,6 +91,10 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    built as a swappable `THEME` object when it happens, not a fork.
 8. **Every version kept as a numbered file.**
 9. **No em dashes** in written output.
+10. **HUD map and wave use icons, not letters.** A 3px-wide M and W both read
+    as H at phone size, and 5px-wide versions blur under the drop shadow
+    (rendered and compared in v30). Map is a flag then the number, wave is a
+    small wave then `1/5`.
 
 ---
 
@@ -139,7 +144,7 @@ can be felt in play first.
 
 ### Open items
 1. **Balance re-tune** after the placement model settles. This is the live one.
-2. **Deploy.** Live site is 26 versions behind. See section 9.
+2. ~~Deploy.~~ Done: GitHub Pages serves `main`. See section 9.
 3. **Theme swap** to space, as a `THEME` object. The soil palette already
    derives from the map palette, so it will follow automatically.
 4. **Hand-drawn sprite pipeline.** Intent is to draw sprites externally and
@@ -249,14 +254,16 @@ step is needed.
 
 ## 9. Deployment
 
-- Project: `sprout-siege` on Netlify. Live site is V3.
-- **Blocker: the Netlify team has SSO enabled on all projects**, so the site
-  returns 401 to anyone not signed in. Turn it off at
-  `app.netlify.com/projects/sprout-siege/configuration/access`. This is a
-  manual step; it cannot be done from a session.
-- The container's egress allowlist rejects `netlify-mcp.netlify.app` with a
-  403, so deploying through the Netlify MCP tools does not work from here.
-  Manual zip upload is the route that works.
+- **Live:** https://faisalwya.github.io/sprout-siege/ via GitHub Pages,
+  publishing `index.html` from `main`. **Merging a pull request is the
+  deploy**: the site updates a minute or two later.
+- **Preview before merging:** Pages only shows `main`, so each pull request
+  gets a private Claude artifact of its `index.html` for phone testing.
+- **Rollback:** copy the previous `versions/sprout-siege-vN.html` over
+  `index.html` and merge that.
+- Cloud sessions cannot open `github.io` (egress 403), so the live site can
+  only be checked from a phone or computer.
+- Netlify (`sprout-siege.netlify.app`) is retired; ignore it.
 
 ---
 
@@ -265,7 +272,7 @@ step is needed.
 Files worth carrying into the project:
 
 1. This brief.
-2. `sprout-siege-v29.html` (current) and `sprout-siege-v3.html` (what is live).
+2. The current `versions/sprout-siege-vN.html`.
 3. The full numbered version set, if the project allows the volume. If not,
    keep v3, v12, v21, v23, v27, v28, v29 as the milestone set.
 4. The harness: `shim.js`, `run.js`, `shot28.js`, `geom.js`, `cover.js`.

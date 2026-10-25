@@ -34,21 +34,13 @@
   #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;align-items:flex-end;
     padding:.45em .5em .45em calc(var(--dockw, 0px) + .6em)}
 
-  /* ---------- bottom dock ---------- */
-  /* the tower dock is painted into the canvas; --dockw reserves its width */
-  #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;align-items:flex-end;
-    padding:.45em .5em .45em calc(var(--dockw, 0px) + .6em)}
-
-  }
-
   /* ---------- tower panel ---------- */
-  #pop,#confirm{
+  #confirm{
     position:absolute;pointer-events:auto;
     background:rgba(18,22,18,.96);border:1px solid rgba(255,246,229,.25);
     border-radius:.55em;padding:.4em .45em;display:flex;flex-direction:column;gap:.3em;
     box-shadow:0 5px 14px rgba(0,0,0,.5);
   }
-  #pop{min-width:11.5em;max-width:min(22em,64%)}
   #confirm{
     position:static;flex:0 1 auto;max-width:27em;border:0!important;border-radius:0;
     padding:.4em .6em;gap:.1em;background:#3b2a1b;
@@ -66,39 +58,12 @@
   .pxi{width:1.9em;height:1.9em;image-rendering:pixelated;flex:none;
        filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
   .pxi.sm{width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.2em}
-  .pxi.hud{width:1.05em;height:1.35em;vertical-align:-.3em;margin-right:.3em}
-  #pop.hide,#confirm.hide{display:none}
-  #pop .tail{
-    position:absolute;width:0;height:0;pointer-events:none;
-    border-left:.4em solid transparent;border-right:.4em solid transparent
-  }
+  #confirm.hide{display:none}
   .prow{display:flex;align-items:center;gap:.45em}
-  .prow2{display:flex;gap:.3em;align-items:center}
   .pname{font-weight:700;letter-spacing:.04em}
   .plvl{color:#ffd452;font-size:.8em}
   .pstat{font-size:.75em;color:#c9d6c4;letter-spacing:.02em;white-space:nowrap}
-  .pbtns{display:flex;gap:.3em;margin-left:auto}
-  .btn{
-    background:#3d5f8f;border:1px solid #7aa6dd!important;border-radius:.45em;
-    padding:.35em .55em;box-shadow:0 3px 0 #23395a;white-space:nowrap;font-size:.85em;flex:1
-  }
-  .btn.x{flex:none}
-  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 #23395a}
-  .btn.sell{background:#8a5a3d;border-color:#c99a76!important;box-shadow:0 3px 0 #55361f}
-  .btn.sell:active{box-shadow:0 1px 0 #55361f}
-  .btn.x{background:#3a3f3a;border-color:#6a706a!important;box-shadow:0 3px 0 #23261f}
-  .btn.dis{opacity:.4;box-shadow:none;transform:none}
   .forkhdr{font-size:.72em;color:#ffd452;letter-spacing:.08em}
-  .fork{
-    width:100%;text-align:left;background:#2f4a3a;border:1px solid #6fb98a!important;border-radius:.45em;
-    padding:.35em .45em;box-shadow:0 3px 0 #1c3024;display:flex;gap:.45em;align-items:center
-  }
-  .fork:active{transform:translateY(2px);box-shadow:0 1px 0 #1c3024}
-  .fork canvas{width:2em;height:2em;image-rendering:pixelated;flex:none}
-  .fork .ft{font-size:.82em;font-weight:700}
-  .fork .fd{font-size:.72em;color:#bfd8c6;line-height:1.15}
-  .fork .fc{font-size:.75em;color:#ffd452}
-
   /* ---------- overlays ---------- */
   #over{
     position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -114,7 +79,6 @@
     font-weight:800;letter-spacing:.1em;box-shadow:0 4px 0 #2c5c2a;margin-top:.2em
   }
   #over .big:active{transform:translateY(3px);box-shadow:0 1px 0 #2c5c2a}
-  .legend{display:flex;gap:1em;font-size:.75em;color:#c9d6c4;flex-wrap:wrap;justify-content:center}
 
   #ver{position:absolute;bottom:.6em;right:.8em;font-size:.7em;color:#6f7a6c;letter-spacing:.1em}
   #toast{
@@ -142,11 +106,9 @@
   </div>
   <div id="over">
     <h1>SPROUT SIEGE</h1>
-    <p>Three plots, five waves each. Bugs are marching on your veggie patch. Plant gnomes, sprinklers and hives along the trail and stop them.</p>
-    <p class="legend"><span>TAP a card, then a plot to preview</span><span>Plots are the tilled beds</span><span>Level 3 forks into a specialty</span><span>Tick and cross appear beside the plot</span><span>Green GO sends the next wave</span></p>
+    <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
     <button class="big" id="bStart">START</button>
-    <p id="a2hs" style="display:none;color:#ffd452"></p>
-    <div id="ver">V26</div>
+    <div id="ver">V30</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -388,7 +350,7 @@ const ENEMIES={
   slug  :{hp:1500,spd:13, bounty:90, art:'slug',   flip:true, r:7, armor:4, slowRes:.7, boss:true, lives:5, name:'Grand Slug'}
 };
 
-// [type, count, gap, delay] — five waves per map, boss on the fifth
+// [type, count, gap, delay]: five waves per map, boss on the fifth
 const WAVES_PER_MAP=5;
 const MAPS=[
  {
@@ -453,7 +415,7 @@ function waveDef(n){
 }
 
 /* ======================================================================
-   3. MAP GEOMETRY — rebuilt at runtime, one map at a time
+   3. MAP GEOMETRY: rebuilt at runtime, one map at a time
    ====================================================================== */
 let WP=[], PTS=[], SEG=[], PATH_LEN=0;
 
@@ -533,7 +495,7 @@ function distToPath(px,py){
 }
 
 /* ======================================================================
-   4. BACKGROUND — the 320x144 playfield sits inside a larger decorated
+   4. BACKGROUND: the 320x144 playfield sits inside a larger decorated
    canvas, so the garden runs to the edges of the screen instead of
    floating in a letterbox. OX/OY are the margin; world coords are unchanged.
    ====================================================================== */
@@ -571,7 +533,7 @@ function tuft(q,x,y,col,col2){
 function clover(q,x,y,col){
   q.fillStyle=col; q.fillRect(x,y,1,1); q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-1,1,1); q.fillRect(x,y-2,1,1);
 }
-// a plus, not a block — a solid 3x3 at this scale reads as a floating blob
+// a plus, not a block; a solid 3x3 at this scale reads as a floating blob
 function bloom(q,x,y,pet,mid){
   q.fillStyle=pet;
   q.fillRect(x,y-1,1,1); q.fillRect(x-1,y,1,1); q.fillRect(x+1,y,1,1); q.fillRect(x,y+1,1,1);
@@ -715,7 +677,7 @@ function paintBG(pal){
 }
 
 /* ======================================================================
-   4b. THE CARROTS — one per life, eaten from the gate inward
+   4b. THE CARROTS: one per life, eaten from the gate inward
    ====================================================================== */
 const MAX_CARROTS=20;
 const CARROT_SLOTS=[];
@@ -976,16 +938,16 @@ const G={
   btns:[], btnHover:null, ui:0
 };
 
-// Lives carry across maps. Towers do not — the grid is a different shape on the
+// Lives carry across maps. Towers do not: the grid is a different shape on the
 // other side. Gold resets so each map stays its own clean puzzle, plus a bounty
-// on the hearts you kept, which is what makes protecting them matter.
+// on the carrots you kept, which is what makes protecting them matter.
 // Two compounding levers, both tunable here.
-// Hearts are worth more the deeper you go, and you pack a slice of your kit
-// through the rift — so a strong earlier map actually pays for the next one.
-const HEART_BONUS=[0,0,6,8];      // by map number: map2 = 6/heart, map3 = 8/heart
+// Carrots are worth more the deeper you go, and you pack a slice of your kit
+// through the rift, so a strong earlier map actually pays for the next one.
+const CARROT_BONUS=[0,0,6,8];     // by map number: map2 = 6/carrot, map3 = 8/carrot
 const PACK_REFUND=0.20;           // share of standing tower value carried over
 const MAP_BASE_GOLD=130;
-function heartRate(n){ return HEART_BONUS[n] || HEART_BONUS[HEART_BONUS.length-1]; }
+function carrotRate(n){ return CARROT_BONUS[n] || CARROT_BONUS[CARROT_BONUS.length-1]; }
 let curPal=MAPS[0].pal;
 function loadMap(n){
   G.map=n;
@@ -1003,7 +965,7 @@ function loadMap(n){
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
   G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null; G.hoverPos=null;
   G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
-  G.gold = (n===1) ? 150 : MAP_BASE_GOLD + heartRate(n)*G.lives + (G.pack||0);
+  G.gold = (n===1) ? 150 : MAP_BASE_GOLD + carrotRate(n)*G.lives + (G.pack||0);
   G.pack=0;
 }
 loadMap(1);
@@ -1116,7 +1078,11 @@ function waveDone(){
   addFx({type:'txt',x:W/2,y:40,txt:'+'+bonus,color:'#ffd452',ttl:1.2,vy:-14});
   SFX.coin();
   if(G.wave>=WAVES_PER_MAP && !G.endless){
-    if(G.map<MAPS.length){ G.phase='rift'; showOver('rift'); }
+    if(G.map<MAPS.length){
+      // a slice of the standing kit comes through the rift; loadMap spends it
+      G.pack=Math.floor(G.towers.reduce((a,t)=>a+t.spent,0)*PACK_REFUND);
+      G.phase='rift'; showOver('rift');
+    }
     else { G.phase='won'; showOver('won'); }
   } else G.phase='idle';
   syncUI();
@@ -1325,7 +1291,7 @@ function ring(cx,cy,rad,color,alpha){
   }
   ctx.globalAlpha=1;
 }
-/* ---------- in-world pixel UI: plates, glyphs, and the vine selector ---------- */
+/* ---------- in-world pixel UI: glyph icons, plates and buttons ---------- */
 const GL={
   check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
   cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
@@ -1333,7 +1299,9 @@ const GL={
   coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
   note:["...xx","..xxx","..x..","xxx..","xxx.."],
   pause:["x.x","x.x","x.x","x.x","x.x"],
-  play:["x..","xx.","xxx","xx.","x.."]
+  play:["x..","xx.","xxx","xx.","x.."],
+  flag:["x...","xxx.","xxxx","x...","x..."],    // map; a 3px M reads as H
+  wave:[".....",".x...","x.x.x","...x.","....."] // wave; so does a 3px W
 };
 function glyph(rows,x,y,col,shadow){
   if(shadow){
@@ -1492,10 +1460,14 @@ function drawHUD(){
   x+=7;
   drawText(x, y0+3, String(G.gold), '#ffd452', SH);
   x+=textW(String(G.gold))+8;
-  drawText(x, y0+3, 'M'+G.map, '#e8dcc4', SH);
-  x+=textW('M'+G.map)+4;
+  glyph(GL.flag, x, y0+3, '#e8dcc4', SH);
+  x+=6;
+  drawText(x, y0+3, String(G.map), '#e8dcc4', SH);
+  x+=textW(String(G.map))+6;
+  glyph(GL.wave, x, y0+3, '#ffffff', SH);
+  x+=7;
   const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
-  const wv='W'+shown+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
+  const wv=String(shown)+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
   drawText(x, y0+3, wv, '#ffffff', SH);
 
   // controls, right to left. Taller than the read-outs so they stay thumb-sized.
@@ -1597,11 +1569,6 @@ function mkOutlined(rows,pal,outline){
     const col=pal[rows[j][i]];
     if(col){ x.fillStyle=col; x.fillRect(i+1,j+1,1,1); }
   }
-  return c;
-}
-function flipVert(src){
-  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
-  const x=c.getContext('2d'); x.translate(0,src.height); x.scale(1,-1); x.drawImage(src,0,0);
   return c;
 }
 function pxLine(x0,y0,x1,y1,col){
@@ -1870,7 +1837,7 @@ function layout(){
   // Fit, then cap.
   let raw=Math.min(vw/ARTW, vh/ARTH, MAX_SCALE);
 
-  // Snap so one art pixel covers a whole number of DEVICE pixels — that is what
+  // Snap so one art pixel covers a whole number of DEVICE pixels; that is what
   // keeps the edges hard. Size beats crispness though, so only take the snap when
   // it is nearly free (within 5%). On a 2x display the snap costs ~2% and is taken;
   // on a 3x phone it would cost 12%, so we fill and let the unevenness go unnoticed
@@ -1911,8 +1878,8 @@ function doAction(b){
     if(G.placing===b.fam){ cancelPlacing(); return; }
     if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
     G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.selected=null;
-    toast(F.name+(PLACEMENT==='open' ? ' \u2014 tap the ground to preview'
-                                     : ' \u2014 tap a plot to preview'));
+    toast(F.name+(PLACEMENT==='open' ? ': tap the ground to preview'
+                                     : ': tap a plot to preview'));
     SFX.tick(); syncUI(); return;
   }
   if(b.act==='ok'){ placeGhost(); return; }
@@ -1929,7 +1896,6 @@ function doAction(b){
   }
   const t=G.selected;
   if(!t||!G.towers.includes(t)) return;
-  if(b.act==='close'){ G.selected=null; syncUI(); return; }
   if(b.act==='sell'){
     const val=Math.floor(t.spent*.6);
     if(G.plots[t.plot]) G.plots[t.plot].tower=null;
@@ -2060,13 +2026,6 @@ function actionState(){
   return 'pause';
 }
 
-function iconCanvas(key){
-  const src=ART[key];
-  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
-  const x=c.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(src,0,0);
-  return c;
-}
-
 function statBar(t){
   const st=statsOf(t), dps=st.aura?st.dmg:Math.round(st.dmg*st.rate);
   let x='DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+'  '+(st.aura?'AURA':'DPS '+dps);
@@ -2106,11 +2065,11 @@ function infoBar(){
   const F=TOWERS[t.fam];
   if(!t.branch && t.level===3){
     const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
-    return '<div class="forkhdr">PICK A PATH &mdash; PERMANENT</div>'+
+    return '<div class="forkhdr">PICK A PATH: PERMANENT</div>'+
       '<div class="pstat">&#9664; '+spriteImg(A.art,'sm')+A.name.toUpperCase()+
-        ' &#9673;'+A.lv[0].cost+' &mdash; '+A.desc+'</div>'+
+        ' &#9673;'+A.lv[0].cost+', '+A.desc+'</div>'+
       '<div class="pstat">&#9654; '+spriteImg(B.art,'sm')+B.name.toUpperCase()+
-        ' &#9673;'+B.lv[0].cost+' &mdash; '+B.desc+'</div>';
+        ' &#9673;'+B.lv[0].cost+', '+B.desc+'</div>';
   }
   return '<div class="prow">'+spriteImg(artOf(t))+'<div><div class="pname">'+nameOf(t).toUpperCase()+
     ' <span class="plvl">LV '+t.level+'</span></div><div class="pstat">'+statBar(t)+'</div></div></div>';
@@ -2134,12 +2093,10 @@ function showOver(kind){
 
   if(kind==='rift'){
     const nx=MAPS[G.map], nn=G.map+1;
-    const standing=G.towers.reduce((a,t)=>a+t.spent,0);
-    G.pack=Math.floor(standing*PACK_REFUND);
-    const rate=heartRate(nn);
+    const rate=carrotRate(nn);
     const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack;
     over.innerHTML='<h1>PLOT HELD</h1>'+
-      '<h2>'+M.name+' cleared &mdash; '+G.lives+' carrots carried</h2>'+
+      '<h2>'+M.name+' cleared: '+G.lives+' carrots carried</h2>'+
       '<p>You pack up the kit and step through: '+G.lives+' carrots at '+rate+
       ' coins each, plus '+G.pack+' salvaged from '+G.towers.length+' tower'+(G.towers.length===1?'':'s')+
       '. You arrive at '+nx.name+' with <b style="color:#ffd452">'+arrive+'</b>.</p>'+

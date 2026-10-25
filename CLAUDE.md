@@ -76,5 +76,8 @@ and follow `WORKFLOW.md`.
 
 ## Testing on a phone
 
-`index.html` is what deploys. Test on the real iPhone through the deployed
-URL, not a local file.
+`index.html` on `main` is what deploys: GitHub Pages serves it at
+https://faisalwya.github.io/sprout-siege/, so merging a pull request puts it
+live. Before merging, publish the branch's `index.html` as a private Claude
+artifact and send Faisal the link so he can play it on his iPhone. After
+merging, test on the real iPhone through the live URL, not a local file.
