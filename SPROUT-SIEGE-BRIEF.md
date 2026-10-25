@@ -212,19 +212,21 @@ Cached per position, palette and growth step, so settled plots cost one
 Built after v12 shipped a crash that static syntax checking missed. **Use it
 before shipping any version.**
 
-| File | Purpose |
-|---|---|
-| `shim.js` | DOM and canvas stub. Lets the game be `eval`'d and driven in Node, catching runtime errors like deleted declarations and undefined helpers. |
-| `run.js` | Loads under the shim, starts, places towers, upgrades, forks, sells, clears stumps, runs waves, checks hit-testing. |
-| `shot28.js` | Drives the real game in Chromium at 852x393 DSF 3 via real pointer events and screenshots each state. |
-| `geom.js` | Measures plot clearance: bed-to-trail gaps, bed overlaps, off-frame plots, per-plot trail coverage. |
-| `cover.js` | Greedy N-tower coverage solver. Compares placement modes. |
+| File | Purpose | Status |
+|---|---|---|
+| `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer tap on the dock, builds and forks all four families, sells, plays all 15 waves to the win screen, fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
+| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v32 |
+| geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
+
+The old `shim.js`, `run.js` and `shot28.js` were lost with the chat sessions
+that made them. `smoke.js` replaces all three.
 
 The game body is wrapped in an IIFE, so the harness injects an export object
-just before the closing `})();` to reach internals.
+just before the closing `})();` to reach internals. The game file on disk is
+never modified.
 
-Chromium and Playwright are pre-installed in the session container; no install
-step is needed.
+Chromium and Playwright are pre-installed in Claude Code cloud sessions. On a
+Mac, run `npm install` and `npx playwright install chromium` once.
 
 ---
 
@@ -267,17 +269,10 @@ step is needed.
 
 ---
 
-## 10. Suggested project setup
+## 10. Where everything lives
 
-Files worth carrying into the project:
-
-1. This brief.
-2. The current `versions/sprout-siege-vN.html`.
-3. The full numbered version set, if the project allows the volume. If not,
-   keep v3, v12, v21, v23, v27, v28, v29 as the milestone set.
-4. The harness: `shim.js`, `run.js`, `shot28.js`, `geom.js`, `cover.js`.
-
-Project instructions worth setting: the format constraints (single HTML file,
-mobile horizontal, pixel art), the numbered-versions rule, the no-em-dash rule,
-and a pointer to sections 3 and 4 of this brief so settled and rejected
-directions are not re-litigated.
+Since 25 Oct 2026 the project is a GitHub repo, `faisalwya/sprout-siege`,
+and `main` on GitHub is the source of truth. See `README.md` for which file
+decides what, `WORKFLOW.md` for syncing, and `ROADMAP.md` for what's next.
+Versions v1 to v3 and v6 were never recovered; everything from v4 on is in
+`versions/` and in the git history.

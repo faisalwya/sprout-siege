@@ -17,26 +17,32 @@ runs them for you.
 | **Merge** | Fold a branch's changes into `main`. |
 | **Conflict** | Two copies changed the same lines differently. Git can't pick a winner, so someone has to. |
 | **Drift** | Copies quietly getting out of step because someone forgot to pull or push. |
+| **Deploy** | Putting a version on the live site. Here it happens automatically whenever `main` changes. |
 
 ## The one rule
 
 **GitHub `main` is the real game.** Your Mac folder and cloud sessions are
 working copies. Anything not pushed to GitHub doesn't count yet.
 
-## Working on your Mac
+## Making a version (same everywhere)
 
-1. Open the Code tab, Local, folder `Documents/Sprout`.
-2. Say **"pull the latest"** first, every time.
-3. Work: **"make v30: ..."**. Claude follows the routine in `CLAUDE.md`.
-4. Finish with **"commit and push"**.
+Start a session on your Mac (Code tab, Local, folder `Documents/Sprout`) or
+from your phone or browser (claude.ai/code or the mobile Code tab, repo
+`faisalwya/sprout-siege`). Then:
 
-## Working from your phone or a browser
+1. Say **"make vN"**. Claude pulls the latest, reads that version in
+   `ROADMAP.md`, and works on its own branch.
+2. It runs the tests, checks the screenshots, and sends you a **private
+   preview link**. Play that on your phone. Ask for fixes in the same session
+   if anything is off.
+3. It opens a pull request. You check it on GitHub and press **Merge**.
+   Merging is the deploy: the live site updates a minute or two later.
+4. On the Mac, say **"pull the latest"** before the next session so the folder
+   catches up. This is the step that brings phone work home.
 
-1. claude.ai/code or the mobile Code tab, repo `faisalwya/sprout-siege`.
-2. Give it one clear task. It works on its own branch.
-3. When it's done, open the PR on GitHub, check it, press **Merge**.
-4. Next time you're on the Mac, start with **"pull the latest"**. This is the
-   step that brings phone work home.
+Small doc tweaks (a typo in the roadmap, a note in the brief) can go straight
+to `main` with **"commit and push"**. Anything that touches `index.html` goes
+through steps 1 to 3.
 
 ## Avoiding conflicts and drift
 

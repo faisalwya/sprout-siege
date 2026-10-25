@@ -4,7 +4,9 @@ Pixel-art tower defense. Bugs march a trail toward a carrot patch; you plant
 garden-themed towers to stop them. Owner: Faisal.
 
 Full context lives in `SPROUT-SIEGE-BRIEF.md`. Read it before any design
-change. Sections 3 (settled decisions) and 4 (rejected ideas) are closed:
+change. `README.md` lists which file decides what. When files disagree:
+Faisal's message in the session wins, then this file for process, the brief
+for design, the roadmap for scope. Sections 3 (settled decisions) and 4 (rejected ideas) are closed:
 do not re-propose anything listed there without a new reason.
 
 ## Layout
@@ -40,6 +42,10 @@ and follow `WORKFLOW.md`.
   doing anything else.
 - **One change in flight.** If an unmerged branch or open PR touches
   `index.html`, say so before starting new edits to it.
+- **Versions go through a branch.** Any change to `index.html` is made on a
+  branch named `vN-short-name`, previewed, and merged by Faisal through a pull
+  request, whether the session is local or in the cloud. Doc-only edits may
+  go straight to `main`.
 - **Finish:** commit and push. Never leave work only in a local copy or a
   cloud container.
 - Never force push, rewrite pushed history, or delete `.git`.
