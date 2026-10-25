@@ -114,7 +114,7 @@ of every map go unused.
 **Done when:** each map reads as a different place; smoke test all PASS,
 including the plaque band check; Faisal approved the mocks.
 
-## v33: Pixel-art screens [ ]
+## v33: Pixel-art screens [x]
 
 The title, map-cleared, win and lose screens are still DOM text in a system
 font. Paint them on the canvas in the pixel style, so the whole game looks
