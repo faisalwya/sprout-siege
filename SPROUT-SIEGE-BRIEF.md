@@ -236,7 +236,7 @@ before shipping any version.**
 | File | Purpose | Status |
 |---|---|---|
 | `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer tap on the dock, builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
-| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v32 |
+| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v34 |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 
 The old `shim.js`, `run.js` and `shot28.js` were lost with the chat sessions

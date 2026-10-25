@@ -1,6 +1,7 @@
 # Roadmap
 
-The plan from the v29 review (25 Oct 2026). Each version is one focused
+The plan from the v29 review (25 Oct 2026). Reordered after v31: look and
+feel (v32, v33) comes before armor and balance (now v34), at Faisal's call. Each version is one focused
 change, small enough to review on a phone. Work them in order, one at a
 time. When a version ships, tick its box and move anything left over to the
 next one.
@@ -92,7 +93,43 @@ Brings play back in line with settled decision 1 (no DOM over the playfield).
 overlays (title, rift, win, lose); screenshots on all three maps show the
 trail clear.
 
-## v32: Armor and balance [ ]
+## v32: Maps that use the screen [ ]
+
+Faisal, 25 Oct: look and feel before balance. All three maps are the same
+idea today: enter mid-left, zigzag right through 3 or 4 switchbacks of about
+the same height, end at a carrot patch hard-coded at the right edge (x 272
+to 318, y 66 to 126). The top-right quadrant of map 1 and the bottom corners
+of every map go unused.
+
+1. **Mock three layouts per map** in `labs/`, rendered at 852x393: vary where
+   the trail enters, its overall shape (not only zigzags), and where the
+   carrot patch sits. Keep each trail's length within about 15% of today's so
+   balance does not swing wildly before v34.
+2. **Faisal picks** one per map from the screenshots.
+3. **Build the picks.** The patch position becomes per map: `CARROT_BOX`,
+   `CARROT_SLOTS` and the baked bed in `paintBG` are hard-coded to one spot
+   today and must move together. Trails must stay clear of the top info
+   band, the HUD and the dock.
+
+**Done when:** each map reads as a different place; smoke test all PASS,
+including the plaque band check; Faisal approved the mocks.
+
+## v33: Pixel-art screens [ ]
+
+The title, map-cleared, win and lose screens are still DOM text in a system
+font. Paint them on the canvas in the pixel style, so the whole game looks
+like one thing.
+
+1. **Larger pixel title** (the 3x5 font scaled up) and body text in the
+   pixel font on a `plate()` panel.
+2. **Buttons** drawn and hit-tested through `G.btns`, like the rest.
+3. **Remove `#over`** and its CSS. Only the portrait "turn your phone"
+   notice stays DOM.
+
+**Done when:** no DOM is visible at any point in landscape; smoke test
+drives the screens through canvas taps and passes.
+
+## v34: Armor and balance [ ]
 
 1. **Armor bug:** armor is a flat cut per hit, so small fast hits are gutted.
    Pollen Bloom loses 62% of its damage against the Grand Slug (armor 4),
@@ -109,7 +146,7 @@ trail clear.
 
 **Target:** a competent run finishes map 3 with 8 to 15 carrots left.
 
-## v33: Save and install [ ]
+## v35: Save and install [ ]
 
 1. **Save** to `localStorage` at each map start and on pause: map, wave,
    carrots, gold, towers. A Continue button on the title screen. Wrap every
@@ -119,7 +156,7 @@ trail clear.
 3. **Add to Home Screen hint** for iPhone Safari users who aren't installed
    yet.
 
-## v34: Next-wave preview [ ]
+## v36: Next-wave preview [ ]
 
 A small strip of the next wave's bug icons and counts beside the GO button.
 
