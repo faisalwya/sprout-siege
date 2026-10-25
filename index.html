@@ -1283,7 +1283,6 @@ const GL={
   check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
   cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
   up:["..x..",".xxx.","xxxxx","..x..","..x.."],      // upgrade: an arrow, not a diamond
-  sell:[".xxx.","x.x.x","xxxxx","x.x.x",".xxx."],     // sell: a coin with a plus, coins back
   coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
   note:["...xx","..xxx","..x..","xxx..","xxx.."],
   pause:["x.x","x.x","x.x","x.x","x.x"],
@@ -1668,11 +1667,11 @@ function draw(){
       var bs=layoutBtns(t.x,t.y,[
         {act:'forkA', side:'left',  w:20,h:20, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
         {act:'forkB', side:'right', w:20,h:20, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
-        {act:'sell',  side:'up',    glyph:'sell', num:sell}
+        {act:'sell',  side:'up',    glyph:'coin', num:sell}
       ]);
     } else {
       const cost=nextCost(t);
-      const specs=[{act:'sell', glyph:'sell', side:'left', num:sell}];
+      const specs=[{act:'sell', glyph:'coin', side:'left', num:sell}];
       if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
       var bs=layoutBtns(t.x,t.y,specs);
     }
