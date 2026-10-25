@@ -16,6 +16,7 @@ do not re-propose anything listed there without a new reason.
 | `labs/` | Throwaway mockups used to settle visual questions. |
 | `tools/smoke.js` | Headless test: plays all 15 waves in Chromium, fails on any error. |
 | `SPROUT-SIEGE-BRIEF.md` | Design brief, decisions, lessons, version map. |
+| `WORKFLOW.md` | Plain-language guide to syncing, branches and avoiding conflicts. |
 
 ## Hard constraints
 
@@ -27,6 +28,21 @@ do not re-propose anything listed there without a new reason.
   under 5% of size.
 - **All in-play UI is painted on the canvas.** No DOM over the playfield.
 - **No em dashes** anywhere: UI copy, comments, docs, commit messages.
+
+## Sync with GitHub (every session)
+
+Faisal is new to git: run the git commands yourself, explain in plain words,
+and follow `WORKFLOW.md`.
+
+- **Start:** fetch and pull `main` before touching anything. If the working
+  copy has uncommitted changes or has diverged, stop and tell Faisal before
+  doing anything else.
+- **One change in flight.** If an unmerged branch or open PR touches
+  `index.html`, say so before starting new edits to it.
+- **Finish:** commit and push. Never leave work only in a local copy or a
+  cloud container.
+- Never force push, rewrite pushed history, or delete `.git`.
+- On a conflict, show both sides and ask which to keep. Don't pick silently.
 
 ## Making a new version (every time)
 

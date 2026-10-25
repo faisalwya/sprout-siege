@@ -24,5 +24,5 @@ npm test
 
 Screenshots of each stage are written to `tools/out/`.
 
-See `SPROUT-SIEGE-BRIEF.md` for the design brief and `CLAUDE.md` for the
-working rules.
+See `SPROUT-SIEGE-BRIEF.md` for the design brief, `WORKFLOW.md` for how to
+sync and avoid conflicts, and `CLAUDE.md` for the working rules.
