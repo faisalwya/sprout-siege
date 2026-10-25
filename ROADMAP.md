@@ -72,7 +72,7 @@ the sides instead of extra garden (`MAX_PAD_X=0`). Brief decision 6 amended.
 **Done when:** Safari shape (852x308) shows the same layout as the
 home-screen shape (852x393); smoke test all PASS.
 
-## v31: UI on the canvas [ ]
+## v31: UI on the canvas [x]
 
 Brings play back in line with settled decision 1 (no DOM over the playfield).
 
@@ -84,7 +84,8 @@ Brings play back in line with settled decision 1 (no DOM over the playfield).
    screenshots on all three maps, pick the one that never overlaps the trail.
    The fork text also runs to the plaque's right edge in v30 ("short reach."
    touches it); size the canvas plaque to its longest line.
-4. **Action icons:** upgrade is an up arrow, sell is a coin with a plus.
+4. **Action icons:** upgrade is an up arrow, sell is a coin with a plus
+   (shipped as the top bar's coin instead, Faisal's call after playtest).
    Refund numbers green, costs yellow.
 
 **Done when:** no DOM element is visible during play except between-screen

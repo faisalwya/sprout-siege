@@ -26,44 +26,6 @@
     box-shadow:0 0 0 1px #39412f, 0 0 0 5px #1b2015, 0 20px 44px rgba(0,0,0,.6);
   }
   canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;background:#6cc16b}
-  #ui{position:absolute;inset:0;line-height:1.25;pointer-events:none;font-size:var(--fs)}
-  #ui button{font:inherit;color:inherit;pointer-events:auto;cursor:pointer;border:0}
-
-  /* ---------- bottom dock ---------- */
-  /* the tower dock is painted into the canvas; --dockw reserves its width */
-  #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:.4em;align-items:flex-end;
-    padding:.45em .5em .45em calc(var(--dockw, 0px) + .6em)}
-
-  /* ---------- tower panel ---------- */
-  #confirm{
-    position:absolute;pointer-events:auto;
-    background:rgba(18,22,18,.96);border:1px solid rgba(255,246,229,.25);
-    border-radius:.55em;padding:.4em .45em;display:flex;flex-direction:column;gap:.3em;
-    box-shadow:0 5px 14px rgba(0,0,0,.5);
-  }
-  #confirm{
-    position:static;flex:0 1 auto;max-width:27em;border:0!important;border-radius:0;
-    padding:.4em .6em;gap:.1em;background:#3b2a1b;
-    background-image:repeating-linear-gradient(0deg,rgba(255,238,221,.045) 0 1px,transparent 1px 3px);
-    box-shadow:
-      0 0 0 1px #6b4a30,
-      0 0 0 2px #241a10,
-      inset 0 1px 0 rgba(255,238,221,.14),
-      0 3px 0 #1a120b;
-  }
-  #confirm .pname{color:#ffeedd;text-shadow:0 1px 0 #241a10}
-  #confirm .pstat{color:#cbb495}
-  #confirm .forkhdr{color:#ffd452;text-shadow:0 1px 0 #241a10}
-  #confirm .prow{gap:.4em}
-  .pxi{width:1.9em;height:1.9em;image-rendering:pixelated;flex:none;
-       filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
-  .pxi.sm{width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.2em}
-  #confirm.hide{display:none}
-  .prow{display:flex;align-items:center;gap:.45em}
-  .pname{font-weight:700;letter-spacing:.04em}
-  .plvl{color:#ffd452;font-size:.8em}
-  .pstat{font-size:.75em;color:#c9d6c4;letter-spacing:.02em;white-space:nowrap}
-  .forkhdr{font-size:.72em;color:#ffd452;letter-spacing:.08em}
   /* ---------- overlays ---------- */
   #over{
     position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -81,12 +43,6 @@
   #over .big:active{transform:translateY(3px);box-shadow:0 1px 0 #2c5c2a}
 
   #ver{position:absolute;bottom:.6em;right:.8em;font-size:.7em;color:#6f7a6c;letter-spacing:.1em}
-  #toast{
-    position:absolute;left:50%;top:22%;transform:translateX(-50%);
-    background:rgba(20,24,20,.9);border:1px solid rgba(255,246,229,.25);
-    padding:.35em .7em;border-radius:.4em;font-size:.8em;opacity:0;transition:opacity .18s
-  }
-  #toast.show{opacity:1}
 
   #rotate{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:.6em;
@@ -98,17 +54,11 @@
 <body>
 <div id="stage">
   <canvas id="cv"></canvas>
-  <div id="ui">
-    <div id="bottom">
-      <div id="confirm" class="hide"></div>
-    </div>
-    <div id="toast"></div>
-  </div>
   <div id="over">
     <h1>SPROUT SIEGE</h1>
     <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
     <button class="big" id="bStart">START</button>
-    <div id="ver">V30.2</div>
+    <div id="ver">V31</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -254,33 +204,55 @@ function whiten(src){
 const WHITE={}, WHITEF={};
 Object.keys(ART).forEach(k=>{ WHITE[k]=whiten(ART[k]); if(FLIP[k]) WHITEF[k]=whiten(FLIP[k]); });
 
-// 3x5 pixel digits for in-world numbers
+// 3x5 pixel font: digits, A to Z and a little punctuation. Upper case only;
+// drawText upper-cases what it is given. Punctuation is narrower than 3px so
+// "2.9" does not read as "2 . 9"; every glyph advances its own width plus 1.
 const GLYPH={
  '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
  '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
  '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
  '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
  '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+ 'A':['111','101','111','101','101'],'B':['110','101','110','101','110'],
+ 'C':['111','100','100','100','111'],'D':['110','101','101','101','110'],
+ 'E':['111','100','110','100','111'],'F':['111','100','110','100','100'],
+ 'G':['111','100','101','101','111'],'H':['101','101','111','101','101'],
+ 'I':['111','010','010','010','111'],'J':['001','001','001','101','111'],
+ 'K':['101','101','110','101','101'],'L':['100','100','100','100','111'],
+ 'M':['101','111','111','101','101'],'N':['110','101','101','101','101'],
+ 'O':['111','101','101','101','111'],'P':['111','101','111','100','100'],
+ 'Q':['111','101','101','111','001'],'R':['110','101','110','101','101'],
+ 'S':['111','100','111','001','111'],'T':['111','010','010','010','010'],
+ 'U':['101','101','101','101','111'],'V':['101','101','101','101','010'],
+ 'W':['101','101','111','111','101'],'X':['101','101','010','101','101'],
+ 'Y':['101','101','010','010','010'],'Z':['111','001','010','100','111'],
  '+':['000','010','111','010','000'],'-':['000','000','111','000','000'],
- 'M':['101','111','111','101','101'],'W':['101','101','111','111','101'],
- 'X':['101','101','010','101','101'],'/':['001','001','010','100','100'],
- 'G':['111','100','101','101','111'],'O':['111','101','101','101','111'],
- 'A':['111','101','111','101','101'],'P':['111','101','111','100','100'],
- 'V':['101','101','101','101','010'],'E':['111','100','110','100','111']
+ '/':['001','001','010','100','100'],'%':['101','001','010','100','101'],
+ '?':['111','001','011','000','010'],
+ ':':['0','1','0','1','0'],'.':['0','0','0','0','1'],
+ ',':['00','00','00','01','10'],'!':['1','1','1','0','1']
 };
+const SPACE_W=3;
 function drawText(x,y,txt,color,shadow){
-  if(shadow){                       // offset copy first, so light text reads on any ground
-    ctx.fillStyle=shadow; let sx=x;
-    for(const ch of txt){ const g=GLYPH[ch]; if(g){
-      for(let j=0;j<5;j++) for(let i=0;i<3;i++) if(g[j][i]==='1') ctx.fillRect(sx+i+1,y+j+1,1,1);
-    } sx+=4; }
-  }
-  ctx.fillStyle=color; let cx=x;
-  for(const ch of txt){ const g=GLYPH[ch]; if(g){
-    for(let j=0;j<5;j++) for(let i=0;i<3;i++) if(g[j][i]==='1') ctx.fillRect(cx+i,y+j,1,1);
-  } cx+=4; }
+  txt=String(txt).toUpperCase();
+  const pass=(ox,oy)=>{
+    let cx=x;
+    for(const ch of txt){
+      const g=GLYPH[ch];
+      if(!g){ cx+=SPACE_W+1; continue; }
+      for(let j=0;j<5;j++) for(let i=0;i<g[j].length;i++)
+        if(g[j][i]==='1') ctx.fillRect(cx+i+ox,y+j+oy,1,1);
+      cx+=g[0].length+1;
+    }
+  };
+  if(shadow){ ctx.fillStyle=shadow; pass(1,1); }   // offset copy first, so light text reads on any ground
+  ctx.fillStyle=color; pass(0,0);
 }
-function textW(t){ return t.length*4-1; }
+function textW(t){
+  let w=0;
+  for(const ch of String(t).toUpperCase()){ const g=GLYPH[ch]; w+=(g?g[0].length:SPACE_W)+1; }
+  return Math.max(0,w-1);
+}
 
 /* ======================================================================
    2. TOWER & ENEMY DATA
@@ -291,9 +263,9 @@ const TOWERS={
     blurb:'Steady single-target pebbles.',
     lv:[ {dmg:12,rng:46,rate:0.90}, {dmg:19,rng:50,rate:1.00,cost:40}, {dmg:28,rng:54,rate:1.10,cost:70} ],
     forks:{
-      deadeye:{name:'Deadeye Gnome', art:'gnomeA', flip:true, desc:'Half the map, twice the pebble.',
+      deadeye:{name:'Deadeye Gnome', art:'gnomeA', flip:true, desc:'long shot',
         lv:[{dmg:85,rng:110,rate:0.55,cost:130},{dmg:150,rng:124,rate:0.60,cost:220}]},
-      rascal:{name:'Rascal Gnome', art:'gnomeB', flip:true, desc:'Blistering fire rate, short reach.',
+      rascal:{name:'Rascal Gnome', art:'gnomeB', flip:true, desc:'fast, short',
         lv:[{dmg:16,rng:54,rate:3.4,cost:130},{dmg:24,rng:58,rate:4.2,cost:220}]}
     }
   },
@@ -304,10 +276,10 @@ const TOWERS={
          {dmg:14,rng:56,rate:0.80,splash:16,slow:.25,slowT:1.2,cost:55},
          {dmg:20,rng:60,rate:0.90,splash:18,slow:.3,slowT:1.4,cost:95} ],
     forks:{
-      geyser:{name:'Geyser', art:'sprinkA', desc:'Huge blasts. Crowd deleter.',
+      geyser:{name:'Geyser', art:'sprinkA', desc:'big splash',
         lv:[{dmg:45,rng:66,rate:0.90,splash:26,slow:.2,slowT:1,cost:150},
             {dmg:75,rng:70,rate:1.00,splash:30,slow:.2,slowT:1,cost:250}]},
-      frost:{name:'Frostmist', art:'sprinkB', desc:'Weak hits, brutal chill.',
+      frost:{name:'Frostmist', art:'sprinkB', desc:'deep slow',
         lv:[{dmg:12,rng:66,rate:1.20,splash:24,slow:.55,slowT:2.0,cost:150},
             {dmg:18,rng:72,rate:1.30,splash:28,slow:.68,slowT:2.6,cost:250}]}
     }
@@ -319,10 +291,10 @@ const TOWERS={
          {dmg:20,rng:54,rate:0.90,chain:3,fall:.68,cost:55},
          {dmg:28,rng:58,rate:1.00,chain:3,fall:.72,cost:95} ],
     forks:{
-      storm:{name:'Storm Lamp', art:'zapA', desc:'Arcs across half the swarm.',
+      storm:{name:'Storm Lamp', art:'zapA', desc:'more chains',
         lv:[{dmg:44,rng:72,rate:1.10,chain:6,fall:.80,cost:155},
             {dmg:68,rng:78,rate:1.20,chain:8,fall:.85,cost:255}]},
-      jolt:{name:'Jolt Post', art:'zapB', desc:'One bug, enormous hit, brief stun.',
+      jolt:{name:'Jolt Post', art:'zapB', desc:'big hit, stun',
         lv:[{dmg:120,rng:62,rate:0.80,chain:0,stun:.35,cost:155},
             {dmg:200,rng:66,rate:0.90,chain:0,stun:.55,cost:255}]}
     }
@@ -332,9 +304,9 @@ const TOWERS={
     blurb:'Homing bees that never miss.',
     lv:[ {dmg:10,rng:58,rate:1.10}, {dmg:15,rng:62,rate:1.30,cost:60}, {dmg:21,rng:66,rate:1.50,cost:100} ],
     forks:{
-      wasp:{name:'Wasp Nest', art:'hiveA', desc:'Furious homing single target.',
+      wasp:{name:'Wasp Nest', art:'hiveA', desc:'fast homing',
         lv:[{dmg:34,rng:74,rate:2.2,cost:160},{dmg:52,rng:82,rate:2.6,cost:260}]},
-      pollen:{name:'Pollen Bloom', art:'hiveB', desc:'Constant aura, hits everything.',
+      pollen:{name:'Pollen Bloom', art:'hiveB', desc:'damage aura',
         lv:[{dmg:26,rng:52,rate:0,aura:true,cost:160},
             {dmg:45,rng:58,rate:0,aura:true,slow:.2,cost:260}]}
     }
@@ -918,6 +890,7 @@ const CARROT_BOX={l:272,t:66,r:318,b:126};     // the home patch, plus a margin
 function overUI(x,y){
   const L=x+BED_L, R=x+BED_R, T=y+BED_T, B=y+BED_B;
   if(T < -OY+15 && (L < -OX+124 || R > W+OX-72)) return true;   // the top ribbon
+  if(T < plqTop()+PLQ_H+1 && R > PLQ_L && L < PLQ_R) return true; // the info plaque
   const dockTop=H+OY-3-(DOCK_W+9);
   if(B > dockTop-2 && L < -OX+dockWidthArt()+2) return true;    // the dock
   return false;
@@ -954,7 +927,7 @@ const G={
   queue:[], qt:0, shake:0, flash:0, time:0,
   plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
   hoverPos:null, selAge:0,
-  btns:[], btnHover:null, ui:0
+  btns:[], btnHover:null, ui:0, toast:null
 };
 
 // Lives carry across maps. Towers do not: the grid is a different shape on the
@@ -1062,11 +1035,9 @@ function plotAt(ax,ay){
 function freePlot(i){ const p=G.plots[i]; return !!p && !p.blocked && !p.tower; }
 function towerAt(i){ const p=G.plots[i]; return p ? p.tower : null; }
 function addFx(o){ G.fx.push(Object.assign({life:0,ttl:.6},o)); }
-function toast(msg){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),1100);
-}
+// painted by drawPlaque, in the plaque's spot, for TOAST_T seconds of real time
+const TOAST_T=1.1;
+function toast(msg){ G.toast={msg, t:G.ui}; }
 
 /* ======================================================================
    8. WAVES
@@ -1082,7 +1053,7 @@ function startWave(){
   });
   G.queue.sort((a,b)=>a.t-b.t);
   G.phase='wave';
-  SFX.wave(); syncUI();
+  SFX.wave();
 }
 function spawn(type,m){
   const E=ENEMIES[type];
@@ -1104,7 +1075,6 @@ function waveDone(){
     }
     else { G.phase='won'; showOver('won'); }
   } else G.phase='idle';
-  syncUI();
 }
 
 /* ======================================================================
@@ -1119,7 +1089,6 @@ function damage(f,amt,src){
     addFx({type:'txt',x:f.x,y:f.y-6,txt:'+'+f.E.bounty,color:'#ffd452',ttl:.8,vy:-16});
     for(let i=0;i<(f.E.boss?14:6);i++) addFx({type:'bit',x:f.x,y:f.y,vx:(Math.random()-.5)*40,vy:-10-Math.random()*30,ttl:.5,color:f.E.boss?'#a057b8':'#8fdc8b'});
     SFX.pop(); if(f.E.boss){ SFX.boom(); G.shake=4; }
-    syncUI();
   }
 }
 function applyStun(f,dur){
@@ -1198,7 +1167,6 @@ function step(dt){
       G.shake=5; G.flash=1; SFX.hurt();
       addFx({type:'txt',x:W-40,y:H/2-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
       if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
-      syncUI();
     }
   }
 
@@ -1314,11 +1282,12 @@ function ring(cx,cy,rad,color,alpha){
 const GL={
   check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
   cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
-  up:["..x..",".xxx.","xxxxx",".xxx.","..x.."],
+  up:["..x..",".xxx.","xxxxx","..x..","..x.."],      // upgrade: an arrow, not a diamond
   coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
   note:["...xx","..xxx","..x..","xxx..","xxx.."],
   pause:["x.x","x.x","x.x","x.x","x.x"],
   play:["x..","xx.","xxx","xx.","x.."],
+  back:["..x",".xx","xxx",".xx","..x"],
   flag:["x...","xxx.","xxxx","x...","x..."],    // map; a 3px M reads as H
   wave:[".....",".x...","x.x.x","...x.","....."] // wave; so does a 3px W
 };
@@ -1410,7 +1379,7 @@ function drawBtn(b){
   } else {
     const sk=BTN_SKIN[b.act]||BTN_SKIN.no;
     plate(b.x,y,b.w,b.h,sk[0],sk[1]);
-    glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':'#ffffff');
+    glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':(b.act==='sell'?'#ffd452':'#ffffff'));
   }
   if(b.num!==undefined){
     // A price tag, not loose text. It used to be a translucent smear that the
@@ -1423,7 +1392,8 @@ function drawBtn(b){
     if(by+7>H+OY-1) by=y-8;
     bx=Math.max(-OX+3, Math.min(W+OX-4-tw, bx));
     plate(bx-2, by-1, tw+4, 9, '#2a2f28', '#4b5248');
-    drawText(bx, by+1, t, b.dis?'#8d92a8':'#ffd452');
+    // money back reads green, money out reads yellow
+    drawText(bx, by+1, t, b.dis?'#8d92a8':(b.act==='sell'?'#8ee88a':'#ffd452'));
   }
 }
 // The dock used to be <button> elements. Native button rendering, focus rings
@@ -1796,6 +1766,7 @@ function draw(){
     else if(e.type==='txt'){ ctx.globalAlpha=Math.min(1,(1-k)*2); drawText(Math.round(e.x-textW(e.txt)/2),Math.round(e.y),e.txt,e.color); ctx.globalAlpha=1; }
   }
 
+  drawPlaque();
   pending.forEach(drawBtn);
 
   // dock last so it paints over the field, but appended last so in-world
@@ -1872,7 +1843,6 @@ function layout(){
   stage.style.width=cw+'px'; stage.style.height=ch+'px';
   stage.style.setProperty('--fs', Math.max(9,Math.min(18,Math.round(ch*0.046)))+'px');
   document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
-  stage.style.setProperty('--dockw', Math.round(dockWidthArt()*s)+'px');
 }
 window.addEventListener('resize',layout);
 window.addEventListener('orientationchange',()=>setTimeout(layout,250));
@@ -1893,16 +1863,15 @@ function doAction(b){
   if(b.act==='hud_action'){
     const st=actionState();
     if(st==='send') startWave(); else G.paused=(st==='pause');
-    syncUI(); return;
+    return;
   }
   if(b.act==='card'){
     const F=TOWERS[b.fam];
     if(G.placing===b.fam){ cancelPlacing(); return; }
     if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
     G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.selected=null;
-    toast(F.name+(PLACEMENT==='open' ? ': tap the ground to preview'
-                                     : ': tap a plot to preview'));
-    SFX.tick(); syncUI(); return;
+    toast(PLACEMENT==='open' ? 'Tap the ground to preview' : 'Tap a plot to preview');
+    SFX.tick(); return;
   }
   if(b.act==='ok'){ placeGhost(); return; }
   if(b.act==='no'){ cancelPlacing(); return; }   // cross leaves build mode entirely
@@ -1914,7 +1883,7 @@ function doAction(b){
     addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:18,ttl:.45,color:'#a97a4f'});
     for(let k=0;k<8;k++) addFx({type:'bit',x:pl.x,y:pl.y,
       vx:(Math.random()-.5)*40, vy:-14-Math.random()*20, ttl:.5, color:k<5?'#8a6242':'#5c4433'});
-    syncUI(); return;
+    return;
   }
   const t=G.selected;
   if(!t||!G.towers.includes(t)) return;
@@ -1928,13 +1897,15 @@ function doAction(b){
     }
     G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
     addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
-    SFX.coin(); syncUI(); return;
+    SFX.coin(); return;
   }
   if(b.act==='up'){
     const cost=nextCost(t);
     if(cost===null) return;
     if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
-    G.gold-=cost; t.spent+=cost; t.level++; SFX.up(); syncUI(); return;
+    G.gold-=cost; t.spent+=cost; t.level++; SFX.up();
+    if(t.level===3 && !t.branch) toast('Pick a path: permanent');
+    return;
   }
   if(b.act==='forkA'||b.act==='forkB'){
     const F=TOWERS[t.fam], B=F.forks[b.branch], c0=B.lv[0].cost;
@@ -1942,7 +1913,7 @@ function doAction(b){
     G.gold-=c0; t.spent+=c0; t.branch=b.branch; t.level=4;
     SFX.up(); G.shake=2;
     addFx({type:'ring',x:t.x,y:t.y,r:2,rmax:22,ttl:.5,color:'#ffd452'});
-    syncUI(); return;
+    return;
   }
 }
 cv.addEventListener('pointerdown',ev=>{
@@ -1967,19 +1938,19 @@ cv.addEventListener('pointerdown',ev=>{
         toast('No room there'); SFX.bad(); return;
       }
       if(!G.ghost||G.ghost.x!==gx||G.ghost.y!==gy){
-        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick(); syncUI();
+        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick();
       }
       return;
     }
     if(i<0){ cancelPlacing(); return; }          // tapping open ground puts it away
     if(freePlot(i)){
       if(!G.ghost||G.ghost.i!==i){
-        const q=G.plots[i]; G.ghost={i,x:q.x,y:q.y,age:0}; SFX.tick(); syncUI();
+        const q=G.plots[i]; G.ghost={i,x:q.x,y:q.y,age:0}; SFX.tick();
       }
     } else toast(G.plots[i].tower ? 'Plot taken' : 'Cleared stumps only');
     return;
   }
-  if(i<0){ G.selected=null; G.selPlot=-1; syncUI(); return; }
+  if(i<0){ G.selected=null; G.selPlot=-1; return; }
   const p2=G.plots[i];
   if(p2.tower){
     G.selPlot=-1;
@@ -1988,7 +1959,6 @@ cv.addEventListener('pointerdown',ev=>{
     G.selected=null;
     G.selPlot=(G.selPlot===i)?-1:i;
   } else { G.selected=null; G.selPlot=-1; }
-  syncUI();
 },{passive:false});
 
 cv.addEventListener('pointermove',ev=>{
@@ -2030,10 +2000,9 @@ function placeGhost(){
   addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:14,ttl:.35,color:'#ffd452'});
   SFX.place();
   G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.btnHover=null;
-  syncUI();
 }
 function cancelPlacing(){
-  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.btnHover=null; syncUI();
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.btnHover=null;
 }
 
 /* ======================================================================
@@ -2048,60 +2017,83 @@ function actionState(){
   return 'pause';
 }
 
-function statBar(t){
-  const st=statsOf(t), dps=st.aura?st.dmg:Math.round(st.dmg*st.rate);
-  let x='DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+'  '+(st.aura?'AURA':'DPS '+dps);
-  if(st.chain) x+='  CHAIN '+(st.chain+1);
-  if(st.stun) x+='  STUN';
-  if(st.splash) x+='  SPLASH';
-  if(st.slow) x+='  SLOW '+Math.round(st.slow*100)+'%';
-  return x;
+// what a tower does beyond plain damage, for the plaque's first line
+function effects(st){
+  const x=[];
+  if(st.chain) x.push('CHAIN '+(st.chain+1));
+  if(st.stun) x.push('STUN');
+  if(st.splash) x.push('SPLASH');
+  if(st.slow) x.push('SLOW '+Math.round(st.slow*100)+'%');
+  return x.length ? ' '+x.join(' ') : '';
+}
+function numbers(st){
+  return 'DMG '+st.dmg+' RNG '+(st.rng/TILE).toFixed(1)+' '+(st.aura?'AURA':'DPS '+Math.round(st.dmg*st.rate));
 }
 
-const conf=document.getElementById('confirm');
-let confKey='';
-const _icons={};
-function spriteImg(key,cls){
-  if(!_icons[key]){
-    const src=ART[key];
-    const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
-    c.getContext('2d').drawImage(src,0,0);
-    _icons[key]=c.toDataURL();
-  }
-  return '<img class="pxi'+(cls?' '+cls:'')+'" src="'+_icons[key]+'" alt="">';
-}
-// slim read-out only: every action now lives on the plot itself
-function infoBar(){
+// The info plaque used to be a DOM panel over the field, and it hid part of
+// map 1's bottom loop. It is painted now, in the one spot that is clear of the
+// trail on all three maps at every screen shape: the top band between the
+// read-outs and the buttons. Measured in v31: two lines fit there, three do
+// not fit anywhere on map 3, so every plaque is two lines, and there is no
+// room for a tower picture beside them: the tower is lit up on the field.
+// Line one says what it is and does, line two gives the numbers.
+// A line is a list of segments: [text,colour] or {glyph,colour}.
+const PLQ_L=146, PLQ_R=266, PLQ_H=18;
+const PLQ_NAME='#ffeedd', PLQ_STAT='#cbb495', PLQ_GOLD='#ffd452', PLQ_SH='#241a10';
+function plqTop(){ return -OY+1; }
+function plaqueContent(){
   if(G.placing){
     const F=TOWERS[G.placing], st=F.lv[0];
-    return '<div class="prow">'+spriteImg(F.art)+'<div><div class="pname">'+F.name.toUpperCase()+
-      '</div><div class="pstat">DMG '+st.dmg+'  RNG '+(st.rng/TILE).toFixed(1)+
-      '  DPS '+Math.round(st.dmg*st.rate)+'  &#9673;'+F.cost+'</div></div></div>';
+    return {lines:[[[F.name,PLQ_NAME],[effects(st),PLQ_STAT]],
+      [{glyph:'coin',col:PLQ_GOLD},[F.cost+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
   }
   if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
-    return '<div class="prow"><div><div class="pname">OVERGROWN PLOT</div>'+
-      '<div class="pstat">Clear the stump for &#9673;'+CLEAR_COST+' to open this ground</div></div></div>';
+    return {lines:[[['Overgrown plot',PLQ_NAME]],
+      [['Clear the stump: ',PLQ_STAT],{glyph:'coin',col:PLQ_GOLD},[String(CLEAR_COST),PLQ_GOLD]]]};
   }
   const t=G.selected;
-  if(!t||!G.towers.includes(t)) return '';
+  if(!t||!G.towers.includes(t)) return null;
   const F=TOWERS[t.fam];
   if(!t.branch && t.level===3){
+    // one line per path, on the same side as its button
     const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
-    return '<div class="forkhdr">PICK A PATH: PERMANENT</div>'+
-      '<div class="pstat">&#9664; '+spriteImg(A.art,'sm')+A.name.toUpperCase()+
-        ' &#9673;'+A.lv[0].cost+', '+A.desc+'</div>'+
-      '<div class="pstat">&#9654; '+spriteImg(B.art,'sm')+B.name.toUpperCase()+
-        ' &#9673;'+B.lv[0].cost+', '+B.desc+'</div>';
+    return {lines:[
+      [{glyph:'back',col:PLQ_GOLD},[' '+A.name+': ',PLQ_NAME],[A.desc,PLQ_STAT]],
+      [[B.name+': ',PLQ_NAME],[B.desc+' ',PLQ_STAT],{glyph:'play',col:PLQ_GOLD}]
+    ]};
   }
-  return '<div class="prow">'+spriteImg(artOf(t))+'<div><div class="pname">'+nameOf(t).toUpperCase()+
-    ' <span class="plvl">LV '+t.level+'</span></div><div class="pstat">'+statBar(t)+'</div></div></div>';
+  const st=statsOf(t);
+  return {lines:[[[nameOf(t),PLQ_NAME],[effects(st),PLQ_STAT]],
+    [['LV '+t.level+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
 }
-
-// Read-outs are painted in drawHUD now; the only DOM left in play is the plaque.
-function syncUI(){
-  const html=infoBar();
-  conf.classList.toggle('hide',!html);
-  if(html!==confKey){ confKey=html; conf.innerHTML=html; }
+function segW(s){ return s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
+function lineW(l){ return l.reduce((w,s)=>w+segW(s),0); }
+function drawLine(l,x,y){
+  for(const s of l){
+    if(s.glyph) glyph(GL[s.glyph],x,y,s.col,PLQ_SH);
+    else drawText(x,y,s[0],s[1],PLQ_SH);
+    x+=segW(s);
+  }
+}
+function plaqueW(c){ return 7+Math.max.apply(null,c.lines.map(lineW)); }
+function drawPlaque(){
+  const y=plqTop();
+  if(G.toast && G.ui-G.toast.t < TOAST_T){         // a toast takes the plaque's spot
+    const age=G.ui-G.toast.t, w=textW(G.toast.msg)+9, h=11;
+    const x=Math.round((PLQ_L+PLQ_R-w)/2);
+    ctx.globalAlpha=Math.min(1,(TOAST_T-age)/0.18);
+    plate(x,y,w,h,'#1f251e','#4b5248');
+    drawText(x+4,y+3,G.toast.msg,'#fff6e5','#0e120e');
+    ctx.globalAlpha=1;
+    return;
+  }
+  const c=plaqueContent();
+  if(!c) return;
+  const w=plaqueW(c), x=Math.round((PLQ_L+PLQ_R-w)/2);
+  plate(x,y,w,PLQ_H,'#3b2a1b','#6b4a30');
+  const tx=x+3;
+  drawLine(c.lines[0],tx,y+3);
+  if(c.lines[1]) drawLine(c.lines[1],tx,y+10);
 }
 
 /* ======================================================================
@@ -2127,7 +2119,7 @@ function showOver(kind){
       loadMap(G.map+1);
       G.paused=false;
       over.classList.add('hide');
-      SFX.wave(); syncUI();
+      SFX.wave();
     });
     SFX.up();
     return;
@@ -2154,7 +2146,7 @@ function showOver(kind){
     '<button class="big" id="bEndless">ENDLESS MODE</button>'+
     '<button class="big" id="bAgain" style="background:#3d5f8f;border-color:#7aa6dd!important;box-shadow:0 4px 0 #23395a">START OVER</button>';
   document.getElementById('bEndless').addEventListener('click',()=>{
-    G.endless=true; G.phase='idle'; G.paused=false; over.classList.add('hide'); syncUI();
+    G.endless=true; G.phase='idle'; G.paused=false; over.classList.add('hide');
   });
   document.getElementById('bAgain').addEventListener('click',reset);
   SFX.up();
@@ -2163,18 +2155,17 @@ function reset(){
   G.lives=20; G.endless=false; G.pack=0;
   loadMap(1);
   G.paused=false;
-  over.classList.add('hide'); syncUI();
+  over.classList.add('hide');
 }
 document.getElementById('bStart').addEventListener('click',()=>{
   actx(); G.started=true; G.paused=false; G.phase='idle';
-  over.classList.add('hide'); syncUI();
+  over.classList.add('hide');
 });
 
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; syncUI(); } });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; } });
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 
-syncUI();
 })();
 </script>
 </body>

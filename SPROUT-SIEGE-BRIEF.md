@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v30.2. Read this
+Working document for continuing the build. Last updated with v31. Read this
 first; it replaces re-reading the chat.
 
 ---
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v30.2** |
+| Current version | **v31** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
@@ -67,7 +67,8 @@ This is a standing requirement, not a one-off.
 | v29 | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
-| **v30.2** | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v31** | The last DOM in play is gone: toast and info plaque are painted on the canvas, in a band at the top that is clear of the trail on all three maps. Full A to Z pixel font. Upgrade is an arrow; sell is the top bar's gold coin (Faisal's call over a coin with a plus, which read as obscure), refunds green. |
 
 ---
 
@@ -101,6 +102,16 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     as H at phone size, and 5px-wide versions blur under the drop shadow
     (rendered and compared in v30). Map is a flag then the number, wave is a
     small wave then `1/5`.
+11. **Info plaque and toast live in the top band** (v31), centred between
+    the read-outs and the buttons (`PLQ_L=146`, `PLQ_R=266`, 18px tall). It
+    is the only spot clear of the trail on all three maps at every screen
+    shape, measured and checked by the smoke test. Nothing can be built under
+    it. A toast takes the plaque's spot for 1.1s.
+12. **Plaques are two lines, no tower picture.** Three lines fit nowhere on
+    map 3. Line one is the name plus effects (chain, stun, splash, slow),
+    line two the level or cost plus the numbers. Fork plaques are one line
+    per path, on the side of its button, with a short role (`desc`) instead
+    of the old flavour line.
 
 ---
 
@@ -120,6 +131,8 @@ Keeping these on record so they do not get re-proposed.
 | **Soil in colours of its own** | A patch in its own browns reads as an object dropped on the lawn, whatever its shape. Deriving it from the map's trail palette is what finally made it read as the same earth, turned over. |
 | **Drawing a rim per disc** | Puts rim pixels through the patch interior wherever a later disc overlaps an earlier one. The patch read as a handful of dark rocks. The outline has to be grown once around the finished union. |
 | **Ground shadow under towers** | Read as extra bed edge and made towers look like they were floating. |
+| **Plaque at the bottom, beside the dock** (v31 mock B) | Covers the trail's bottom loop on maps 1 and 3 and grazes it on map 2. Comparison in `labs/v31-plaque/`. |
+| **Three-line plaque, or a tower picture in it** (v31) | No three-line spot is clear of the trail on map 3. With a picture, the Sprinkler's stats ran to 168px of a 120px band. |
 
 ---
 
@@ -205,8 +218,10 @@ Cached per position, palette and growth step, so settled plots cost one
   a square.
 - **Path** is a centripetal Catmull-Rom spline with a perpendicular meander,
   with a binary-search `posAt(d)` over cumulative arc length.
-- **Text** is a 3x5 `GLYPH` table. **Add characters before using them.** A
-  missing G and O shipped a blank GO button in v22.
+- **Text** is a 3x5 `GLYPH` table: digits, A to Z, `+ - / % ? : . , !`.
+  `drawText` upper-cases its input and punctuation is narrower than letters,
+  so measure with `textW()`, never `length*4`. Any other character draws as
+  a blank: add it first. A missing G and O shipped a blank GO button in v22.
 - **Buttons** are hit-tested from `G.btns` via `hitBtn()` with 3px padding, and
   drawn last so nothing covers them.
 - **Foliage colours** must not match the grass. `#6cc16b` is the grass colour;
@@ -220,7 +235,7 @@ before shipping any version.**
 
 | File | Purpose | Status |
 |---|---|---|
-| `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer tap on the dock, builds and forks all four families, sells, plays all 15 waves to the win screen, fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
+| `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer tap on the dock, builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
 | `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v32 |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 
