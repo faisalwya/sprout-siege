@@ -149,7 +149,14 @@ function instrument(src) {
       r.waves.map(w => `W${w.w} ${w.secs}s -${w.lost}`).join(' '));
     await shot(`0${3 + map}-map${map}-end`);
     if (r.phase === 'rift') {
-      if (map === 1) await shot('04b-map-cleared');
+      if (map === 1) {
+        await shot('04b-map-cleared');
+        // A boss kill shakes the screen just as the map clears; on the paused
+        // map-cleared screen that shake must settle, not freeze (v33 fix).
+        await page.evaluate(() => { __SS.G.shake = 4; });
+        await page.waitForTimeout(2300);
+        check('shake settles on the map-cleared screen', await page.evaluate(() => __SS.G.shake === 0));
+      }
       const before = await page.evaluate(() => __SS.G.map);
       check(`map ${map} cleared: next-map tap loads map ${map + 1}`,
         await tapAct('sc_next') && await page.evaluate(b => __SS.G.map === b + 1 && !__SS.G.screen, before));

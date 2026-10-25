@@ -1786,6 +1786,7 @@ function draw(){
 /* ======================================================================
    11. LOOP
    ====================================================================== */
+const SHAKE_SETTLE=2;   // shake units per second while paused: 4 settles in 2s
 let last=performance.now();
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000); last=now;
@@ -1796,6 +1797,11 @@ function frame(now){
     let t=raw*G.speed;
     while(t>0){ const d=Math.min(1/60,t); step(d); t-=d; }
   } else if(!G.paused){ G.time+=raw; }
+  // A paused game (a screen is up, or the pause button) runs no step(), so the
+  // shake would freeze at whatever the last hit left. Let it settle in real
+  // time instead, slowly, so a boss kill still rumbles under the map-cleared
+  // screen for a moment and then goes still.
+  if(G.paused && G.shake>0) G.shake=Math.max(0,G.shake-raw*SHAKE_SETTLE);
   draw();
   requestAnimationFrame(frame);
 }
