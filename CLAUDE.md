@@ -69,7 +69,8 @@ and follow `WORKFLOW.md`.
 ## Gotchas that have each cost a version
 
 - A crash can hide behind valid syntax. Always run the smoke test.
-- The 3x5 `GLYPH` table only has some characters. Add a glyph before using it.
+- The 3x5 `GLYPH` table has digits, A to Z and `+ - / % ? : . , !`. Anything
+  else draws blank: add a glyph before using it. Measure text with `textW()`.
 - `#6cc16b` is the grass colour. Never use it for foliage or anything that
   must stand out from the ground.
 - Don't use `globalCompositeOperation='source-atop'` over an opaque

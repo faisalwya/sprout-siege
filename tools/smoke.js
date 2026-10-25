@@ -18,7 +18,8 @@ const OUT = path.join(__dirname, 'out');
 fs.mkdirSync(OUT, { recursive: true });
 
 const EXPORTS = `window.__SS={G,TOWERS,MAPS,FAMS,placeOK,placeGhost,doAction,
-  startWave,step,statsOf,nextCost,get PLACEMENT(){return PLACEMENT}};`;
+  startWave,step,statsOf,nextCost,get PLACEMENT(){return PLACEMENT},
+  plaqueContent,plaqueW,PLQ_L,PLQ_R,PLQ_H,loadMap,distToPath,TRAIL_CLEAR};`;
 
 function instrument(src) {
   const i = src.lastIndexOf('})();');
@@ -131,6 +132,38 @@ function instrument(src) {
   check('campaign ends on the win screen',
     await page.evaluate(() => __SS.G.phase === 'won'));
   await shot('07-won');
+
+  // The info plaque is painted in a fixed band at the top (v31). Every plaque
+  // the game can show must fit that band, and the band must be clear of the
+  // trail on every map, with or without a top margin (OY 0 to 2).
+  const plq = await page.evaluate(() => {
+    const S = __SS, G = S.G, room = S.PLQ_R - S.PLQ_L, wide = [];
+    const measure = label => { const c = S.plaqueContent(), w = c ? S.plaqueW(c) : 0;
+      if (w > room) wide.push(label + ' ' + w); };
+    G.selected = null; G.selPlot = -1;
+    for (const fam of S.FAMS) {
+      G.placing = fam; measure(fam + ' placing'); G.placing = null;
+      const F = S.TOWERS[fam], t = { fam, level: 1, branch: null };
+      G.towers.push(t); G.selected = t;
+      for (let l = 1; l <= 3; l++) { t.level = l; measure(fam + ' L' + l); }
+      for (const b of Object.keys(F.forks)) for (let l = 4; l <= 5; l++) {
+        t.branch = b; t.level = l; measure(b + ' L' + l);
+      }
+      G.towers.pop(); G.selected = null;
+    }
+    const hits = [];
+    for (let m = 1; m <= 3; m++) {
+      S.loadMap(m);
+      for (let oy = 0; oy <= 2; oy++)
+        for (let y = -oy + 1; y < -oy + 1 + S.PLQ_H; y++)
+          for (let x = S.PLQ_L; x < S.PLQ_R; x++)
+            if (S.distToPath(x + .5, y + .5) < S.TRAIL_CLEAR) { hits.push('map ' + m + ' OY ' + oy); y = 1e9; break; }
+    }
+    return { room, wide, hits: [...new Set(hits)] };
+  });
+  check('every info plaque fits its band', plq.wide.length === 0,
+    plq.wide.length ? plq.wide.join(', ') : 'all within ' + plq.room + 'px');
+  check('plaque band is clear of the trail on all maps', plq.hits.length === 0, plq.hits.join(', '));
 
   // Let a few real animation frames run so draw() is exercised in every state.
   await page.waitForTimeout(400);

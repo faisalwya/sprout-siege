@@ -72,7 +72,7 @@ the sides instead of extra garden (`MAX_PAD_X=0`). Brief decision 6 amended.
 **Done when:** Safari shape (852x308) shows the same layout as the
 home-screen shape (852x393); smoke test all PASS.
 
-## v31: UI on the canvas [ ]
+## v31: UI on the canvas [x]
 
 Brings play back in line with settled decision 1 (no DOM over the playfield).
 
