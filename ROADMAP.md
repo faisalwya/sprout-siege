@@ -29,7 +29,7 @@ No gameplay or look changes except the text and glyph fixes listed.
 4. **Version label:** `#ver` says V26. Set it to V30.
 5. **Title screen copy** still describes plots ("Plots are the tilled beds",
    "tap a plot"). Rewrite for open placement in at most three short lines.
-6. **Em dashes:** remove every `—` and `&mdash;` (toast around line 1914,
+6. **Em dashes:** remove every `\u2014` and `&mdash;` (toast around line 1914,
    fork plaque around 2109, rift screen around 2142). Use a colon or comma.
 7. **Glyphs:** in the 3x5 font, W reads as H and M nearly does too, so the
    HUD shows "M1 H1/5". Redraw W and M so they read at phone size (render
@@ -44,7 +44,7 @@ No gameplay or look changes except the text and glyph fixes listed.
     Wasp Nest / Pollen Bloom. Fix the header line too.
 
 **Done when:** `npm test` all PASS; title, HUD and fork screenshots checked;
-no `—` or `&mdash;` left in `index.html`.
+no `\u2014` or `&mdash;` left in `index.html`.
 
 ## v31: UI on the canvas [ ]
 
