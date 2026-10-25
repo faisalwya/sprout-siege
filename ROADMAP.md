@@ -63,6 +63,15 @@ No gameplay change: the walked path and timings are untouched.
 **Done when:** all three maps checked at home-screen, Safari, wide desktop
 and iPad shapes; smoke test wave times identical to v30.
 
+## v30.2: Safari matches the home-screen app [x]
+
+v30.1 fixed the trail ends, but Faisal wants Safari to look the same as the
+home-screen app, not just tidy. Wider-than-game screens now get plain bars at
+the sides instead of extra garden (`MAX_PAD_X=0`). Brief decision 6 amended.
+
+**Done when:** Safari shape (852x308) shows the same layout as the
+home-screen shape (852x393); smoke test all PASS.
+
 ## v31: UI on the canvas [ ]
 
 Brings play back in line with settled decision 1 (no DOM over the playfield).
