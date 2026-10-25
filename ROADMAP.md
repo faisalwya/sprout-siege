@@ -46,6 +46,23 @@ No gameplay or look changes except the text and glyph fixes listed.
 **Done when:** `npm test` all PASS; title, HUD and fork screenshots checked;
 no `\u2014` or `&mdash;` left in `index.html`.
 
+## v30.1: Trail fits any screen [x]
+
+Found on the live site: in iPhone Safari (toolbars make the screen wider than
+the game) the trail started in open grass on the left and a stub poked out
+behind the carrot patch. The side margin can reach 72px but the trail only
+ran 24px past each edge.
+
+1. Draw the trail straight on to the canvas edge, however wide the margin.
+2. Clip the trail at the far side of the carrot bed.
+3. Fade bugs in and out over the first and last 16px of the path, so they
+   don't pop into view on wide screens.
+
+No gameplay change: the walked path and timings are untouched.
+
+**Done when:** all three maps checked at home-screen, Safari, wide desktop
+and iPad shapes; smoke test wave times identical to v30.
+
 ## v31: UI on the canvas [ ]
 
 Brings play back in line with settled decision 1 (no DOM over the playfield).

@@ -108,7 +108,7 @@
     <h1>SPROUT SIEGE</h1>
     <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
     <button class="big" id="bStart">START</button>
-    <div id="ver">V30</div>
+    <div id="ver">V30.1</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -601,42 +601,58 @@ function paintBG(pal){
 
   // ---- the trail, in world space
   q.save(); q.translate(OX,OY);
-  const widths=[]; let run=0;
-  for(let i=0;i<PTS.length;i++){
-    if(i) run+=Math.hypot(PTS[i].x-PTS[i-1].x, PTS[i].y-PTS[i-1].y);
+  // The walked path only reaches just past a phone's edges. A wider screen
+  // (Safari with its toolbars) shows more margin, so the drawn trail carries on
+  // straight to the canvas edge, and is clipped at the far side of the carrot
+  // bed so no stub pokes out behind it. Bugs fade in and out over the same ends.
+  const bx0=17*TILE+6, by0=4*TILE+2, bw=3*TILE, bh=4*TILE-4;
+  q.beginPath(); q.rect(-OX,-OY,OX+bx0+bw,ARTH); q.clip();
+  const T=PTS.slice();
+  {
+    const k=Math.min(6,PTS.length-1), ux=PTS[k].x-PTS[0].x, uy=PTS[k].y-PTS[0].y, ul=Math.hypot(ux,uy)||1;
+    for(let n=1; n<60 && PTS[0].x-ux/ul*3*n > -OX-10; n++)
+      T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
+  }
+  const ext=T.length-PTS.length;
+  const widths=[]; let run=-3*ext;
+  for(let i=0;i<T.length;i++){
+    if(i) run+=Math.hypot(T[i].x-T[i-1].x, T[i].y-T[i-1].y);
     widths.push(6.1 + Math.sin(run*0.105)*0.85 + Math.sin(run*0.047+1.7)*0.75 + Math.sin(run*0.29+0.4)*0.3);
   }
-  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i]+1.5,pal.edge);
-  for(let i=0;i<PTS.length;i++) disc(q,PTS[i].x,PTS[i].y,widths[i],pal.dirt);
-  for(let i=0;i<PTS.length;i++){
-    const a=PTS[Math.max(0,i-1)], b=PTS[Math.min(PTS.length-1,i+1)];
-    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
-    const sway=Math.sin(i*0.06)*1.8+Math.sin(i*0.017+1)*1.2;
-    disc(q,PTS[i].x+(-dy/L)*sway, PTS[i].y+(dx/L)*sway, widths[i]*0.42, pal.inner);
+  for(let i=0;i<T.length;i++) disc(q,T[i].x,T[i].y,widths[i]+1.5,pal.edge);
+  for(let i=0;i<T.length;i++) disc(q,T[i].x,T[i].y,widths[i],pal.dirt);
+  for(let i=0;i<T.length;i++){
+    const a=T[Math.max(0,i-1)], b=T[Math.min(T.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, n=i-ext;
+    const sway=Math.sin(n*0.06)*1.8+Math.sin(n*0.017+1)*1.2;
+    disc(q,T[i].x+(-dy/L)*sway, T[i].y+(dx/L)*sway, widths[i]*0.42, pal.inner);
   }
-  for(let i=0;i<PTS.length;i++){
-    const a=PTS[Math.max(0,i-1)], b=PTS[Math.min(PTS.length-1,i+1)];
+  function specks(i){
+    const a=T[Math.max(0,i-1)], b=T[Math.min(T.length-1,i+1)];
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
     const nx=-dy/L, ny=dx/L, w=widths[i];
     for(let j=0;j<2;j++){
       const t=(rnd()*2-1)*w*0.85;
       q.fillStyle=rnd()<.5?pal.edge:pal.inner;
-      q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,1);
+      q.fillRect(Math.round(T[i].x+nx*t), Math.round(T[i].y+ny*t),1,1);
     }
     if(rnd()<.34){
       const side=rnd()<.5?-1:1, t=(w+0.5+rnd()*1.4)*side;
       q.fillStyle=rnd()<.5?pal.speck:pal.dark;
-      q.fillRect(Math.round(PTS[i].x+nx*t), Math.round(PTS[i].y+ny*t),1,rnd()<.4?2:1);
+      q.fillRect(Math.round(T[i].x+nx*t), Math.round(T[i].y+ny*t),1,rnd()<.4?2:1);
     }
     if(rnd()<.05){
       const t=(rnd()*2-1)*w*0.6;
-      disc(q,PTS[i].x+nx*t,PTS[i].y+ny*t,1.6,pal.edge);
+      disc(q,T[i].x+nx*t,T[i].y+ny*t,1.6,pal.edge);
     }
   }
+  for(let i=ext;i<T.length;i++) specks(i);
+  const sv=seed;                    // the extension's specks must not shift the
+  for(let i=0;i<ext;i++) specks(i); // random draws the bed below depends on
+  seed=sv;
 
   // ---- The carrot bed. Soil, stones, sprouts and fence are static so they stay
   // baked here; the carrots themselves are live state and draw every frame.
-  const bx0=17*TILE+6, by0=4*TILE+2, bw=3*TILE, bh=4*TILE-4;
   q.fillStyle='#6b4630'; q.fillRect(bx0,by0,bw,bh);
   for(let i=0;i<bw;i+=3){                       // chewed edge, not a clean rectangle
     if(rnd()<.55) q.fillRect(bx0+i,by0-1,3,1);
@@ -1713,15 +1729,17 @@ function draw(){
   // enemies
   for(const f of G.foes){
     const E=f.E, w=E.boss?16:12;
+    const fa=Math.max(0,Math.min(1, f.d/16, (PATH_LEN-f.d)/16));   // trail ends
+    ctx.globalAlpha=fa;
     const bob=E.boss?0:Math.round(Math.sin(f.bob)* (f.type==='moth'?1.5:0.6));
     shadow(f.x, f.y+ (E.boss?7:5), E.boss?14:9);
     const fl=(E.flip&&f.face===-1)?-1:1;
     drawSprite(E.art, fl, f.x, f.y-1+bob, w,w);
     if(f.hit>0){
       const img=fl===-1?WHITEF[E.art]:WHITE[E.art];
-      ctx.globalAlpha=Math.min(.85,f.hit*6);
+      ctx.globalAlpha=fa*Math.min(.85,f.hit*6);
       ctx.drawImage(img, Math.round(f.x-w/2), Math.round(f.y-1+bob-w/2));
-      ctx.globalAlpha=1;
+      ctx.globalAlpha=fa;
     }
     if(f.stunT>0){
       ctx.fillStyle='#ffd452';
@@ -1739,6 +1757,7 @@ function draw(){
       ctx.fillStyle=hp>.5?'#6cc16b':(hp>.25?'#ffd452':'#e0524f');
       ctx.fillRect(bx,by,Math.ceil(bw*hp),1);
     }
+    ctx.globalAlpha=1;
   }
 
   // projectiles
