@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Placement Lab 2</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{height:100%;overflow:hidden;position:fixed;inset:0;background:#12150f;overscroll-behavior:none}
+  body{display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;color:#fff6e5;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action:none}
+  #stage{position:relative;line-height:0}
+  canvas{display:block;image-rendering:pixelated;touch-action:none}
+  #ui{position:absolute;inset:0;line-height:1.3;pointer-events:none;font-size:var(--fs)}
+  #ui button{font:inherit;color:inherit;pointer-events:auto;cursor:pointer;border:0}
+
+  #top{position:absolute;top:0;left:0;right:0;display:flex;gap:.3em;padding:.4em .5em;align-items:flex-start;flex-wrap:wrap}
+  .grp{display:flex;gap:.2em;background:rgba(18,22,18,.78);border:1px solid rgba(255,246,229,.16);
+       border-radius:.45em;padding:.2em}
+  .grp .lbl{font-size:.6em;color:#9fb09b;padding:.25em .3em;letter-spacing:.08em;align-self:center}
+  .opt{background:transparent;border-radius:.3em;padding:.25em .45em;font-size:.72em;letter-spacing:.04em;color:#c2cfbe}
+  .opt.on{background:#4f9d4a;color:#fff;font-weight:700}
+  .opt:active{transform:translateY(1px)}
+
+  #hint{position:absolute;left:.5em;top:3.5em;font-size:.66em;color:#cfe0ca;
+        background:rgba(18,22,18,.72);border-left:2px solid #ffd452;padding:.3em .5em;border-radius:.2em;max-width:30em}
+  #count{position:absolute;right:.5em;bottom:.55em;font-size:.68em;color:#9fb09b}
+
+  #bottom{position:absolute;left:0;bottom:0;display:flex;gap:.35em;padding:.45em .5em;align-items:flex-end}
+  .card{pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:.05em;
+    background:rgba(24,28,24,.8);border:1px solid rgba(255,246,229,.2);border-radius:.5em;
+    padding:.25em .3em .2em;min-width:4.2em;touch-action:none}
+  .card canvas{width:2.1em;height:2.1em;image-rendering:pixelated;pointer-events:none}
+  .card .nm{font-size:.6em;letter-spacing:.04em;color:#c2cfbe;white-space:nowrap}
+  .card .pr{font-size:.7em;color:#ffd452}
+  .card.sel{border-color:#ffd452;background:rgba(60,52,20,.9);box-shadow:0 0 0 2px rgba(255,212,82,.35)}
+
+  #rotate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+    gap:.6em;background:#12150f;z-index:50;text-align:center;padding:2em;font-size:14px}
+  @media (orientation:portrait){#rotate{display:flex}#stage{visibility:hidden}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="ui">
+    <div id="top">
+      <div class="grp"><span class="lbl">CONFIRM</span>
+        <button class="opt" data-var="flank">&#10003;/&#10007; flanking</button>
+        <button class="opt" data-var="retap">tap again</button>
+      </div>
+      <div class="grp"><span class="lbl">RETICLE</span>
+        <button class="opt" data-ret="vine">vine</button>
+        <button class="opt" data-ret="fire">fireflies</button>
+      </div>
+      <div class="grp"><span class="lbl">OPT</span>
+        <button class="opt" id="oSticky">sticky</button>
+        <button class="opt" id="oClear">clear</button>
+      </div>
+    </div>
+    <div id="hint"></div>
+    <div id="bottom"><div id="dock" style="display:flex;gap:.35em"></div></div>
+    <div id="count">0 placed</div>
+  </div>
+</div>
+<div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
+
+<script>
+(function(){
+'use strict';
+const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
+
+/* ================= sprites ================= */
+const PAL={'.':null,k:'#17141f',w:'#ffffff',W:'#ffeedd',s:'#f6c9a0',r:'#e0524f',R:'#9e2f34',
+  g:'#6cc16b',G:'#3d8a4d',b:'#59b0e6',B:'#2f6fae',y:'#ffd452',Y:'#c98f2b',n:'#a97a4f',N:'#6b4a30',
+  c:'#cfd3e0',C:'#8d92a8',i:'#a8ecff'};
+function mkSprite(rows){
+  const w=rows[0].length,h=rows.length,cn=document.createElement('canvas');
+  cn.width=w;cn.height=h;const x=cn.getContext('2d');
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const col=PAL[rows[j][i]];if(col){x.fillStyle=col;x.fillRect(i,j,1,1);}}
+  return cn;
+}
+const ART={};
+ART.gnome=mkSprite([
+"................","................",".......rr.......","......rrrr......",
+"......rRRr......",".....rrRRrr.....","....rrRRRRrr....","...rrrrrrrrrr...",
+".....ssssss.....",".....skssks.....",".....wwwwww.....","....wwwwwwww....",
+"....bwwwwwwb....","....bbwwwwbb....","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+ART.sprink=mkSprite([
+"................","................","......cccc......",".....bCccCb.....",
+".....cccccc.....","......cCCc......","......cCCc......","......cccc......",
+"......cCCc......","......cCCc......","......cCCc......",".....CccccC.....",
+"....ccCCCCcc....","...cccccccccc...","...nnnnnnnnnn...","...NNNNNNNNNN..."]);
+const TOWERS={
+  gnome :{name:'GNOME',    art:'gnome',  rng:46, cost:45},
+  sprink:{name:'SPRINKLER',art:'sprink', rng:56, cost:70}
+};
+const FAMS=['gnome','sprink'];
+
+// 3x5 digits, for in-world numbers
+const GLYPH={'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+'2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+'4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+'6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
+'8':['111','101','111','101','111'],'9':['111','101','111','001','111']};
+function drawNum(x,y,txt,color){
+  ctx.fillStyle=color; let cx=x;
+  for(const ch of txt){ const g=GLYPH[ch]; if(g){
+    for(let j=0;j<5;j++)for(let i=0;i<3;i++) if(g[j][i]==='1') ctx.fillRect(cx+i,y+j,1,1);
+  } cx+=4; }
+}
+const numW=t=>t.length*4-1;
+
+/* ================= map ================= */
+const WP=[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]]
+  .map(p=>({x:(p[0]+.5)*TILE,y:(p[1]+.5)*TILE}));
+const SEG=[];
+for(let i=0;i<WP.length-1;i++){
+  const a=WP[i],b=WP[i+1],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+  SEG.push({a,dx:dx/len,dy:dy/len,len});
+}
+function distToPath(px,py){
+  let best=1e9;
+  for(const s of SEG){
+    let t=(px-s.a.x)*s.dx+(py-s.a.y)*s.dy; t=t<0?0:(t>s.len?s.len:t);
+    const ex=px-(s.a.x+s.dx*t),ey=py-(s.a.y+s.dy*t),d=ex*ex+ey*ey;
+    if(d<best) best=d;
+  }
+  return Math.sqrt(best);
+}
+const BUILD=[];
+for(let r=0;r<ROWS;r++){BUILD[r]=[];
+  for(let c=0;c<COLS;c++){
+    const cx=(c+.5)*TILE,cy=(r+.5)*TILE;
+    BUILD[r][c]= r>=1&&r<=7&&c<=17&&distToPath(cx,cy)>11.5&&!(c>=17&&r>=4&&r<=7);
+  }
+}
+
+/* ================= background ================= */
+let seed=99;
+function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
+const bg=document.createElement('canvas'); bg.width=W; bg.height=H;
+function disc(q,cx,cy,r,col){
+  q.fillStyle=col;
+  for(let py=Math.floor(cy-r);py<=Math.ceil(cy+r);py++){
+    const dy=py+.5-cy,k=r*r-dy*dy; if(k<0) continue;
+    const hw=Math.sqrt(k),x0=Math.round(cx-hw),x1=Math.round(cx+hw);
+    if(x1>x0) q.fillRect(x0,py,x1-x0,1);
+  }
+}
+(function paint(){
+  const q=bg.getContext('2d');
+  q.fillStyle='#6cc16b'; q.fillRect(0,0,W,H);
+  for(let i=0;i<20;i++) disc(q,rnd()*W,rnd()*H,10+rnd()*14,'#66bb66');
+  for(let i=0;i<10;i++) disc(q,rnd()*W,rnd()*H,7+rnd()*9,'#5cb25d');
+  for(let i=0;i<5;i++)  disc(q,rnd()*W,rnd()*H,6+rnd()*8,'#7fd07c');
+  for(let i=0;i<320;i++){
+    const px=Math.floor(rnd()*W),py=Math.floor(rnd()*H);
+    if(distToPath(px,py)<10) continue;
+    const k=rnd(); q.fillStyle=k<.5?'#5cb25d':(k<.8?'#7fd07c':'#3d8a4d');
+    q.fillRect(px,py,1,k<.8?1:2);
+  }
+  for(let c=0;c<W;c+=5){
+    for(let i=0;i<3;i++) disc(q,c+rnd()*6,rnd()*9,2.6,i?'#2f6f3c':'#3d8a4d');
+    for(let i=0;i<3;i++) disc(q,c+rnd()*6,H-1-rnd()*9,2.6,i?'#2f6f3c':'#3d8a4d');
+  }
+  const pts=[];
+  for(const s of SEG) for(let t=0;t<s.len;t+=2) pts.push({x:s.a.x+s.dx*t,y:s.a.y+s.dy*t});
+  pts.forEach((p,i)=>disc(q,p.x,p.y,7.6+Math.sin(i*.09)*.8,'#8f6a44'));
+  pts.forEach((p,i)=>disc(q,p.x,p.y,6.1+Math.sin(i*.09)*.8,'#c9a06a'));
+  for(let i=0;i<260;i++){
+    const p=pts[Math.floor(rnd()*pts.length)];
+    q.fillStyle=rnd()<.5?'#b58f60':'#dcb787';
+    q.fillRect(Math.round(p.x+(rnd()*2-1)*5),Math.round(p.y+(rnd()*2-1)*5),1,1);
+  }
+  q.fillStyle='#8a6242'; q.fillRect(17*TILE+6,4*TILE+2,3*TILE,4*TILE-4);
+  [[18.2,4.6],[19.1,5.0],[18.4,7.2],[19.3,7.5],[18.0,5.6]].forEach(cr=>{
+    const px=Math.round(cr[0]*TILE),py=Math.round(cr[1]*TILE);
+    q.fillStyle='#3d8a4d'; q.fillRect(px-1,py-4,1,3); q.fillRect(px+1,py-4,1,3);
+    q.fillStyle='#ff9a3c'; q.fillRect(px-1,py,3,2); q.fillRect(px,py+2,1,2);
+  });
+})();
+
+/* ================= state ================= */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+cv.width=W; cv.height=H; ctx.imageSmoothingEnabled=false;
+
+const S={
+  variant:'flank', ret:'vine', sticky:false,
+  placing:null, ghost:null, hover:null, hoverAge:0,
+  towers:[], placed:0, time:0,
+  btns:[], btnHover:null, shake:0
+};
+
+/* ================= reticles ================= */
+const easeOut=t=>1-Math.pow(1-t,3);
+
+// -------- vine: an L-bracket at each corner, grown out of vine rather than
+// drawn as a tick. The bracket shape is what says "this tile"; the leaves and
+// blooms are what make it charming. Dark contour on the outside edge so the
+// green still reads against green grass.
+function reticleVine(cx,cy,age,ok){
+  const grow=easeOut(Math.min(1,age/0.24));
+  const t=S.time, L=TILE/2-1, ARM=4;
+  const dark = ok?'#1d4227':'#55171b';
+  const mid  = ok?'#3d8a4d':'#9e2f34';
+  const lit  = ok?'#7fd07c':'#e0524f';
+  const corners=[[-1,-1],[1,-1],[-1,1],[1,1]];
+
+  corners.forEach(([sx,sy],ci)=>{
+    const vx=Math.round(cx+sx*L), vy=Math.round(cy+sy*L);
+    const n=Math.max(1,Math.round(ARM*grow));
+
+    // contour sits one pixel outboard of each arm
+    ctx.fillStyle=dark;
+    for(let i=0;i<n;i++){
+      ctx.fillRect(vx-sx*i, vy+sy, 1,1);
+      ctx.fillRect(vx+sx,   vy-sy*i, 1,1);
+    }
+    ctx.fillRect(vx+sx, vy+sy, 1,1);
+
+    // the arms themselves, thickening toward the corner
+    for(let i=0;i<n;i++){
+      ctx.fillStyle = i>3 ? lit : mid;
+      ctx.fillRect(vx-sx*i, vy, 1,1);
+      ctx.fillRect(vx,      vy-sy*i, 1,1);
+    }
+
+    // one leaf per arm, flicking on its own beat
+    if(grow>0.55){
+      const fl=Math.sin(t*2.4+ci*1.7)>0?1:0;
+      ctx.fillStyle=lit;
+      ctx.fillRect(vx-sx*3, vy-sy*(1+fl), 1,1);
+      ctx.fillRect(vx-sx*(1+fl), vy-sy*3, 1,1);
+      ctx.fillStyle=mid;
+      ctx.fillRect(vx-sx*3, vy-sy, 1,1);
+      ctx.fillRect(vx-sx, vy-sy*3, 1,1);
+    }
+
+    // a bloom opens at the corner once the bracket is grown
+    if(grow>0.78){
+      const open=Math.min(1,(grow-0.78)/0.22);
+      const p=(Math.sin(t*2.8+ci*1.3)+1)*.5;
+      ctx.fillStyle = ok ? (p>.5?'#ffd452':'#f58fbf') : '#ff7b7b';
+      ctx.fillRect(vx,vy,1,1);
+      if(open>.55){
+        ctx.fillRect(vx-sx,vy,1,1);
+        ctx.fillRect(vx,vy-sy,1,1);
+        ctx.fillStyle = ok?'#ffeedd':'#ffffff';
+        ctx.fillRect(vx,vy,1,1);
+      }
+    }
+  });
+}
+
+// -------- fireflies: motes orbit the tile with trails, twinkle, and wander
+const MOTES=[];
+for(let i=0;i<10;i++) MOTES.push({p:i/10, sp:0.17+ (i%3)*0.035, w:Math.random()*6.28});
+function reticleFire(cx,cy,age,ok){
+  const grow=easeOut(Math.min(1,age/0.3));
+  const t=S.time, L=TILE/2-1;
+  const edge=(f)=>{ // walk the tile perimeter, f in 0..1
+    const per=((f%1)+1)%1*4, side=Math.floor(per), u=(per-side)*2-1;
+    if(side===0) return {x:cx+u*L, y:cy-L};
+    if(side===1) return {x:cx+L,   y:cy+u*L};
+    if(side===2) return {x:cx-u*L, y:cy+L};
+    return {x:cx-L, y:cy-u*L};
+  };
+  MOTES.forEach((m,i)=>{
+    const f=m.p + t*m.sp;
+    const wob=Math.sin(t*1.9+m.w)*1.5*(ok?1:2.6);   // scatter outward when blocked
+    for(let k=3;k>=0;k--){                          // short fading trail
+      const p=edge(f - k*0.012);
+      const nx=(p.x-cx)/L, ny=(p.y-cy)/L;
+      const mag=Math.max(Math.abs(nx),Math.abs(ny))||1;
+      const x=p.x + (nx/mag)*wob, y=p.y + (ny/mag)*wob;
+      const tw=(Math.sin(t*4.2+i*2.1)+1)*.5;
+      const a=(k===0? .55+tw*.45 : (0.30-k*0.08)) * grow;
+      if(a<=0.02) continue;
+      ctx.globalAlpha=a;
+      ctx.fillStyle = k===0
+        ? (ok ? (tw>.62?'#ffeedd':'#ffd452') : '#ff7b7b')
+        : (ok ? '#c98f2b' : '#9e2f34');
+      ctx.fillRect(Math.round(x),Math.round(y),1,1);
+      if(k===0 && tw>.86){                           // glow cross on the brightest
+        ctx.globalAlpha=0.30*grow;
+        ctx.fillRect(Math.round(x)-1,Math.round(y),1,1);
+        ctx.fillRect(Math.round(x)+1,Math.round(y),1,1);
+        ctx.fillRect(Math.round(x),Math.round(y)-1,1,1);
+        ctx.fillRect(Math.round(x),Math.round(y)+1,1,1);
+      }
+      ctx.globalAlpha=1;
+    }
+  });
+}
+function reticle(cx,cy,age,ok){
+  if(S.ret==='vine') reticleVine(cx,cy,age,ok); else reticleFire(cx,cy,age,ok);
+}
+
+function ring(cx,cy,rad,color,alpha,dash){
+  ctx.fillStyle=color; ctx.globalAlpha=alpha;
+  const steps=Math.max(16,Math.floor(rad*2.4));
+  for(let i=0;i<steps;i++){
+    if(dash && ((i+Math.floor(S.time*8))%6)>2) continue;
+    const a=i/steps*Math.PI*2;
+    ctx.fillRect(Math.round(cx+Math.cos(a)*rad),Math.round(cy+Math.sin(a)*rad),1,1);
+  }
+  ctx.globalAlpha=1;
+}
+function shadow(x,y,w){
+  ctx.fillStyle='rgba(0,0,0,.18)';
+  ctx.fillRect(Math.round(x-w/2),Math.round(y),w,1);
+  ctx.fillRect(Math.round(x-w/2)+1,Math.round(y)+1,w-2,1);
+}
+
+/* ================= pixel-art buttons, drawn in the world ================= */
+const CHECK=[".....x","....xx","x..xx.","xxxx..",".xx..."];
+const CROSS=["x...x",".x.x.","..x..",".x.x.","x...x"];
+function plate(x,y,w,h,fill,edge,lift){
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  ctx.fillRect(x+1,y+h-1+ (lift?0:1),w-2,2);
+  ctx.fillStyle=edge;
+  ctx.fillRect(x+1,y,w-2,h); ctx.fillRect(x,y+1,w,h-2);
+  ctx.fillStyle=fill;
+  ctx.fillRect(x+2,y+1,w-4,h-2); ctx.fillRect(x+1,y+2,w-2,h-4);
+}
+function glyph(rows,x,y,col){
+  ctx.fillStyle=col;
+  for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+    if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
+}
+// returns hit rects in art space
+function confirmButtons(cx,cy){
+  const w=11,h=11,gap=2;
+  const fitsX=x=>x>=1&&x+w<=W-1;
+  const clampY=y=>Math.max(1,Math.min(H-1-h,Math.round(y)));
+  const y=clampY(cy-h/2);
+  const right=Math.round(cx+TILE/2+gap), left=Math.round(cx-TILE/2-gap-w);
+  // preferred: one either side of the plot
+  if(fitsX(right)&&fitsX(left))
+    return [{act:'ok',x:right,y,w,h},{act:'no',x:left,y,w,h}];
+  // only one side has room: stack them on that side, tick on top
+  const side = fitsX(right)?right:(fitsX(left)?left:null);
+  if(side!==null)
+    return [{act:'ok',x:side,y:clampY(cy-h-1),w,h},{act:'no',x:side,y:clampY(cy+1),w,h}];
+  // neither side fits: sit above the plot, clamped into frame
+  const clampX=x=>Math.max(1,Math.min(W-1-w,Math.round(x)));
+  const yy=clampY(cy-TILE/2-h-gap);
+  return [{act:'ok',x:clampX(cx+1),y:yy,w,h},{act:'no',x:clampX(cx-w-1),y:yy,w,h}];
+}
+function drawConfirmButtons(btns){
+  btns.forEach(b=>{
+    const hot=S.btnHover===b.act;
+    const press=hot?1:0;
+    if(b.act==='ok'){
+      plate(b.x,b.y+press,b.w,b.h,hot?'#5cb457':'#4f9d4a',hot?'#a6e59f':'#82d17c',press);
+      glyph(CHECK,b.x+3,b.y+3+press,'#ffffff');
+    } else {
+      plate(b.x,b.y+press,b.w,b.h,hot?'#4a5048':'#3a3f3a',hot?'#8b918a':'#6a706a',press);
+      glyph(CROSS,b.x+3,b.y+3+press,'#ffeedd');
+    }
+  });
+}
+function hitBtn(ax,ay){
+  for(const b of S.btns){
+    if(ax>=b.x-3&&ax<=b.x+b.w+3&&ay>=b.y-3&&ay<=b.y+b.h+3) return b;
+  }
+  return null;
+}
+
+/* ================= draw ================= */
+function draw(){
+  ctx.save();
+  if(S.shake>0){ ctx.translate(Math.round((Math.random()-.5)*S.shake),0); S.shake-=0.35; }
+  ctx.drawImage(bg,0,0);
+
+  S.towers.forEach(t=>{
+    shadow(t.x,t.y+7,12);
+    ctx.drawImage(ART[TOWERS[t.fam].art],Math.round(t.x-8),Math.round(t.y-9));
+  });
+
+  S.btns=[];
+
+  // hover preview, nothing committed
+  if(S.hover && !S.ghost){
+    const cx=(S.hover.c+.5)*TILE, cy=(S.hover.r+.5)*TILE;
+    reticle(cx,cy,S.hoverAge,S.hover.ok);
+    if(S.hover.ok && S.placing) ring(cx,cy,TOWERS[S.placing].rng,'#ffffff',.28,true);
+  }
+
+  // the armed plot
+  if(S.ghost && S.placing){
+    const F=TOWERS[S.placing];
+    const cx=(S.ghost.c+.5)*TILE, cy=(S.ghost.r+.5)*TILE;
+    ring(cx,cy,F.rng,'#ffd452',.85,false);
+    reticle(cx,cy,S.ghost.age,true);
+    // ghost drops in with a small settle
+    const drop=easeOut(Math.min(1,S.ghost.age/0.18));
+    const yOff=Math.round((1-drop)*-4);
+    ctx.globalAlpha=0.55+drop*0.3;
+    ctx.drawImage(ART[F.art],Math.round(cx-8),Math.round(cy-9+yOff));
+    ctx.globalAlpha=1;
+    // cost floats above the plot
+    const txt=String(F.cost);
+    const tx=Math.round(cx-numW(txt)/2), ty=Math.round(cy-TILE/2-7);
+    ctx.fillStyle='rgba(18,22,18,.7)'; ctx.fillRect(tx-2,ty-1,numW(txt)+4,7);
+    drawNum(tx,ty,txt,'#ffd452');
+
+    if(S.variant==='flank'){
+      S.btns=confirmButtons(cx,cy);
+      drawConfirmButtons(S.btns);
+    } else {
+      // tap-again: the ring doubles and a soft chevron pulses under the plot
+      const p=(Math.sin(S.time*4)+1)*.5;
+      ring(cx,cy,F.rng-2,'#ffd452',.25+p*.3,true);
+      ctx.globalAlpha=.5+p*.5;
+      glyph(CHECK,Math.round(cx-3),Math.round(cy+TILE/2+2),'#ffd452');
+      ctx.globalAlpha=1;
+    }
+  }
+  ctx.restore();
+}
+
+/* ================= helpers ================= */
+function towerAt(c,r){ return S.towers.find(t=>t.c===c&&t.r===r); }
+function cellAt(ax,ay){
+  const c=Math.floor(ax/TILE), r=Math.floor(ay/TILE);
+  if(r<0||r>=ROWS||c<0||c>=COLS) return null;
+  return {c,r,ok:BUILD[r][c]&&!towerAt(c,r)};
+}
+function toArt(ev){
+  const b=cv.getBoundingClientRect();
+  return {x:(ev.clientX-b.left)/b.width*W, y:(ev.clientY-b.top)/b.height*H};
+}
+function build(){
+  const g=S.ghost, fam=S.placing;
+  S.towers.push({fam,c:g.c,r:g.r,x:(g.c+.5)*TILE,y:(g.r+.5)*TILE});
+  S.placed++; document.getElementById('count').textContent=S.placed+' placed';
+  S.ghost=null; S.hover=null; S.btnHover=null;
+  if(!S.sticky) S.placing=null;
+  syncUI();
+}
+// cancelling the plot should not cost you the tower — you almost always want to
+// try a different spot, not start over from the dock
+function cancel(){ S.ghost=null; S.btnHover=null; S.hover=null; S.hoverAge=0; syncUI(); }
+
+/* ================= input ================= */
+cv.addEventListener('pointermove',ev=>{
+  const p=toArt(ev);
+  if(S.ghost && S.variant==='flank'){
+    const b=hitBtn(p.x,p.y);
+    S.btnHover=b?b.act:null;
+    if(b) return;
+  }
+  if(!S.placing){ S.hover=null; return; }
+  const cell=cellAt(p.x,p.y);
+  const same=S.hover&&cell&&S.hover.c===cell.c&&S.hover.r===cell.r;
+  if(!same) S.hoverAge=0;
+  S.hover=cell;
+});
+cv.addEventListener('pointerleave',()=>{ S.hover=null; S.btnHover=null; });
+
+cv.addEventListener('pointerdown',ev=>{
+  ev.preventDefault();
+  const p=toArt(ev);
+
+  // pixel buttons take the tap first
+  if(S.ghost && S.variant==='flank'){
+    const b=hitBtn(p.x,p.y);
+    if(b){ if(b.act==='ok') build(); else cancel(); return; }
+  }
+
+  const cell=cellAt(p.x,p.y);
+  if(!cell){ if(S.ghost) cancel(); return; }
+
+  const ex=towerAt(cell.c,cell.r);
+  if(ex && !S.placing){ S.towers=S.towers.filter(t=>t!==ex); S.placed--;
+    document.getElementById('count').textContent=S.placed+' placed'; return; }
+  if(!S.placing) return;
+
+  if(!cell.ok){ S.hover=cell; S.hoverAge=0; S.shake=2; return; }
+
+  if(S.ghost && S.ghost.c===cell.c && S.ghost.r===cell.r){
+    if(S.variant==='retap') build();          // same plot twice = commit
+    return;                                    // in flank mode the buttons commit
+  }
+  S.ghost={c:cell.c,r:cell.r,age:0};
+  S.hoverAge=0; S.btnHover=null;
+  syncUI();
+},{passive:false});
+
+/* ================= UI ================= */
+const dock=document.getElementById('dock'), hintEl=document.getElementById('hint');
+FAMS.forEach(fam=>{
+  const F=TOWERS[fam];
+  const b=document.createElement('button'); b.className='card'; b.dataset.fam=fam;
+  const ic=document.createElement('canvas'); ic.width=16;ic.height=16;
+  ic.getContext('2d').drawImage(ART[F.art],0,0);
+  const nm=document.createElement('div'); nm.className='nm'; nm.textContent=F.name;
+  const pr=document.createElement('div'); pr.className='pr'; pr.innerHTML='&#9673; '+F.cost;
+  b.appendChild(ic); b.appendChild(nm); b.appendChild(pr);
+  b.addEventListener('click',()=>{
+    S.placing = S.placing===fam ? null : fam;
+    S.ghost=null; S.hover=null; syncUI();
+  });
+  dock.appendChild(b);
+});
+const HINTS={
+  flank:'Tap a card, tap a plot. A green tick and a grey cross appear either side of the plot, in the world, right where you are looking. They flip sides near the map edge.',
+  retap:'Tap a card, tap a plot to arm it, tap the same plot again to build. Tap a different plot to move it, tap off-map to cancel. No buttons at all.'
+};
+function syncUI(){
+  document.querySelectorAll('[data-var]').forEach(b=>b.classList.toggle('on',b.dataset.var===S.variant));
+  document.querySelectorAll('[data-ret]').forEach(b=>b.classList.toggle('on',b.dataset.ret===S.ret));
+  document.getElementById('oSticky').classList.toggle('on',S.sticky);
+  [...dock.children].forEach(b=>b.classList.toggle('sel',S.placing===b.dataset.fam));
+  hintEl.textContent=HINTS[S.variant]+(S.sticky?'  [sticky: stays armed after building]':'');
+}
+document.querySelectorAll('[data-var]').forEach(b=>b.addEventListener('click',()=>{
+  S.variant=b.dataset.var; S.ghost=null; S.hover=null; syncUI();
+}));
+document.querySelectorAll('[data-ret]').forEach(b=>b.addEventListener('click',()=>{ S.ret=b.dataset.ret; syncUI(); }));
+document.getElementById('oSticky').addEventListener('click',()=>{ S.sticky=!S.sticky; syncUI(); });
+document.getElementById('oClear').addEventListener('click',()=>{
+  S.towers=[]; S.placed=0; S.ghost=null;
+  document.getElementById('count').textContent='0 placed'; syncUI();
+});
+
+/* ================= layout + loop ================= */
+const stage=document.getElementById('stage');
+function layout(){
+  const cs=getComputedStyle(document.body);
+  const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  const padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const vv=window.visualViewport;
+  const vw=(vv?vv.width:window.innerWidth)-padX, vh=(vv?vv.height:window.innerHeight)-padY;
+  const dpr=window.devicePixelRatio||1;
+  let raw=Math.min(vw/W,vh/H,6);
+  const snap=Math.floor(raw*dpr)/dpr;
+  const s=(snap>=.5&&snap>=raw*.95)?snap:raw;
+  cv.style.width=(W*s)+'px'; cv.style.height=(H*s)+'px';
+  stage.style.width=(W*s)+'px'; stage.style.height=(H*s)+'px';
+  stage.style.setProperty('--fs',Math.max(9,Math.min(17,Math.round(H*s*0.05)))+'px');
+}
+window.addEventListener('resize',layout);
+window.addEventListener('orientationchange',()=>setTimeout(layout,250));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',layout);
+layout();
+
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  S.time+=dt; S.hoverAge+=dt;
+  if(S.ghost) S.ghost.age+=dt;
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+syncUI();
+})();
+</script>
+</body>
+</html>

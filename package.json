@@ -1,0 +1,11 @@
+{
+  "name": "sprout-siege",
+  "private": true,
+  "description": "Pixel-art tower defense. One self-contained HTML file.",
+  "scripts": {
+    "test": "node tools/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

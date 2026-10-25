@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Selector Lab</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:#12150f;color:#fff6e5;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;overflow:hidden}
+  #wrap{display:flex;height:100%;gap:10px;padding:10px}
+  #left{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;min-width:0;overflow:auto}
+  #right{flex:0 0 300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+    padding-right:4px}
+  canvas{image-rendering:pixelated;display:block}
+  .panel{background:#1b2016;border:1px solid #333c2c;border-radius:4px;padding:8px}
+  .panel h2{font-size:10px;letter-spacing:.14em;color:#8fa386;font-weight:600;margin-bottom:6px}
+  #zoomCv{background:#0d100a;border:1px solid #2a3324}
+  #ctxCv{background:#0d100a;border:1px solid #2a3324}
+  .row{display:flex;align-items:center;gap:6px;font-size:11px;margin:3px 0}
+  .row label{flex:0 0 96px;color:#b9c9b2}
+  .row input[type=range]{flex:1;min-width:0;accent-color:#7fd07c}
+  .row .val{flex:0 0 32px;text-align:right;color:#ffd452}
+  .seg{display:flex;gap:3px;flex-wrap:wrap}
+  .seg button,.tbtn{background:#2a3324;color:#c2cfbe;border:1px solid #3d4a34;border-radius:3px;
+    font:inherit;font-size:10px;padding:4px 7px;cursor:pointer;letter-spacing:.04em}
+  .seg button.on{background:#4f9d4a;color:#fff;border-color:#82d17c}
+  .tbtn:hover{border-color:#7fd07c}
+  #grid{background:#0d100a;cursor:crosshair;touch-action:none;border:1px solid #2a3324}
+  #sw{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+  .sw{width:26px;height:26px;border:2px solid #3d4a34;border-radius:3px;cursor:pointer;position:relative}
+  .sw.on{border-color:#ffd452}
+  .sw span{position:absolute;bottom:-1px;right:1px;font-size:8px;color:#000}
+  #out{width:100%;height:112px;background:#0d100a;color:#9fe08f;border:1px solid #333c2c;
+    border-radius:3px;font:inherit;font-size:9.5px;padding:5px;resize:none;white-space:pre}
+  .hint{font-size:10px;color:#8fa386;line-height:1.45}
+  .mode{display:flex;gap:4px;margin-bottom:6px}
+  .mode button{flex:1}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="left">
+    <div class="panel" style="flex:0 0 auto">
+      <h2>IN CONTEXT &mdash; TRUE GAME SCALE</h2>
+      <canvas id="ctxCv"></canvas>
+    </div>
+    <div class="panel" style="flex:1 1 auto;display:flex;flex-direction:column;min-height:0">
+      <h2>ZOOM</h2>
+      <canvas id="zoomCv"></canvas>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="panel">
+      <div class="mode">
+        <button class="tbtn" id="mShape">SHAPE DIALS</button>
+        <button class="tbtn" id="mDraw">DRAW</button>
+      </div>
+      <div class="seg">
+        <button class="tbtn" data-preset="v17">preset v17</button>
+        <button class="tbtn" data-preset="v18">preset v18</button>
+        <button class="tbtn" data-preset="mid">midpoint</button>
+      </div>
+    </div>
+
+    <div class="panel" id="shapePanel">
+      <h2>SHAPE</h2>
+      <div id="dials"></div>
+      <div class="row"><label>outline</label>
+        <div class="seg" id="segOutline">
+          <button data-v="none">none</button>
+          <button data-v="out">outboard</button>
+          <button data-v="full">full</button>
+        </div>
+      </div>
+      <div class="row"><label>arms</label>
+        <div class="seg" id="segArm">
+          <button data-v="straight">straight</button>
+          <button data-v="stepped">stepped</button>
+          <button data-v="curl">curled</button>
+        </div>
+      </div>
+      <div class="row"><label>foliage</label>
+        <div class="seg" id="segLeaf">
+          <button data-v="none">none</button>
+          <button data-v="dark">dark</button>
+          <button data-v="mid">mid</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="drawPanel" style="display:none">
+      <h2>DRAW ONE CORNER &mdash; MIRRORED LIVE</h2>
+      <canvas id="grid" width="286" height="286"></canvas>
+      <div id="sw"></div>
+      <div class="seg" style="margin-top:6px">
+        <button class="tbtn" id="bBake">&larr; bake dials into grid</button>
+        <button class="tbtn" id="bClear">clear</button>
+      </div>
+      <div class="seg" style="margin-top:4px" id="templates"></div>
+      <p class="hint" style="margin-top:6px">
+        The shaded quadrant is <b>inside</b> the tile. The cross-hair marks the tile's corner
+        pixel. Paint outside it and the motif sits proud of the plot.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>CONTEXT</h2>
+      <div class="seg" id="segCtx">
+        <button data-v="bug" >bug walking</button>
+        <button data-v="nbr" class="on">neighbour tower</button>
+        <button data-v="grow">replay grow-in</button>
+      </div>
+      <div class="row"><label>zoom</label>
+        <input type="range" id="zoomR" min="3" max="14" step="1" value="8">
+        <span class="val" id="zoomV">8</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>EXPORT &mdash; SCREENSHOT OR COPY</h2>
+      <textarea id="out" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const TILE=16, GN=11;                 // motif grid is GN x GN, vertex at centre
+const MID=(GN-1)/2;
+
+/* ---------- palettes (no red: it read as a bug rather than a berry) ---------- */
+const PAL={'.':null,
+  d:'#241a10', D:'#5c4433', b:'#8a6242', l:'#a97a4f',
+  g:'#25562b', G:'#3d8043', H:'#6aa85c', w:'#ffeedd'};
+const SWATCH=[['b','bark'],['l','light'],['D','dark bark'],['d','outline'],
+              ['g','leaf dk'],['G','leaf'],['H','leaf lt'],['w','cream'],['.','erase']];
+
+/* ---------- a couple of game sprites for context ---------- */
+const SPR={'.':null,k:'#17141f',w:'#ffffff',s:'#f6c9a0',r:'#e0524f',R:'#9e2f34',
+  b:'#59b0e6',n:'#a97a4f',N:'#6b4a30',P:'#a057b8',W:'#ffeedd'};
+function mk(rows,pal){
+  const c=document.createElement('canvas'); c.width=rows[0].length; c.height=rows.length;
+  const x=c.getContext('2d');
+  rows.forEach((r,j)=>{ for(let i=0;i<r.length;i++){ const col=pal[r[i]];
+    if(col){ x.fillStyle=col; x.fillRect(i,j,1,1); } } });
+  return c;
+}
+const GNOME=mk(["................","................",".......rr.......","......rrrr......",
+"......rRRr......",".....rrRRrr.....","....rrRRRRrr....","...rrrrrrrrrr...",
+".....ssssss.....",".....skssks.....",".....wwwwww.....","....wwwwwwww....",
+"....bwwwwwwb....","....bbwwwwbb....","....NN....NN....","................"],SPR);
+const BEETLE=mk(["............","............","....kkkk....","...kPPPPk...",
+"..kPwPPPPk..","..kPPPPPPk..","..kPPkPPPk..","..kPPkPPPk..",
+"..kkPPPPkk..","...k.kk.k...","............","............"],SPR);
+
+/* ---------- state ---------- */
+const S={
+  mode:'shape',
+  p:{arm:5, thick:1, inset:0, leaves:2, leafSize:1, rustle:2.6, grow:0.20, vertex:1},
+  outline:'out', armStyle:'straight', leafTone:'dark',
+  grid:blank(), brush:'b', zoom:8,
+  ctx:{bug:false, nbr:true},
+  t:0, growAt:-99
+};
+function blank(){ return Array.from({length:GN},()=>Array(GN).fill('.')); }
+
+/* ---------- procedural corner: the dials version ---------- */
+// Returns a GN x GN char grid for the top-left corner, vertex at (MID,MID).
+function shapeGrid(frame){
+  const g=blank(), p=S.p;
+  const put=(x,y,c)=>{ if(x>=0&&y>=0&&x<GN&&y<GN&&c) g[y][x]=c; };
+  const arm=p.arm, th=Math.max(1,p.thick), ins=p.inset;
+  const v=MID+ins;                                  // vertex, pushed by inset
+  // arms run inward (+x along the top edge, +y down the left edge)
+  for(let i=0;i<arm;i++){
+    let off=0;
+    if(S.armStyle==='stepped') off = i>=arm-2 ? 1 : 0;
+    if(S.armStyle==='curl')    off = Math.round(Math.pow(i/Math.max(1,arm-1),2)*2);
+    for(let k=0;k<th;k++){
+      put(v+i, v+off+k, i===0&&p.vertex?'l':'b');   // horizontal arm
+      put(v+off+k, v+i, i===0&&p.vertex?'l':'b');   // vertical arm
+    }
+  }
+  // leaves sit inboard of each arm so they stay inside the frame line
+  if(S.leafTone!=='none'){
+    const tone = S.leafTone==='mid' ? ['G','H'] : ['g','G'];
+    const spots=[[2,1],[3,2],[1,2],[4,1]];
+    for(let n=0;n<p.leaves;n++){
+      const sp=spots[(n+frame)%spots.length];
+      for(let k=0;k<p.leafSize;k++){
+        put(v+sp[0]+k, v+sp[1]+th, tone[0]);
+        put(v+sp[1]+th, v+sp[0]+k, tone[1]);
+      }
+    }
+  }
+  return g;
+}
+
+/* ---------- outline + mirroring ---------- */
+function toCanvas(grid){
+  const pad=(S.outline==='none')?0:1;
+  const c=document.createElement('canvas');
+  c.width=GN+pad*2; c.height=GN+pad*2;
+  const x=c.getContext('2d');
+  const on=(i,j)=> i>=0&&j>=0&&i<GN&&j<GN && grid[j][i]!=='.' && PAL[grid[j][i]];
+  if(pad){
+    x.fillStyle=PAL.d;
+    for(let j=-1;j<=GN;j++) for(let i=-1;i<=GN;i++){
+      if(on(i,j)) continue;
+      const n4 = on(i-1,j)||on(i+1,j)||on(i,j-1)||on(i,j+1);
+      if(!n4) continue;
+      if(S.outline==='full'){ x.fillRect(i+pad,j+pad,1,1); continue; }
+      // outboard only: keep the contour on the side facing away from the tile
+      const outward = (i<=MID && j<=MID) ? (on(i+1,j)||on(i,j+1)) : false;
+      if(outward || i<0 || j<0) x.fillRect(i+pad,j+pad,1,1);
+      else if(on(i+1,j)&&i<MID) x.fillRect(i+pad,j+pad,1,1);
+      else if(on(i,j+1)&&j<MID) x.fillRect(i+pad,j+pad,1,1);
+    }
+  }
+  for(let j=0;j<GN;j++) for(let i=0;i<GN;i++){
+    const col=PAL[grid[j][i]];
+    if(col){ x.fillStyle=col; x.fillRect(i+pad,j+pad,1,1); }
+  }
+  c._mid=MID+pad;
+  return c;
+}
+function flipH(src){ const c=document.createElement('canvas');c.width=src.width;c.height=src.height;
+  const x=c.getContext('2d');x.translate(src.width,0);x.scale(-1,1);x.drawImage(src,0,0);c._mid=src._mid;return c; }
+function flipV(src){ const c=document.createElement('canvas');c.width=src.width;c.height=src.height;
+  const x=c.getContext('2d');x.translate(0,src.height);x.scale(1,-1);x.drawImage(src,0,0);c._mid=src._mid;return c; }
+
+function cornerSet(frame){
+  const grid = S.mode==='draw' ? S.grid : shapeGrid(frame);
+  const tl=toCanvas(grid);
+  return [tl, flipH(tl), flipV(tl), flipH(flipV(tl))];
+}
+
+/* ---------- paint the selector around a tile ---------- */
+function paintSelector(x,cx,cy,age){
+  const r=TILE-1;
+  const spots=[[cx-TILE/2, cy-TILE/2, 0],[cx-TILE/2+r, cy-TILE/2, 1],
+               [cx-TILE/2, cy-TILE/2+r, 2],[cx-TILE/2+r, cy-TILE/2+r, 3]];
+  spots.forEach((sp,i)=>{
+    const frame=Math.floor(S.t*S.p.rustle + i)%4;
+    const set=cornerSet(frame);
+    const a=age - i*0.05;
+    if(a<=0) return;
+    x.globalAlpha=Math.min(1, a/Math.max(0.01,S.p.grow));
+    const m=set[sp[2]]._mid;
+    x.drawImage(set[sp[2]], Math.round(sp[0]-m), Math.round(sp[1]-m));
+    x.globalAlpha=1;
+  });
+}
+
+/* ---------- context strip: grass, dirt, neighbour, at true scale ---------- */
+const ctxCv=document.getElementById('ctxCv'), cx2=ctxCv.getContext('2d');
+const CW=168, CH=54, CSCALE=4;
+ctxCv.width=CW; ctxCv.height=CH;
+ctxCv.style.width=(CW*CSCALE)+'px'; ctxCv.style.height=(CH*CSCALE)+'px';
+function speck(x,w,h,seedv,base,dots){
+  let sd=seedv;
+  const rnd=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
+  x.fillStyle=base; x.fillRect(0,0,w,h);
+  for(let i=0;i<w*h/14;i++){ x.fillStyle=dots[Math.floor(rnd()*dots.length)];
+    x.fillRect(Math.floor(rnd()*w),Math.floor(rnd()*h),1,1); }
+}
+function drawContext(age){
+  cx2.imageSmoothingEnabled=false;
+  speck(cx2,CW,CH,7,'#6cc16b',['#5cb25d','#7fd07c','#66bb66']);
+  cx2.fillStyle='#c9a06a'; cx2.fillRect(114,0,CW-114,CH);
+  cx2.fillStyle='#b58f60';
+  for(let i=0;i<40;i++) cx2.fillRect(114+((i*37)%(CW-114)),(i*53)%CH,1,1);
+  const cy=CH/2-2;
+  paintSelector(cx2, 26, cy, age);                      // plain grass
+  paintSelector(cx2, 72, cy, age);                      // beside a tower
+  if(S.ctx.nbr) cx2.drawImage(GNOME, 72+TILE-8, cy-8);
+  paintSelector(cx2, 140, cy, age);                     // on dirt
+  if(S.ctx.bug){
+    const bx=((S.t*22)%(CW+24))-12;
+    cx2.drawImage(BEETLE, Math.round(bx), Math.round(cy-6));
+  }
+  cx2.fillStyle='rgba(18,22,18,.75)'; cx2.fillRect(0,CH-7,CW,7);
+  cx2.fillStyle='#8fa386';
+  tinyText(cx2,'GRASS',10,CH-6); tinyText(cx2,'NEIGHBOUR',50,CH-6); tinyText(cx2,'DIRT',128,CH-6);
+}
+// 3x5 caps, just enough to label the tiles
+const FONT={A:'111 101 111 101 101',B:'110 101 110 101 110',C:'111 100 100 100 111',D:'110 101 101 101 110',
+E:'111 100 110 100 111',G:'111 100 101 101 111',H:'101 101 111 101 101',I:'111 010 010 010 111',
+N:'101 101 111 101 101',O:'111 101 101 101 111',R:'111 101 110 101 101',S:'111 100 111 001 111',
+T:'111 010 010 010 010',U:'101 101 101 101 111',B2:'',' ':'000 000 000 000 000'};
+function tinyText(x,str,px,py){
+  let cx=px;
+  for(const ch of str){
+    const g=FONT[ch];
+    if(g){ const rows=g.split(' ');
+      for(let j=0;j<5;j++) for(let i=0;i<3;i++) if(rows[j][i]==='1') x.fillRect(cx+i,py+j-4,1,1); }
+    cx+=4;
+  }
+}
+
+/* ---------- zoom panel ---------- */
+const zCv=document.getElementById('zoomCv'), zx=zCv.getContext('2d');
+function drawZoom(age){
+  const pad=14, w=TILE+pad*2, h=TILE+pad*2;
+  const z=Math.max(3,Math.min(S.zoom, Math.floor(420/w)));   // never inflate past the panel
+  zCv.width=w; zCv.height=h;
+  zCv.style.width=(w*z)+'px'; zCv.style.height=(h*z)+'px';
+  zx.imageSmoothingEnabled=false;
+  const ox=zx;
+  speck(ox,w,h,3,'#6cc16b',['#5cb25d','#7fd07c','#66bb66']);
+  // faint tile outline so the frame's fit is legible
+  ox.fillStyle='rgba(0,0,0,.12)';
+  ox.fillRect(pad,pad,TILE,1); ox.fillRect(pad,pad+TILE-1,TILE,1);
+  ox.fillRect(pad,pad,1,TILE); ox.fillRect(pad+TILE-1,pad,1,TILE);
+  paintSelector(ox, pad+TILE/2, pad+TILE/2, age);
+}
+
+/* ---------- draw grid ---------- */
+const gCv=document.getElementById('grid'), gx=gCv.getContext('2d');
+const CELL=24;
+function drawGrid(){
+  gCv.width=GN*CELL; gCv.height=GN*CELL;
+  gCv.style.width=(GN*CELL)+'px'; gCv.style.height=(GN*CELL)+'px';
+  gx.clearRect(0,0,gCv.width,gCv.height);
+  for(let j=0;j<GN;j++) for(let i=0;i<GN;i++){
+    const inside = i>=MID && j>=MID;              // this quadrant is inside the tile
+    gx.fillStyle = inside ? '#1d2a18' : '#151a12';
+    gx.fillRect(i*CELL,j*CELL,CELL-1,CELL-1);
+    const col=PAL[S.grid[j][i]];
+    if(col){ gx.fillStyle=col; gx.fillRect(i*CELL,j*CELL,CELL-1,CELL-1); }
+  }
+  gx.fillStyle='#ffd452';                          // the tile's corner pixel
+  gx.fillRect(MID*CELL,MID*CELL,CELL-1,2);
+  gx.fillRect(MID*CELL,MID*CELL,2,CELL-1);
+}
+let painting=false;
+function paintAt(ev){
+  const b=gCv.getBoundingClientRect();
+  const i=Math.floor((ev.clientX-b.left)/b.width*GN), j=Math.floor((ev.clientY-b.top)/b.height*GN);
+  if(i<0||j<0||i>=GN||j>=GN) return;
+  S.grid[j][i]=S.brush; drawGrid(); writeOut();
+}
+gCv.addEventListener('pointerdown',e=>{painting=true;gCv.setPointerCapture(e.pointerId);paintAt(e);});
+gCv.addEventListener('pointermove',e=>{ if(painting) paintAt(e); });
+gCv.addEventListener('pointerup',()=>{painting=false;});
+
+/* ---------- templates ---------- */
+function rowsToGrid(rows){
+  const g=blank();
+  rows.forEach((r,j)=>{ for(let i=0;i<r.length&&i<GN;i++) if(j<GN) g[j][i]=r[i]; });
+  return g;
+}
+const TEMPLATES={
+ 'sprig (v17, no berry)':[
+  "...........","...........","...........","........G..",".......GHGH",
+  ".......g.bl","......dbb..","...GHgb....","......b....","...Ggb.....","...HGl....."],
+ 'thin bracket (v18)':[
+  "...........","...........","...........","...........","...........",
+  ".....lbbbb",".....b.....",".....b.....",".....b.....",".....b.....","..........."],
+ 'twig + leaves':[
+  "...........","...........","...........","...........","....G......",
+  ".....lbbb..","....Gb.....",".....b.g...",".....b.....",".....bG....","..........."],
+ 'double bracket':[
+  "...........","...........","...........","...........","....bbbb...",
+  ".....lbbbb",".....bb....",".....b.....",".....b.....",".....b.....","..........."],
+ 'leafy corner':[
+  "...........","...........","....G......","...GHG.....","....Gg.....",
+  ".....lbbb..","....g......",".....b.....",".....Gb....",".....b.....","..........."],
+};
+const tWrap=document.getElementById('templates');
+Object.keys(TEMPLATES).forEach(name=>{
+  const b=document.createElement('button'); b.className='tbtn'; b.textContent=name;
+  b.onclick=()=>{ S.grid=rowsToGrid(TEMPLATES[name]); S.mode='draw'; setMode(); drawGrid(); writeOut(); S.growAt=S.t; };
+  tWrap.appendChild(b);
+});
+
+/* ---------- dials ---------- */
+const DIALS=[
+  ['arm','arm length',2,8,1],
+  ['thick','thickness',1,3,1],
+  ['inset','inset',-2,3,1],
+  ['leaves','leaves / arm',0,4,1],
+  ['leafSize','leaf size',1,3,1],
+  ['rustle','rustle speed',0,6,0.5],
+  ['grow','grow time',0.05,0.6,0.05],
+  ['vertex','vertex highlight',0,1,1],
+];
+const dWrap=document.getElementById('dials');
+DIALS.forEach(([key,label,min,max,step])=>{
+  const row=document.createElement('div'); row.className='row';
+  row.innerHTML='<label>'+label+'</label>';
+  const r=document.createElement('input');
+  r.type='range'; r.min=min; r.max=max; r.step=step; r.value=S.p[key];
+  const v=document.createElement('span'); v.className='val'; v.textContent=S.p[key];
+  r.oninput=()=>{ S.p[key]=parseFloat(r.value); v.textContent=r.value; S.growAt=S.t; writeOut(); };
+  row.appendChild(r); row.appendChild(v); dWrap.appendChild(row);
+});
+function seg(id,key,onset){
+  const el=document.getElementById(id);
+  [...el.children].forEach(b=>{
+    b.classList.toggle('on', S[key]===b.dataset.v);
+    b.onclick=()=>{ S[key]=b.dataset.v; [...el.children].forEach(o=>o.classList.toggle('on',o===b));
+      S.growAt=S.t; if(onset)onset(); writeOut(); };
+  });
+}
+seg('segOutline','outline'); seg('segArm','armStyle'); seg('segLeaf','leafTone');
+document.getElementById('segCtx').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    if(b.dataset.v==='grow'){ S.growAt=S.t; return; }
+    const k=b.dataset.v; S.ctx[k]=!S.ctx[k]; b.classList.toggle('on',S.ctx[k]);
+  };
+});
+const zR=document.getElementById('zoomR'), zV=document.getElementById('zoomV');
+zR.oninput=()=>{ S.zoom=parseInt(zR.value); zV.textContent=zR.value; };
+
+/* ---------- presets ---------- */
+const PRESETS={
+  v17:{mode:'draw', grid:'sprig (v17, no berry)', outline:'full'},
+  v18:{mode:'shape', p:{arm:5,thick:1,inset:0,leaves:2,leafSize:1,rustle:2.6,grow:0.20,vertex:1},
+       outline:'out', armStyle:'straight', leafTone:'dark'},
+  mid:{mode:'shape', p:{arm:4,thick:1,inset:-1,leaves:2,leafSize:2,rustle:2.6,grow:0.20,vertex:1},
+       outline:'out', armStyle:'stepped', leafTone:'dark'},
+};
+document.querySelectorAll('[data-preset]').forEach(b=>{
+  b.onclick=()=>{
+    const P=PRESETS[b.dataset.preset];
+    if(P.p) Object.assign(S.p,P.p);
+    if(P.outline) S.outline=P.outline;
+    if(P.armStyle) S.armStyle=P.armStyle;
+    if(P.leafTone) S.leafTone=P.leafTone;
+    if(P.grid) S.grid=rowsToGrid(TEMPLATES[P.grid]);
+    S.mode=P.mode; setMode();
+    [...dWrap.querySelectorAll('.row')].forEach((row,i)=>{
+      const k=DIALS[i][0], r=row.querySelector('input'), v=row.querySelector('.val');
+      r.value=S.p[k]; v.textContent=S.p[k];
+    });
+    seg('segOutline','outline'); seg('segArm','armStyle'); seg('segLeaf','leafTone');
+    drawGrid(); writeOut(); S.growAt=S.t;
+  };
+});
+
+/* ---------- mode + export ---------- */
+function setMode(){
+  document.getElementById('shapePanel').style.display = S.mode==='shape'?'':'none';
+  document.getElementById('drawPanel').style.display  = S.mode==='draw'?'':'none';
+  document.getElementById('mShape').style.borderColor = S.mode==='shape'?'#7fd07c':'#3d4a34';
+  document.getElementById('mDraw').style.borderColor  = S.mode==='draw'?'#7fd07c':'#3d4a34';
+}
+document.getElementById('mShape').onclick=()=>{S.mode='shape';setMode();writeOut();S.growAt=S.t;};
+document.getElementById('mDraw').onclick =()=>{S.mode='draw'; setMode();writeOut();S.growAt=S.t;};
+document.getElementById('bBake').onclick=()=>{ S.grid=shapeGrid(0); drawGrid(); writeOut(); };
+document.getElementById('bClear').onclick=()=>{ S.grid=blank(); drawGrid(); writeOut(); };
+
+const out=document.getElementById('out');
+function writeOut(){
+  const g = S.mode==='draw' ? S.grid : shapeGrid(0);
+  const rows=g.map(r=>'"'+r.join('')+'"').join(',\n');
+  out.value =
+   'mode: '+S.mode+'   outline: '+S.outline+'   arms: '+S.armStyle+'   foliage: '+S.leafTone+'\n'+
+   'p: '+JSON.stringify(S.p)+'\n'+
+   'grid (top-left corner, vertex at '+MID+','+MID+'):\n['+rows+']';
+}
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  S.t+=dt;
+  const age=S.t-S.growAt;
+  drawContext(age); drawZoom(age);
+  requestAnimationFrame(frame);
+}
+setMode(); drawGrid(); writeOut(); S.growAt=0;
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
