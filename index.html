@@ -680,9 +680,12 @@ function layoutCarrots(){        // 4 x 5 grid (5 x 4 in a wide bed), fixed jitt
   let sd=7777;
   const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
   const cols=BED.o==='h'?5:4, rows=BED.o==='h'?4:5;
+  // centred in the bed: a carrot covers x-2..x+3 and y-2..y+3 of its slot
+  const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
+  const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
   CARROT_SLOTS=[];
   for(let row=0;row<rows;row++) for(let col=0;col<cols;col++)
-    CARROT_SLOTS.push({x:BED.x+3+col*10+Math.round(r()*2-1), y:BED.y+8+row*11+Math.round(r()*2-1)});
+    CARROT_SLOTS.push({x:x0+col*10+Math.round(r()*2-1), y:y0+row*11+Math.round(r()*2-1)});
 }
 function sortCarrots(){          // nearest the gate is eaten first, so the damage
   const g=bedGate();             // visibly advances inward from where bugs break in
