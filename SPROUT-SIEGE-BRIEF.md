@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v30.1. Read this
+Working document for continuing the build. Last updated with v30.2. Read this
 first; it replaces re-reading the chat.
 
 ---
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v30.1** |
+| Current version | **v30.2** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
@@ -66,7 +66,8 @@ This is a standing requirement, not a one-off.
 | v28 | Open placement behind a flag. No-build shade mask. |
 | v29 | Shade mask removed. The bed rectangle is gone: towers stand on an irregular patch of turned earth in the map's own trail colours. Placement mark is the ground being dug. |
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
-| **v30.1** | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
+| v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
+| **v30.2** | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
 
 ---
 
@@ -86,8 +87,12 @@ Do not re-open these without a reason. Each cost at least one version to reach.
 5. **Carrots are lives**, eaten gate-first. Numbers stay in the HUD alongside.
 6. **Scaling: fill, do not letterbox.** Integer-snap only when it costs under
    5% of size, otherwise fill and accept uneven pixels. An adaptive margin
-   (`ARTW/ARTH/OX/OY`) extends the world into non-matching aspect ratios
-   instead of adding bars.
+   (`ARTW/ARTH/OX/OY`) extends the world into taller-than-game screens
+   instead of adding bars. **Wider-than-game screens get plain bars at the
+   sides** (`MAX_PAD_X=0`, since v30.2, Faisal's call): in iPhone Safari the
+   toolbars make the screen wider than the game, and side margin moved the
+   trail and patch away from where the home-screen app puts them. The game
+   is height-limited there either way, so bars cost no size.
 7. **Garden theme for now.** A space theme stays on the table and should be
    built as a swappable `THEME` object when it happens, not a fork.
 8. **Every version kept as a numbered file.**

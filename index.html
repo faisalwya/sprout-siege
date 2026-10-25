@@ -108,7 +108,7 @@
     <h1>SPROUT SIEGE</h1>
     <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
     <button class="big" id="bStart">START</button>
-    <div id="ver">V30.1</div>
+    <div id="ver">V30.2</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -500,7 +500,10 @@ function distToPath(px,py){
    floating in a letterbox. OX/OY are the margin; world coords are unchanged.
    ====================================================================== */
 let ARTW=W, ARTH=H, OX=0, OY=0;
-const MAX_PAD_X=72, MAX_PAD_Y=52;
+// Wider than the game (Safari's toolbars eat height): plain bars at the sides,
+// so the trail and carrot patch sit exactly where the home-screen app puts
+// them. Taller than the game still grows garden above and below.
+const MAX_PAD_X=0, MAX_PAD_Y=52;
 
 let seed=1337;
 function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
