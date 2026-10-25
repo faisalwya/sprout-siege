@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v31. Read this
+Working document for continuing the build. Last updated with v32. Read this
 first; it replaces re-reading the chat.
 
 ---
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v31** |
+| Current version | **v32** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
@@ -35,8 +35,10 @@ specialisations at level 3, reaching level 5.
 | Beehive | 85 | Swarm | Wasp Nest (fast single target) / Pollen Bloom (damage aura) |
 
 ### Lives
-20 carrots in a patch on the right edge. Each life lost eats one carrot,
-**nearest the gate first**, so damage visibly advances inward from the breach.
+20 carrots in a fenced bed whose place each map sets (since v32). Bugs
+break in through the gate where the trail meets the fence. Each life lost
+eats one carrot, **nearest the gate first**, so damage visibly advances
+inward from the breach.
 The HUD counter is a carrot icon, not a heart.
 
 ---
@@ -68,6 +70,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v32** | New maps, picked by Faisal from nine rendered mocks: 1 is a spiral into a bed in the middle, 2 is three long hedge rows from the bottom-right to a bed top-left, 3 is a figure eight that crosses itself, bed top-left. The bed's place comes from map data and is fenced, with a gate where the trail enters. |
 | **v31** | The last DOM in play is gone: toast and info plaque are painted on the canvas, in a band at the top that is clear of the trail on all three maps. Full A to Z pixel font. Upgrade is an arrow; sell is the top bar's gold coin (Faisal's call over a coin with a plus, which read as obscure), refunds green. |
 
 ---
@@ -112,6 +115,11 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     line two the level or cost plus the numbers. Fork plaques are one line
     per path, on the side of its button, with a short role (`desc`) instead
     of the old flavour line.
+13. **Each map is its own shape** (v32). No more shared left-to-right
+    zigzag into a bed at the right edge. A map sets `wp` (tile waypoints)
+    and `bed` (`{x,y,o}`, top-left in px, `o` 'v' upright 4x5 or 'h' wide
+    5x4). The trail ends inside the bed; the fence gate is where it crosses
+    in. Mocks and the options not picked are in `labs/v32-maps/`.
 
 ---
 
@@ -168,7 +176,8 @@ can be felt in play first.
    derives from the map palette, so it will follow automatically.
 4. **Hand-drawn sprite pipeline.** Intent is to draw sprites externally and
    bring them in. Art integration work should wait for this.
-5. **Plot count**, if `'plots'` mode returns. 16 per map reads busy; 12 would
+5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
+   were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
 6. **Placement mark depth.** What exists is deliberately minimal: the patch
    grows, six clods of dirt fly, a gold rim marks the spot. Built to be

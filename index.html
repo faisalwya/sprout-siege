@@ -58,7 +58,7 @@
     <h1>SPROUT SIEGE</h1>
     <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
     <button class="big" id="bStart">START</button>
-    <div id="ver">V31</div>
+    <div id="ver">V32</div>
   </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
@@ -329,7 +329,8 @@ const MAPS=[
   name:'The Carrot Patch',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
-  wp:[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]],
+  wp:[[-2.37,4],[1.38,4],[3.25,2],[8.88,1.63],[15.88,2],[18,4],[17.63,6.5],[14.5,7.38],[8.88,7.38],[6.88,5.75],[7.5,4.13],[10.25,4]],
+  bed:{x:150,y:52,o:'h'},
   pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
        dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
        flowers:['#ffd452','#f58fbf','#ffeedd','#a8ecff']},
@@ -345,7 +346,8 @@ const MAPS=[
   name:'The Long Hedge',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[184,100,1],[12,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[97,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
-  wp:[[-2,1],[4,1],[4,6],[7,6],[7,2],[10,2],[10,7],[13,7],[13,2],[16,2],[16,6],[21,6]],
+  wp:[[21.38,7.25],[17,7.25],[8.25,7.25],[7.38,5.75],[8.88,4.5],[17,4.5],[18.25,3.13],[17,1.75],[8.88,2],[5.13,2.13],[2,3]],
+  bed:{x:6,y:34,o:'h'},
   pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
        dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
        flowers:['#a8ecff','#ffeedd','#c9a0ff','#ffd452']},
@@ -361,7 +363,8 @@ const MAPS=[
   name:'The Bramble',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[120,61,1],[202,56,1],[16,68,0],[149,103,0],[259,92,0],[59,90,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[110,89,0],[161,50,0],[65,25,0],[157,20,0],[110,123,0],[220,121,0]],
-  wp:[[-2,2],[2,2],[2,6],[5,6],[5,1],[8,1],[8,7],[11,7],[11,2],[14,2],[14,6],[21,6]],
+  wp:[[-2.37,5.25],[3.25,5.25],[6.38,5.5],[9.5,4],[13.25,2],[17.31,2.63],[18.13,5.25],[15.13,6.88],[12,6],[9.5,4],[6.38,2.5],[3.88,2.38],[1.69,2.38]],
+  bed:{x:6,y:22,o:'h'},
   pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
        dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
        flowers:['#ffd452','#ff9a3c','#ffeedd','#f58fbf']},
@@ -576,12 +579,10 @@ function paintBG(pal){
 
   // ---- the trail, in world space
   q.save(); q.translate(OX,OY);
-  // The walked path only reaches just past a phone's edges. A wider screen
-  // (Safari with its toolbars) shows more margin, so the drawn trail carries on
-  // straight to the canvas edge, and is clipped at the far side of the carrot
-  // bed so no stub pokes out behind it. Bugs fade in and out over the same ends.
-  const bx0=17*TILE+6, by0=4*TILE+2, bw=3*TILE, bh=4*TILE-4;
-  q.beginPath(); q.rect(-OX,-OY,OX+bx0+bw,ARTH); q.clip();
+  // The walked path starts just past a phone's edge. A screen with more margin
+  // shows more, so the drawn trail carries on straight to the canvas edge. It
+  // ends inside the carrot bed, which is painted over its last stretch. Bugs
+  // fade in at the start and out among the carrots.
   const T=PTS.slice();
   {
     const k=Math.min(6,PTS.length-1), ux=PTS[k].x-PTS[0].x, uy=PTS[k].y-PTS[0].y, ul=Math.hypot(ux,uy)||1;
@@ -628,6 +629,7 @@ function paintBG(pal){
 
   // ---- The carrot bed. Soil, stones, sprouts and fence are static so they stay
   // baked here; the carrots themselves are live state and draw every frame.
+  const B=BED, bx0=B.x, by0=B.y, bw=B.w, bh=B.h;
   q.fillStyle='#6b4630'; q.fillRect(bx0,by0,bw,bh);
   for(let i=0;i<bw;i+=3){                       // chewed edge, not a clean rectangle
     if(rnd()<.55) q.fillRect(bx0+i,by0-1,3,1);
@@ -638,32 +640,34 @@ function paintBG(pal){
     q.fillStyle = k<.45?'#7d5238':(k<.85?'#5a3a27':'#8a6242');
     q.fillRect(px,py,1,1);
   }
+  const sx=bw/48, sy=bh/60;                     // laid out for the upright bed
   [[6,15],[33,22],[4,44],[30,52]].forEach(st=>{
-    q.fillStyle='#8e9285'; q.fillRect(bx0+st[0],by0+st[1],3,2);
-    q.fillStyle='#b3b8a8'; q.fillRect(bx0+st[0],by0+st[1],2,1);
+    const x=bx0+Math.round(st[0]*sx), y=by0+Math.round(st[1]*sy);
+    q.fillStyle='#8e9285'; q.fillRect(x,y,3,2);
+    q.fillStyle='#b3b8a8'; q.fillRect(x,y,2,1);
   });
   [[19,20],[20,38],[3,26],[36,33],[17,54]].forEach(sp=>{
-    q.fillStyle='#4f9d4a'; q.fillRect(bx0+sp[0],by0+sp[1],1,1);
-    q.fillStyle='#2f6b36'; q.fillRect(bx0+sp[0]-1,by0+sp[1]-1,1,1);
-    q.fillStyle='#7fd07c'; q.fillRect(bx0+sp[0]+1,by0+sp[1]-1,1,1);
+    const x=bx0+Math.round(sp[0]*sx), y=by0+Math.round(sp[1]*sy);
+    q.fillStyle='#4f9d4a'; q.fillRect(x,y,1,1);
+    q.fillStyle='#2f6b36'; q.fillRect(x-1,y-1,1,1);
+    q.fillStyle='#7fd07c'; q.fillRect(x+1,y-1,1,1);
   });
-  const fx0=19*TILE+12, gateY=posAt(PATH_LEN).y;
-  for(let py=by0-4; py<by0+bh+4; py++){
-    if(py>gateY-9 && py<gateY+9) continue;      // leave the gate open
-    q.fillStyle='#e2c9a0'; q.fillRect(fx0,py,2,1);
-    q.fillStyle='#a88d63'; q.fillRect(fx0+2,py,1,1);
+  // A picket fence round the bed, open where the trail comes in.
+  const gate=bedGate();
+  const open=(side,t)=>gate.side===side && Math.abs(t-gate.t)<9;
+  const post=(x,y)=>{ q.fillStyle='#c9ab80'; q.fillRect(x-1,y-1,4,4); q.fillStyle='#e2c9a0'; q.fillRect(x-1,y-1,4,1); };
+  const fl=bx0-3, fr=bx0+bw+1, ft=by0-4, fb=by0+bh+2;
+  for(let x=fl; x<=fr+1; x++){
+    if(!open('t',x)){ q.fillStyle='#e2c9a0'; q.fillRect(x,ft,1,2); q.fillStyle='#a88d63'; q.fillRect(x,ft+2,1,1); }
+    if(!open('b',x)){ q.fillStyle='#e2c9a0'; q.fillRect(x,fb,1,2); q.fillStyle='#a88d63'; q.fillRect(x,fb+2,1,1); }
   }
-  for(let by=by0+2; by<by0+bh; by+=14){
-    if(by>gateY-9 && by<gateY+9) continue;
-    q.fillStyle='#c9ab80'; q.fillRect(fx0-1,by,5,3);
-    q.fillStyle='#e2c9a0'; q.fillRect(fx0-1,by,5,1);
+  for(let y=ft; y<=fb+2; y++){
+    if(!open('l',y)){ q.fillStyle='#e2c9a0'; q.fillRect(fl,y,2,1); q.fillStyle='#a88d63'; q.fillRect(fl+2,y,1,1); }
+    if(!open('r',y)){ q.fillStyle='#e2c9a0'; q.fillRect(fr,y,2,1); q.fillStyle='#a88d63'; q.fillRect(fr+2,y,1,1); }
   }
-  [by0+8, by0+50].forEach(vy=>{
-    if(vy>gateY-9 && vy<gateY+9) return;
-    q.fillStyle='#2f6b36'; q.fillRect(fx0-1,vy,1,1);
-    q.fillStyle='#4f9d4a'; q.fillRect(fx0-2,vy+1,1,1);
-    q.fillStyle='#7fd07c'; q.fillRect(fx0-3,vy+1,1,1); q.fillRect(fx0-2,vy-1,1,1);
-  });
+  for(let x=fl; x<=fr; x+=14){ if(!open('t',x)) post(x,ft); if(!open('b',x)) post(x,fb); }
+  for(let y=ft; y<=fb; y+=14){ if(!open('l',y)) post(fl,y); if(!open('r',y)) post(fr,y); }
+  post(fr,fb); post(fl,fb); post(fr,ft); post(fl,ft);
   q.restore();
 }
 
@@ -671,15 +675,20 @@ function paintBG(pal){
    4b. THE CARROTS: one per life, eaten from the gate inward
    ====================================================================== */
 const MAX_CARROTS=20;
-const CARROT_SLOTS=[];
-(function(){                     // 4 x 5 grid with a fixed jitter
+let CARROT_SLOTS=[];
+function layoutCarrots(){        // 4 x 5 grid (5 x 4 in a wide bed), fixed jitter
   let sd=7777;
   const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
-  for(let row=0;row<5;row++) for(let col=0;col<4;col++)
-    CARROT_SLOTS.push({x:281+col*10+Math.round(r()*2-1), y:74+row*11+Math.round(r()*2-1)});
-})();
+  const cols=BED.o==='h'?5:4, rows=BED.o==='h'?4:5;
+  // centred in the bed: a carrot covers x-2..x+3 and y-2..y+3 of its slot
+  const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
+  const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
+  CARROT_SLOTS=[];
+  for(let row=0;row<rows;row++) for(let col=0;col<cols;col++)
+    CARROT_SLOTS.push({x:x0+col*10+Math.round(r()*2-1), y:y0+row*11+Math.round(r()*2-1)});
+}
 function sortCarrots(){          // nearest the gate is eaten first, so the damage
-  const g=posAt(PATH_LEN);       // visibly advances inward from where bugs break in
+  const g=bedGate();             // visibly advances inward from where bugs break in
   CARROT_SLOTS.sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y));
 }
 function drawCarrot(x,y,s){
@@ -886,7 +895,24 @@ function clearOfTrail(x,y){
       if(distToPath(ix,iy) < TRAIL_CLEAR) return false;
   return true;
 }
-const CARROT_BOX={l:272,t:66,r:318,b:126};     // the home patch, plus a margin
+// The carrot bed: where the map puts it, upright (4 x 5 carrots) or wide (5 x 4).
+// Its fence and a margin are no-build ground.
+let BED={x:278,y:66,w:48,h:60,o:'v'}, CARROT_BOX={l:272,t:62,r:332,b:130};
+function setBed(b){
+  const w=b.o==='h'?58:48, h=b.o==='h'?49:60;
+  BED={x:b.x,y:b.y,w,h,o:b.o};
+  CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
+}
+// where the trail crosses into the bed: which side, and how far along it
+function bedGate(){
+  const inside=p=>p.x>=BED.x&&p.x<=BED.x+BED.w&&p.y>=BED.y&&p.y<=BED.y+BED.h;
+  let i=PTS.length-1;
+  while(i>0 && inside(PTS[i])) i--;
+  const p=PTS[Math.min(PTS.length-1,i+1)];
+  const d={l:p.x-BED.x, r:BED.x+BED.w-p.x, t:p.y-BED.y, b:BED.y+BED.h-p.y};
+  const side=Object.keys(d).reduce((a,k)=>d[k]<d[a]?k:a,'l');
+  return {side, t:(side==='l'||side==='r')?p.y:p.x, x:p.x, y:p.y};
+}
 function overUI(x,y){
   const L=x+BED_L, R=x+BED_R, T=y+BED_T, B=y+BED_B;
   if(T < -OY+15 && (L < -OX+124 || R > W+OX-72)) return true;   // the top ribbon
@@ -948,7 +974,7 @@ function loadMap(n){
   buildSoilPals(curPal);
   seed=1337+n*7919;
   buildGeometry(M.wp);
-  sortCarrots();
+  setBed(M.bed); layoutCarrots(); sortCarrots();
   paintBG(M.pal);
   // in open mode a plot comes into existence when a tower is planted in it
   G.plots = (PLACEMENT==='plots')

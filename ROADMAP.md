@@ -93,7 +93,7 @@ Brings play back in line with settled decision 1 (no DOM over the playfield).
 overlays (title, rift, win, lose); screenshots on all three maps show the
 trail clear.
 
-## v32: Maps that use the screen [ ]
+## v32: Maps that use the screen [x]
 
 Faisal, 25 Oct: look and feel before balance. All three maps are the same
 idea today: enter mid-left, zigzag right through 3 or 4 switchbacks of about
@@ -167,3 +167,4 @@ A small strip of the next wave's bug icons and counts beside the GO button.
   the style. Its licence is non-commercial with credit required:
   "Assets from Sprout Lands by Cup Nooble".
 - Placement mark refinement (brief section 5, item 6).
+- Authored `plots` arrays predate the v32 maps; redo them if `'plots'` mode returns.
