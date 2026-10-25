@@ -17,6 +17,7 @@ do not re-propose anything listed there without a new reason.
 | `tools/smoke.js` | Headless test: plays all 15 waves in Chromium, fails on any error. |
 | `SPROUT-SIEGE-BRIEF.md` | Design brief, decisions, lessons, version map. |
 | `WORKFLOW.md` | Plain-language guide to syncing, branches and avoiding conflicts. |
+| `ROADMAP.md` | What each upcoming version contains and when it's done. |
 
 ## Hard constraints
 
@@ -46,6 +47,8 @@ and follow `WORKFLOW.md`.
 
 ## Making a new version (every time)
 
+0. "Make vN" means build the vN section of `ROADMAP.md`. Do only what it
+   lists; note anything else you spot under a later version instead.
 1. Edit `index.html`.
 2. Bump the version label in `<div id="ver">` to match.
 3. Run `npm test`. It must print all PASS. Then look at the screenshots in
@@ -53,7 +56,9 @@ and follow `WORKFLOW.md`.
 4. Copy `index.html` to `versions/sprout-siege-vN.html`.
 5. Update the brief: version map row, and any decision that was settled or
    rejected along the way.
-6. Commit as `vN: one-line summary`.
+6. Tick the version's box in `ROADMAP.md`.
+7. Commit as `vN: one-line summary`. In the pull request, attach or describe
+   the screenshots so Faisal can review from his phone.
 
 ## Gotchas that have each cost a version
 
