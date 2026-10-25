@@ -56,7 +56,7 @@ and follow `WORKFLOW.md`.
 0. "Make vN" means build the vN section of `ROADMAP.md`. Do only what it
    lists; note anything else you spot under a later version instead.
 1. Edit `index.html`.
-2. Bump the version label in `<div id="ver">` to match.
+2. Bump the version label: `const VERSION` near the top of the script.
 3. Run `npm test`. It must print all PASS. Then look at the screenshots in
    `tools/out/`: render before judging, never reason about pixels blind.
 4. Copy `index.html` to `versions/sprout-siege-vN.html`.

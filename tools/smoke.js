@@ -68,9 +68,34 @@ function instrument(src) {
   const check = (name, ok, info) => { results.push({ name, ok, info }); };
   const shot = n => page.screenshot({ path: path.join(OUT, n + '.png') });
 
+  // Screen buttons are painted on the canvas (v33), so tap them like a player:
+  // find the button by its action in G.btns and click its centre.
+  const tapAct = async act => {
+    await page.waitForTimeout(120);              // let a frame lay the buttons out
+    const pt = await page.evaluate(a => {
+      const b = __SS.G.btns.find(q => q.act === a);
+      if (!b) return null;
+      const c = document.getElementById('cv'), r = c.getBoundingClientRect();
+      const OX = (c.width - 320) / 2, OY = (c.height - 144) / 2;
+      return { x: r.left + (b.x + b.w / 2 + OX) / c.width * r.width,
+               y: r.top + (b.y + b.h / 2 + OY) / c.height * r.height };
+    }, act);
+    if (!pt) return false;
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(150);
+    return true;
+  };
+  // Nothing but the canvas may show in landscape (the portrait notice is hidden).
+  const strayDom = () => page.evaluate(() =>
+    [...document.body.querySelectorAll('*')].filter(e =>
+      !['stage', 'cv'].includes(e.id) && e.tagName !== 'SCRIPT' &&
+      e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'
+    ).map(e => e.id || e.tagName));
+
   await shot('01-title');
-  await page.click('#bStart');
-  await page.waitForTimeout(200);
+  check('title screen is canvas only', (await strayDom()).length === 0, (await strayDom()).join(' '));
+  check('START tap starts the game', await tapAct('sc_start') &&
+    await page.evaluate(() => __SS.G.started && !__SS.G.screen));
 
   // Real pointer tap on the first dock card: proves hit-testing, not just logic.
   const tapped = await page.evaluate(() => {
@@ -124,14 +149,34 @@ function instrument(src) {
       r.waves.map(w => `W${w.w} ${w.secs}s -${w.lost}`).join(' '));
     await shot(`0${3 + map}-map${map}-end`);
     if (r.phase === 'rift') {
-      await page.click('#bNext');
-      await page.waitForTimeout(200);
+      if (map === 1) await shot('04b-map-cleared');
+      const before = await page.evaluate(() => __SS.G.map);
+      check(`map ${map} cleared: next-map tap loads map ${map + 1}`,
+        await tapAct('sc_next') && await page.evaluate(b => __SS.G.map === b + 1 && !__SS.G.screen, before));
       await page.evaluate(() => window.__buildAll());
     }
   }
   check('campaign ends on the win screen',
     await page.evaluate(() => __SS.G.phase === 'won'));
   await shot('07-won');
+  check('won screen offers endless and start over',
+    await page.evaluate(() => __SS.G.screen === 'won' &&
+      ['sc_endless', 'sc_again'].every(a => __SS.G.btns.some(b => b.act === a))));
+
+  // Start over, then lose on purpose to reach the lost screen.
+  await tapAct('sc_again');
+  const lost = await page.evaluate(() => {
+    const S = __SS, G = S.G;
+    G.lives = 1; S.startWave();
+    for (let t = 0; t < 600 && G.phase !== 'dead'; t += 1 / 60) S.step(1 / 60);
+    return G.screen;
+  });
+  await page.waitForTimeout(150);
+  await shot('08-lost');
+  check('losing shows the lost screen', lost === 'dead', String(lost));
+  check('PLANT AGAIN tap restarts on map 1', await tapAct('sc_again') &&
+    await page.evaluate(() => __SS.G.map === 1 && __SS.G.lives === 20 && !__SS.G.screen));
+  check('no DOM visible during play', (await strayDom()).length === 0, (await strayDom()).join(' '));
 
   // The info plaque is painted in a fixed band at the top (v31). Every plaque
   // the game can show must fit that band, and the band must be clear of the

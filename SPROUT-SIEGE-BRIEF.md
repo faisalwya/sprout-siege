@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v32. Read this
+Working document for continuing the build. Last updated with v33. Read this
 first; it replaces re-reading the chat.
 
 ---
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v32** |
+| Current version | **v33** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
@@ -70,6 +70,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v33** | Title, map-cleared, won and lost screens painted on the canvas in the pixel font, on a wooden plate, with canvas buttons. The page is now only the canvas (plus the portrait notice). The version label is `const VERSION`, drawn on the title. |
 | **v32** | New maps, picked by Faisal from nine rendered mocks: 1 is a spiral into a bed in the middle, 2 is three long hedge rows from the bottom-right to a bed top-left, 3 is a figure eight that crosses itself, bed top-left. The bed's place comes from map data and is fenced, with a gate where the trail enters. |
 | **v31** | The last DOM in play is gone: toast and info plaque are painted on the canvas, in a band at the top that is clear of the trail on all three maps. Full A to Z pixel font. Upgrade is an arrow; sell is the top bar's gold coin (Faisal's call over a coin with a plus, which read as obscure), refunds green. |
 
@@ -120,6 +121,11 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     and `bed` (`{x,y,o}`, top-left in px, `o` 'v' upright 4x5 or 'h' wide
     5x4). The trail ends inside the bed; the fence gate is where it crosses
     in. Mocks and the options not picked are in `labs/v32-maps/`.
+14. **Screens are painted too** (v33). Title, map cleared, won and lost dim
+    the field and draw a plate with a 3x heading, a line under it, wrapped
+    body text and plate buttons. While `G.screen` is set its buttons are the
+    only ones `G.btns` holds, so nothing behind can be tapped. Body text is
+    wrapped to even lines (`wrapEven`); a ` \n ` word forces a break.
 
 ---
 
@@ -244,7 +250,7 @@ before shipping any version.**
 
 | File | Purpose | Status |
 |---|---|---|
-| `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer tap on the dock, builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
+| `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer taps on the canvas for every screen button (title, map cleared, won, lost) and the dock, checks no DOM shows in landscape (v33), builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
 | `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v34 |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 

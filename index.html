@@ -26,24 +26,6 @@
     box-shadow:0 0 0 1px #39412f, 0 0 0 5px #1b2015, 0 20px 44px rgba(0,0,0,.6);
   }
   canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;background:#6cc16b}
-  /* ---------- overlays ---------- */
-  #over{
-    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:.55em;background:rgba(14,18,14,.88);pointer-events:auto;text-align:center;padding:1em;
-    font-size:var(--fs);line-height:1.4
-  }
-  #over.hide{display:none}
-  #over h1{font-size:2.1em;line-height:1.1;letter-spacing:.1em;color:#ffd452;text-shadow:0 3px 0 #7a4a12;font-weight:800}
-  #over h2{font-size:1.15em;line-height:1.25;letter-spacing:.08em;font-weight:600}
-  #over p{font-size:.85em;color:#c9d6c4;max-width:32em;line-height:1.45}
-  #over .big{font-size:1em;
-    background:#4f9d4a;border:1px solid #82d17c!important;padding:.6em 1.4em;border-radius:.5em;
-    font-weight:800;letter-spacing:.1em;box-shadow:0 4px 0 #2c5c2a;margin-top:.2em
-  }
-  #over .big:active{transform:translateY(3px);box-shadow:0 1px 0 #2c5c2a}
-
-  #ver{position:absolute;bottom:.6em;right:.8em;font-size:.7em;color:#6f7a6c;letter-spacing:.1em}
-
   #rotate{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:.6em;
     background:#191d19;z-index:50;text-align:center;padding:2em;font-size:14px
@@ -54,12 +36,6 @@
 <body>
 <div id="stage">
   <canvas id="cv"></canvas>
-  <div id="over">
-    <h1>SPROUT SIEGE</h1>
-    <p>Bugs are marching on your carrot patch.<br>Tap a card, then any open ground to plant.<br>Level 3 picks a specialty. GO sends the next wave.</p>
-    <button class="big" id="bStart">START</button>
-    <div id="ver">V32</div>
-  </div>
 </div>
 <div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
 
@@ -70,6 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
+const VERSION='V33';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 
 const PAL={'.':null,
@@ -233,25 +210,26 @@ const GLYPH={
  ',':['00','00','00','01','10'],'!':['1','1','1','0','1']
 };
 const SPACE_W=3;
-function drawText(x,y,txt,color,shadow){
-  txt=String(txt).toUpperCase();
+// sc scales every font pixel to an sc x sc block, for headings
+function drawText(x,y,txt,color,shadow,sc){
+  txt=String(txt).toUpperCase(); sc=sc||1;
   const pass=(ox,oy)=>{
     let cx=x;
     for(const ch of txt){
       const g=GLYPH[ch];
-      if(!g){ cx+=SPACE_W+1; continue; }
+      if(!g){ cx+=(SPACE_W+1)*sc; continue; }
       for(let j=0;j<5;j++) for(let i=0;i<g[j].length;i++)
-        if(g[j][i]==='1') ctx.fillRect(cx+i+ox,y+j+oy,1,1);
-      cx+=g[0].length+1;
+        if(g[j][i]==='1') ctx.fillRect(cx+i*sc+ox,y+j*sc+oy,sc,sc);
+      cx+=(g[0].length+1)*sc;
     }
   };
-  if(shadow){ ctx.fillStyle=shadow; pass(1,1); }   // offset copy first, so light text reads on any ground
+  if(shadow){ ctx.fillStyle=shadow; pass(sc,sc); }  // offset copy first, so light text reads on any ground
   ctx.fillStyle=color; pass(0,0);
 }
-function textW(t){
+function textW(t,sc){
   let w=0;
   for(const ch of String(t).toUpperCase()){ const g=GLYPH[ch]; w+=(g?g[0].length:SPACE_W)+1; }
-  return Math.max(0,w-1);
+  return Math.max(0,w-1)*(sc||1);
 }
 
 /* ======================================================================
@@ -953,7 +931,7 @@ const G={
   queue:[], qt:0, shake:0, flash:0, time:0,
   plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
   hoverPos:null, selAge:0,
-  btns:[], btnHover:null, ui:0, toast:null
+  btns:[], btnHover:null, ui:0, toast:null, screen:'title'
 };
 
 // Lives carry across maps. Towers do not: the grid is a different shape on the
@@ -1801,6 +1779,7 @@ function draw(){
   G.btns=G.btns.concat(drawHUD());
 
   if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(-OX,-OY,ARTW,ARTH); }
+  if(G.screen) G.btns=drawScreen(G.screen);   // on top of everything, and takes every tap
   ctx.restore();
 }
 
@@ -1867,7 +1846,6 @@ function layout(){
   const cw=ARTW*s, ch=ARTH*s;
   cv.style.width=cw+'px'; cv.style.height=ch+'px';
   stage.style.width=cw+'px'; stage.style.height=ch+'px';
-  stage.style.setProperty('--fs', Math.max(9,Math.min(18,Math.round(ch*0.046)))+'px');
   document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
 }
 window.addEventListener('resize',layout);
@@ -1944,9 +1922,9 @@ function doAction(b){
 }
 cv.addEventListener('pointerdown',ev=>{
   ev.preventDefault();
-  if(!G.started) return;
   const p=toArt(ev);
   const b=hitBtn(p.x,p.y);
+  if(G.screen){ if(b) screenAction(b.act); return; }
   if(b){ if(b.dis){ toast('Not enough coins'); SFX.bad(); } else doAction(b); return; }
 
   const i=plotAt(p.x,p.y);
@@ -2094,10 +2072,11 @@ function plaqueContent(){
 }
 function segW(s){ return s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
 function lineW(l){ return l.reduce((w,s)=>w+segW(s),0); }
-function drawLine(l,x,y){
+function drawLine(l,x,y,sh){
+  sh=sh||PLQ_SH;
   for(const s of l){
-    if(s.glyph) glyph(GL[s.glyph],x,y,s.col,PLQ_SH);
-    else drawText(x,y,s[0],s[1],PLQ_SH);
+    if(s.glyph) glyph(GL[s.glyph],x,y,s.col,sh);
+    else drawText(x,y,s[0],s[1],sh);
     x+=segW(s);
   }
 }
@@ -2123,70 +2102,114 @@ function drawPlaque(){
 }
 
 /* ======================================================================
-   15. OVERLAYS
+   15. SCREENS: title, map cleared, lost, won. They used to be DOM text in a
+   system font over the field; painted here they share the game's pixel font
+   and plates. A screen dims the field and takes every tap while it is up.
    ====================================================================== */
-const over=document.getElementById('over');
-function showOver(kind){
-  G.paused=true;
-  over.classList.remove('hide');
+const SC_TITLE='#ffd452', SC_HEAD='#ffeedd', SC_BODY='#cbb495', SC_GOLD='#ffd452';
+const SC_SKIN={go:['#4f9d4a','#82d17c','#2c5c2a'], alt:['#3d5f8f','#7aa6dd','#23395a']};
+const SC_MAXW=236;                 // body text wraps here, in art px
+// words of [text,colour] runs, packed into lines no wider than w; a '\n'
+// word starts a new line
+function wrapRuns(runs,w){
+  const lines=[]; let line=[], lw=0;
+  for(const [txt,col] of runs) for(const word of String(txt).split(' ')){
+    if(!word) continue;
+    if(word==='\n'){ if(line.length) lines.push(line); line=[]; lw=0; continue; }
+    const ww=textW(word), sp=line.length?SPACE_W+1:0;
+    if(line.length && lw+sp+ww>w){ lines.push(line); line=[]; lw=0; }
+    const last=line[line.length-1], lead=line.length?' ':'';
+    if(last && last[1]===col) last[0]+=lead+word; else line.push([lead+word,col]);
+    lw+=(line.length>1||lead?sp:0)+ww;
+  }
+  if(line.length) lines.push(line);
+  return lines;
+}
+// same number of lines, but as even as they can be, so no word sits alone
+function wrapEven(runs,w){
+  const n=wrapRuns(runs,w).length;
+  let lo=40, hi=w;
+  while(lo<hi){ const m=(lo+hi)>>1; if(wrapRuns(runs,m).length<=n) hi=m; else lo=m+1; }
+  return wrapRuns(runs,lo);
+}
+function screenContent(kind){
   const M=MAPS[G.map-1];
-
+  if(kind==='title') return {
+    title:'Sprout Siege', col:SC_TITLE, shade:'#7a4a12',
+    body:[['Bugs are marching on your carrot patch. \n Tap a card, then any open ground to plant. \n Level 3 picks a specialty. GO sends the next wave.',SC_BODY]],
+    btns:[{act:'sc_start',label:'Start',skin:'go'}], ver:true };
   if(kind==='rift'){
-    const nx=MAPS[G.map], nn=G.map+1;
-    const rate=carrotRate(nn);
-    const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack;
-    over.innerHTML='<h1>PLOT HELD</h1>'+
-      '<h2>'+M.name+' cleared: '+G.lives+' carrots carried</h2>'+
-      '<p>You pack up the kit and step through: '+G.lives+' carrots at '+rate+
-      ' coins each, plus '+G.pack+' salvaged from '+G.towers.length+' tower'+(G.towers.length===1?'':'s')+
-      '. You arrive at '+nx.name+' with <b style="color:#ffd452">'+arrive+'</b>.</p>'+
-      '<button class="big" id="bNext">ON TO '+nx.name.toUpperCase()+' &#9654;</button>';
-    document.getElementById('bNext').addEventListener('click',()=>{
-      loadMap(G.map+1);
-      G.paused=false;
-      over.classList.add('hide');
-      SFX.wave();
-    });
-    SFX.up();
-    return;
+    const nx=MAPS[G.map], rate=carrotRate(G.map+1);
+    const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
+    return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
+      head:M.name+' cleared: '+G.lives+' carrots carried',
+      body:[['You pack up the kit and step through: '+G.lives+' carrots at '+rate+
+        ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
+        [arrive+'.',SC_GOLD]],
+      btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
   }
-
-  if(kind==='dead'){
-    over.innerHTML='<h1 style="color:#ff7b7b;text-shadow:0 3px 0 #5c1f1f">PATCH EATEN</h1>'+
-      '<h2>'+M.name+', wave '+Math.max(1,G.wave)+'</h2>'+
-      '<p>The bugs got through. Replant and try a different mix of specialties.</p>'+
-      '<button class="big" id="bAgain">PLANT AGAIN</button>';
-    document.getElementById('bAgain').addEventListener('click',reset);
-    SFX.bad();
-    return;
-  }
-
+  if(kind==='dead') return { title:'Patch eaten', col:'#ff7b7b', shade:'#5c1f1f',
+      head:M.name+', wave '+Math.max(1,G.wave),
+      body:[['The bugs got through. Replant and try a different mix of specialties.',SC_BODY]],
+      btns:[{act:'sc_again',label:'Plant again',skin:'go'}] };
   const hp=G.lives;
   const line = hp>=20 ? 'Not one carrot lost.'
              : hp>=13 ? 'Chewed at the edges, still standing.'
              : hp>=6  ? 'More stem than carrot now, but it held.'
              :          'Down to the last row. That was close.';
-  over.innerHTML='<h1>GARDEN HELD</h1>'+
-    '<h2>All '+MAPS.length+' plots held, '+hp+' carrots left</h2>'+
-    '<p>'+line+' Keep going and the swarm stops holding back.</p>'+
-    '<button class="big" id="bEndless">ENDLESS MODE</button>'+
-    '<button class="big" id="bAgain" style="background:#3d5f8f;border-color:#7aa6dd!important;box-shadow:0 4px 0 #23395a">START OVER</button>';
-  document.getElementById('bEndless').addEventListener('click',()=>{
-    G.endless=true; G.phase='idle'; G.paused=false; over.classList.add('hide');
-  });
-  document.getElementById('bAgain').addEventListener('click',reset);
-  SFX.up();
+  return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
+    head:'All '+MAPS.length+' plots held, '+hp+' carrots left',
+    body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
+    btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
+}
+const SC_T=3, BTN_H=13;            // heading scale, button height
+function drawScreen(kind){
+  const c=screenContent(kind);
+  ctx.fillStyle='rgba(14,18,14,.82)'; ctx.fillRect(-OX,-OY,ARTW,ARTH);
+  const body=wrapEven(c.body,SC_MAXW);
+  const btnW=b=>textW(b.label)+12+(b.arrow?6:0);
+  const rowW=c.btns.reduce((w,b)=>w+btnW(b),0)+(c.btns.length-1)*6;
+  const tw=textW(c.title,SC_T);
+  const innerW=Math.max(tw, c.head?textW(c.head):0, ...body.map(lineW), rowW);
+  const h=5*SC_T+(c.head?12:0)+9+body.length*7+6+BTN_H;
+  const pw=innerW+20, ph=h+18;
+  const px=Math.round((W-pw)/2), py=Math.round((H-ph)/2);
+  plate(px,py,pw,ph,'#3b2a1b','#6b4a30');
+  let y=py+8;
+  drawText(Math.round((W-tw)/2),y,c.title,c.col,c.shade,SC_T);
+  y+=5*SC_T+6;
+  if(c.head){ drawText(Math.round((W-textW(c.head))/2),y,c.head,SC_HEAD,PLQ_SH); y+=12; } else y+=3;
+  for(const l of body){ drawLine(l,Math.round((W-lineW(l))/2),y); y+=7; }
+  y+=6;
+  const out=[]; let bx=Math.round((W-rowW)/2);
+  for(const b of c.btns){
+    const w=btnW(b), sk=SC_SKIN[b.skin], press=G.btnHover===b.act?1:0;
+    plate(bx,y+press,w,BTN_H,sk[0],sk[1]);
+    drawText(bx+6,y+4+press,b.label,'#ffffff',sk[2]);
+    if(b.arrow) glyph(GL.play,bx+w-9,y+4+press,'#ffffff',sk[2]);
+    out.push({act:b.act,x:bx,y,w,h:BTN_H});
+    bx+=w+6;
+  }
+  if(c.ver) drawText(W+OX-3-textW(VERSION),H+OY-8,VERSION,'#6f7a6c');
+  return out;
+}
+function screenAction(act){
+  if(act==='sc_start'){ actx(); G.started=true; G.paused=false; G.phase='idle'; }
+  else if(act==='sc_next'){ loadMap(G.map+1); G.paused=false; SFX.wave(); }
+  else if(act==='sc_again'){ reset(); }
+  else if(act==='sc_endless'){ G.endless=true; G.phase='idle'; G.paused=false; }
+  else return;
+  G.screen=null; G.btnHover=null;
+}
+function showOver(kind){
+  G.paused=true; G.screen=kind; G.selected=null; G.placing=null; G.ghost=null;
+  if(kind==='rift'||kind==='won') SFX.up(); else SFX.bad();
 }
 function reset(){
   G.lives=20; G.endless=false; G.pack=0;
   loadMap(1);
   G.paused=false;
-  over.classList.add('hide');
 }
-document.getElementById('bStart').addEventListener('click',()=>{
-  actx(); G.started=true; G.paused=false; G.phase='idle';
-  over.classList.add('hide');
-});
 
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; } });
 document.addEventListener('gesturestart',e=>e.preventDefault());
