@@ -394,7 +394,7 @@ const MAPS=[
  {
   name:'The Carrot Patch',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
-  plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[8,42,0],[86,42,1],[222,94,0],[178,75,0],[162,45,0],[240,21,0],[222,123,0],[270,34,0],[206,28,0],[108,70,0],[8,105,0]],
+  plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
   wp:[[-2,4],[3,4],[3,1],[8,1],[8,7],[12,7],[12,3],[16,3],[16,6],[21,6]],
   pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
        dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
@@ -410,7 +410,7 @@ const MAPS=[
  {
   name:'The Long Hedge',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
-  plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[183,100,1],[8,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[96,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
+  plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[184,100,1],[12,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[97,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
   wp:[[-2,1],[4,1],[4,6],[7,6],[7,2],[10,2],[10,7],[13,7],[13,2],[16,2],[16,6],[21,6]],
   pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
        dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
@@ -426,7 +426,7 @@ const MAPS=[
  {
   name:'The Bramble',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
-  plots:[[121,60,1],[202,56,1],[16,68,0],[148,105,0],[259,92,0],[58,91,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[109,89,0],[161,50,0],[65,25,0],[156,20,0],[110,123,0],[220,121,0]],
+  plots:[[120,61,1],[202,56,1],[16,68,0],[149,103,0],[259,92,0],[59,90,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[110,89,0],[161,50,0],[65,25,0],[157,20,0],[110,123,0],[220,121,0]],
   wp:[[-2,2],[2,2],[2,6],[5,6],[5,1],[8,1],[8,7],[11,7],[11,2],[14,2],[14,6],[21,6]],
   pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
        dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
@@ -745,29 +745,213 @@ function drawCarrot(x,y,s){
   ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
   ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
 }
-// Back to a 12x12 bed. The tower's silhouette overhangs it slightly, which is
-// fine so long as the overhang is even: what made towers look wrong before was
-// the sprite being drawn a pixel high, plus a shadow and level pips stacked
-// underneath the bed. All three are gone, so the sprite sits dead centre.
+/* ---------------------------------------------------------------------------
+   PLOT GEOMETRY. One source of truth, and now purely logical: these numbers
+   drive spacing, the tap target and the button keep-out box, but nothing is
+   drawn as a rectangle any more.
+
+   The bed went through three shapes. Square was wrong because tower art is
+   13px tall and only 9-11px wide. A wide tilled strip seated the tower
+   properly but still read as an object dropped on the lawn, sixteen identical
+   rectangles to a map. What is drawn now is a scuff of turned earth: an
+   irregular patch with a ragged edge, seeded from its own position so no two
+   are alike. Ground, not furniture.
+--------------------------------------------------------------------------- */
+const BED_W=20, BED_H=14;        // logical footprint, for spacing and hit-tests
+const BED_L=-10, BED_T=-4;       // relative to the anchor
+const BED_R=BED_L+BED_W-1;       // +9
+const BED_B=BED_T+BED_H-1;       // +9, four rows of soil in front of the feet
+const TOWER_DY=-2;               // sprite centre, so the feet land on the soil
+const PIP_Y=7;                   // level pips sit on the apron, clear of the feet
+
+/* PLACEMENT MODE.
+   'open'  - build anywhere off the trail. No bed exists until a tower stands
+             in it, so the lawn stays clean and every bed on screen is there
+             because the player put it there.
+   'plots' - the authored sixteen beds per map, visible from the start. Keeps
+             position as a real decision (coverage varies about 2.5x across
+             the set) at the cost of sixteen identical rectangles sitting on
+             the grass before anything is built.
+   The authored arrays stay in MAPS either way, so this is a one-word switch
+   while the mechanics and the art direction are still moving. */
+const PLACEMENT='open';
+const SNAP=2;                    // placements land on even pixels, so beds align
+const TRAIL_CLEAR=10;            // the drawn trail runs ~9.5px either side
+const BED_GAP=3;                 // breathing room between two beds
+
+/* ---- the soil ------------------------------------------------------------
+   A patch is the union of eleven small overlapping discs along a shallow
+   line, with a bite out of the top and the bottom so the silhouette never
+   closes into a neat oval. Everything is seeded from the patch's own
+   position, so a patch is identical every frame (nothing shimmers) and
+   different at every spot (nothing looks stamped from the same die).
+
+   It is rendered into a small cached canvas rather than drawn disc by disc,
+   because the outline has to be grown around the finished union. Drawing a
+   rim per disc puts rim pixels through the interior wherever a later disc
+   overlaps an earlier one, which is what made the first attempt read as a
+   handful of dark rocks instead of turned earth. */
+function soilRnd(x,y){
+  let s=((((x|0)*73856093) ^ ((y|0)*19349663) ^ 0x9e3779b9)>>>0);
+  return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+}
+const SOIL_CACHE=new Map();
+function soilLobes(x,y){
+  const key=x+','+y;
+  let L=SOIL_CACHE.get(key);
+  if(L) return L;
+  if(SOIL_CACHE.size>512) SOIL_CACHE.clear();   // the hover walks the whole map
+  const r=soilRnd(x,y);
+  L=[];
+  for(let i=0;i<9;i++){
+    const t=i/8*2-1;                            // -1 .. 1 across the patch
+    L.push({dx:t*7.4+(r()*1.3-0.65),
+            dy:4.0+(r()*1.3-0.65)+Math.abs(t)*0.4,
+            r :4.1-Math.abs(t)*0.9+r()*0.7});
+  }
+  L.push({dx:r()*9-4.5, dy:1.0+r()*1.1, r:2.3+r()*1.1});
+  L.push({dx:r()*11-5.5, dy:7.2+r()*0.9, r:2.0+r()*1.1});
+  // crumbs, the light ones biased high so the patch reads as lit from above
+  L.crumbs=[];
+  for(let i=0;i<16;i++){
+    const lit=r()<.5;
+    L.crumbs.push([Math.round(r()*19-9.5),
+                   Math.round(lit ? 1+r()*4 : 4+r()*5), lit]);
+  }
+  SOIL_CACHE.set(key,L);
+  return L;
+}
+
+/* [edge, fill, light crumb, dark crumb].
+   Derived from the map's own trail palette rather than fixed. A patch in
+   colours of its own reads as an object dropped on the lawn, which is what
+   the bed kept doing; in the path's colours it reads as the same earth, just
+   turned over. It also means a theme swap carries the soil with it. */
+let SOIL_TILLED=[], SOIL_ROUGH=[], SOIL_BAD=[];
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16), c=i=>
+    Math.max(0,Math.min(255,Math.round(((n>>i)&255)*f)));
+  return '#'+((1<<24)|(c(16)<<16)|(c(8)<<8)|c(0)).toString(16).slice(1);
+}
+function buildSoilPals(P){
+  SOIL_TILLED=[shade(P.edge,.72), shade(P.dirt,.92), P.inner,        shade(P.edge,.86)];
+  SOIL_ROUGH =[shade(P.edge,.50), shade(P.dirt,.60), shade(P.dirt,.80), shade(P.edge,.42)];
+  SOIL_BAD   =['#7e3330','#a85450','#c97d78','#8f3f3b'];
+  PATCH_CACHE.clear();
+}
+
+const PATCH_W=30, PATCH_H=22, PATCH_AX=15, PATCH_AY=7;
+const PATCH_CACHE=new Map();
+function rgb3(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function soilPatch(x,y,step,pal,halo,palKey){
+  const key=x+','+y+','+step+','+palKey+','+(halo||'-');
+  let c=PATCH_CACHE.get(key);
+  if(c) return c;
+  if(PATCH_CACHE.size>320) PATCH_CACHE.clear();
+  const g=step/8, L=soilLobes(x,y);
+  c=document.createElement('canvas'); c.width=PATCH_W; c.height=PATCH_H;
+  const q=c.getContext('2d');
+  for(const b of L) disc(q, PATCH_AX+b.dx, PATCH_AY+b.dy, b.r*g, pal[1]);
+  if(g>=0.8){
+    for(const cr of L.crumbs){
+      const px=PATCH_AX+cr[0], py=PATCH_AY+cr[1];
+      if(px<1||py<1||px>=PATCH_W-1||py>=PATCH_H-1) continue;
+      let inside=false;
+      for(const b of L){
+        const ex=px+0.5-(PATCH_AX+b.dx), ey=py+0.5-(PATCH_AY+b.dy);
+        if(ex*ex+ey*ey <= (b.r*g-1.2)*(b.r*g-1.2)){ inside=true; break; }
+      }
+      if(!inside) continue;
+      q.fillStyle = cr[2]?pal[2]:pal[3];
+      q.fillRect(px,py,1,1);
+    }
+  }
+  // one outline grown around the finished union, then the halo ring outside it
+  const im=q.getImageData(0,0,PATCH_W,PATCH_H), d=im.data;
+  let on=new Uint8Array(PATCH_W*PATCH_H);
+  for(let i=0;i<on.length;i++) on[i]= d[i*4+3] ? 1 : 0;
+  const ring=(src,col)=>{
+    const add=[];
+    for(let py=0;py<PATCH_H;py++) for(let px=0;px<PATCH_W;px++){
+      const i=py*PATCH_W+px;
+      if(src[i]) continue;
+      if((px>0&&src[i-1]) || (px<PATCH_W-1&&src[i+1]) ||
+         (py>0&&src[i-PATCH_W]) || (py<PATCH_H-1&&src[i+PATCH_W])) add.push(i);
+    }
+    const nx=Uint8Array.from(src);
+    for(const i of add){
+      d[i*4]=col[0]; d[i*4+1]=col[1]; d[i*4+2]=col[2]; d[i*4+3]=255; nx[i]=1;
+    }
+    return nx;
+  };
+  on=ring(on, rgb3(pal[0]));
+  if(halo) ring(on, rgb3(halo));
+  q.putImageData(im,0,0);
+  PATCH_CACHE.set(key,c);
+  return c;
+}
+// halo is a 1px rim in the patch's own shape: a selection marker shaped like
+// the thing it marks, which a rectangle around an irregular patch never was
+function drawSoil(x,y,grow,halo,pal,palKey){
+  const g=(grow===undefined)?1:grow;
+  if(g<=0.1) return;
+  const step=Math.max(1,Math.min(8,Math.round(g*8)));
+  ctx.drawImage(soilPatch(x,y,step,pal||SOIL_TILLED,halo,palKey||('t'+G.map)),
+                x-PATCH_AX, y-PATCH_AY);
+}
+
 function drawPlot(p){
   const x=Math.round(p.x), y=Math.round(p.y);
   if(p.blocked){                                  // a stump: pay to clear it
-    ctx.fillStyle='#4a3122'; ctx.fillRect(x-6,y-6,12,12);
-    ctx.fillStyle='#5c4433'; ctx.fillRect(x-5,y-5,10,10);
-    ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-4,8,8);
-    ctx.fillStyle='#a97a4f'; ctx.fillRect(x-3,y-3,6,6);
-    ctx.fillStyle='#5c4433'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+1,y+2,1,1);
+    drawSoil(x,y,1,null,SOIL_ROUGH,'r'+G.map);
+    ctx.fillStyle='#3a2617'; ctx.fillRect(x-5,y-3,10,8);      // the cut trunk
+    ctx.fillStyle='#6b4630'; ctx.fillRect(x-4,y-2,8,6);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-3,8,3);       // sawn face
+    ctx.fillStyle='#b08454'; ctx.fillRect(x-3,y-3,6,2);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-1,y-3,2,1);       // growth rings
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-3,y,1,3); ctx.fillRect(x+2,y+1,1,2);
+    ctx.fillStyle='#2f6b36';                                  // weeds beside it
+    ctx.fillRect(x-7,y+1,1,3); ctx.fillRect(x+6,y+2,1,2);
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-8,y+1,1,1); ctx.fillRect(x+7,y+2,1,1);
     return;
   }
-  ctx.fillStyle='#7a5636'; ctx.fillRect(x-6,y-6,12,12);
-  ctx.fillStyle='#9c7048'; ctx.fillRect(x-5,y-5,10,10);
-  ctx.fillStyle='#7a5636';
-  for(let k=0;k<3;k++) ctx.fillRect(x-4,y-3+k*3,8,1);
-  ctx.fillStyle='#b08454'; ctx.fillRect(x-5,y-5,10,1);
+  drawSoil(x,y,1,null,SOIL_TILLED);
 }
 function drawPlots(){
   for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
 }
+
+/* Open placement: is this a legal spot for a bed?
+   Five tests, cheapest first. The trail test samples the bed on a 2px lattice
+   rather than measuring rectangle-to-polyline properly; the bed is 18x10, so
+   45 samples is exact enough and only ever runs for the one spot under the
+   pointer. */
+function clearOfTrail(x,y){
+  if(distToPath(x,y) >= TRAIL_CLEAR+10.3) return true;   // whole bed is far
+  for(let ix=x+BED_L; ix<=x+BED_R; ix+=2)
+    for(let iy=y+BED_T; iy<=y+BED_B; iy+=2)
+      if(distToPath(ix,iy) < TRAIL_CLEAR) return false;
+  return true;
+}
+const CARROT_BOX={l:272,t:66,r:318,b:126};     // the home patch, plus a margin
+function overUI(x,y){
+  const L=x+BED_L, R=x+BED_R, T=y+BED_T, B=y+BED_B;
+  if(T < -OY+15 && (L < -OX+124 || R > W+OX-72)) return true;   // the top ribbon
+  const dockTop=H+OY-3-(DOCK_W+9);
+  if(B > dockTop-2 && L < -OX+dockWidthArt()+2) return true;    // the dock
+  return false;
+}
+function placeOK(x,y){
+  if(x+BED_L < -OX+2 || x+BED_R > W+OX-3) return false;
+  if(y+BED_T < -OY+2 || y+BED_B > H+OY-3) return false;
+  if(x+BED_R > CARROT_BOX.l && x+BED_L < CARROT_BOX.r &&
+     y+BED_B > CARROT_BOX.t && y+BED_T < CARROT_BOX.b) return false;
+  for(const p of G.plots)
+    if(Math.abs(p.x-x) < BED_W+BED_GAP && Math.abs(p.y-y) < BED_H+BED_GAP) return false;
+  if(overUI(x,y)) return false;
+  return clearOfTrail(x,y);
+}
+function snapTo(v){ return Math.round(v/SNAP)*SNAP; }
 function drawCarrots(){
   const eaten=Math.max(0,MAX_CARROTS-G.lives);
   for(let i=eaten;i<MAX_CARROTS;i++){
@@ -788,6 +972,7 @@ const G={
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
   plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
+  hoverPos:null, selAge:0,
   btns:[], btnHover:null, ui:0
 };
 
@@ -806,13 +991,17 @@ function loadMap(n){
   G.map=n;
   const M=MAPS[n-1];
   curPal=M.pal;
+  buildSoilPals(curPal);
   seed=1337+n*7919;
   buildGeometry(M.wp);
   sortCarrots();
   paintBG(M.pal);
-  G.plots=M.plots.map(q=>({x:q[0],y:q[1],blocked:!!q[2],tower:null}));
+  // in open mode a plot comes into existence when a tower is planted in it
+  G.plots = (PLACEMENT==='plots')
+    ? M.plots.map(q=>({x:q[0],y:q[1],blocked:!!q[2],tower:null}))
+    : [];
   G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
-  G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null;
+  G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null; G.hoverPos=null;
   G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
   G.gold = (n===1) ? 150 : MAP_BASE_GOLD + heartRate(n)*G.lives + (G.pack||0);
   G.pack=0;
@@ -872,13 +1061,20 @@ function nextCost(t){
   return null; // fork point
 }
 // ---- plots ----------------------------------------------------------------
-const PLOT_HIT=11;          // tap radius; the bed itself is 12px across
+// The tap target is the bed itself, grown by PLOT_PAD so a thumb still lands
+// on it. A radius no longer works now that the bed is wide and shallow: it
+// would either miss the ends or swallow the ground above and below.
+const PLOT_PAD=4;
 const CLEAR_COST=60;
 function plotAt(ax,ay){
-  let best=-1, bd=PLOT_HIT*PLOT_HIT;
+  let best=-1, bd=1e9;
+  const hw=BED_W/2+PLOT_PAD, hh=BED_H/2+PLOT_PAD;
   for(let i=0;i<G.plots.length;i++){
-    const p=G.plots[i], dx=ax-p.x, dy=ay-p.y, d=dx*dx+dy*dy;
-    if(d<=bd){ bd=d; best=i; }
+    const p=G.plots[i], dx=ax-p.x, dy=ay-(p.y+0.5);
+    if(Math.abs(dx)>hw || Math.abs(dy)>hh) continue;
+    // normalise so the nearest plot wins consistently across the two axes
+    const d=(dx/hw)*(dx/hw)+(dy/hh)*(dy/hh);
+    if(d<bd){ bd=d; best=i; }
   }
   return best;
 }
@@ -1165,15 +1361,20 @@ const BTN_SKIN={
 function rectsHit(a,b){
   return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
 }
+// The keep-out box is the bed plus its selection frame plus the tower
+// silhouette standing in it, not a 16px tile. Buttons that cleared a tile
+// still landed on the gnome's hat.
+const KEEP_L=BED_L-1, KEEP_R=BED_R+1, KEEP_T=TOWER_DY-9, KEEP_B=BED_B+1;
 function layoutBtns(cx,cy,specs){
   const gap=2, minX=-OX+1, maxX=W+OX-1, minY=-OY+1, maxY=H+OY-1;
-  const tile={x:cx-TILE/2,y:cy-TILE/2,w:TILE,h:TILE};
+  const tile={x:cx+KEEP_L, y:cy+KEEP_T, w:KEEP_R-KEEP_L+1, h:KEEP_B-KEEP_T+1};
+  const midY=cy+(BED_T+BED_B)/2;      // vertical centre of the bed, not the box
   const placed=[], out=[];
   const posFor=(side,w,h)=>{
-    if(side==='right') return {x:cx+TILE/2+gap, y:cy-h/2};
-    if(side==='left')  return {x:cx-TILE/2-gap-w, y:cy-h/2};
-    if(side==='up')    return {x:cx-w/2, y:cy-TILE/2-gap-h};
-    return {x:cx-w/2, y:cy+TILE/2+gap};
+    if(side==='right') return {x:cx+KEEP_R+1+gap, y:midY-h/2};
+    if(side==='left')  return {x:cx+KEEP_L-gap-w, y:midY-h/2};
+    if(side==='up')    return {x:cx-w/2, y:cy+KEEP_T-gap-h};
+    return {x:cx-w/2, y:cy+KEEP_B+1+gap};
   };
   const okAt=(x,y,w,h)=>{
     if(x<minX||x+w>maxX||y<minY||y+h>maxY) return false;
@@ -1225,11 +1426,16 @@ function drawBtn(b){
     glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':'#ffffff');
   }
   if(b.num!==undefined){
+    // A price tag, not loose text. It used to be a translucent smear that the
+    // trail showed straight through; now it is an opaque chip with a rim, and
+    // it flips to whichever side of the button has room inside the frame.
     const t=String(b.num), tw=textW(t);
-    const bx=Math.round(b.x+b.w/2-tw/2);
-    const by=(b.side==='up') ? y-8 : y+b.h+3;
-    ctx.fillStyle='rgba(18,22,18,.65)';
-    ctx.fillRect(bx-1, by, tw+2, 7);
+    let bx=Math.round(b.x+b.w/2-tw/2);
+    let by=(b.side==='up'||b.side==='left'||b.side==='right') ? y-8 : y+b.h+1;
+    if(by<-OY+1) by=y+b.h+1;
+    if(by+7>H+OY-1) by=y-8;
+    bx=Math.max(-OX+3, Math.min(W+OX-4-tw, bx));
+    plate(bx-2, by-1, tw+4, 9, '#2a2f28', '#4b5248');
     drawText(bx, by+1, t, b.dis?'#8d92a8':'#ffd452');
   }
 }
@@ -1329,69 +1535,51 @@ function hitBtn(ax,ay){
   return null;
 }
 
-// ---------------- the selector ----------------
-// Four vines growing out of a knot at the plot's centre, unfurling when a plot
-// is hovered and then rustling while it is held. Arm lengths are deliberately
-// uneven: four matching arms read as a spider, uneven ones read as a plant.
-// The leading pixel of a growing arm stays light so the eye tracks it outward,
-// and each arm eases slightly past its length before settling, which is what
-// makes it look grown rather than drawn.
-const SEL_ARMS=[
-  [-1,-1,6,[0,0,1,1,1,0,0,-1,-1,0,0],[3,5]],
-  [ 1,-1,8,[0,1,1,0,0,-1,-1,-1,0,0,1],[3,6,7]],
-  [-1, 1,7,[0,0,-1,-1,0,1,1,1,0,0,-1],[4,6]],
-  [ 1, 1,6,[0,-1,-1,0,1,1,0,0,-1,0,0],[2,5]]
-];
-const SEL_GROW=0.52, SEL_STAGGER=0.085;
+/* ---------------- the placement mark ----------------
+   Third attempt, and the first one that is not an object laid over the world.
+   Vines lost because they sprouted from exactly where the tower stands. The
+   frame lost because it drew a rectangle around something that is not
+   rectangular. What marks a spot now is the ground itself being turned over:
+   the soil patch grows out of nothing with easeOutBack, a few clods of dirt
+   kick up and fall back, and a 1px rim in the patch's own shape says whose
+   spot it is. One animation, at the moment of choosing, which is the only
+   moment that needed marking. Deliberately small, so it can be built on. */
+const SEL_GROW=0.22;
 function easeOutBack(t,k){ k=k||1.9; t=t<0?0:(t>1?1:t);
   return 1+(k+1)*Math.pow(t-1,3)+k*Math.pow(t-1,2); }
 
-function reticle(cx,cy,age,ok){
-  if(age<=0) return;
-  const bark = ok?'#8a6242':'#9e2f34';
-  const dark = ok?'#5c4433':'#6e1f22';
-  const lit  = ok?'#a97a4f':'#c94a48';
-  const lfm  = ok?'#4f9d4a':'#e0524f';
-  const lfl  = ok?'#7fd07c':'#ff9a8f';
-  const lfd  = ok?'#2f6b36':'#7a2226';
-  const ox=Math.round(cx-TILE/2), oy=Math.round(cy-TILE/2);
-  const put=(x,y,c)=>{ ctx.fillStyle=c; ctx.fillRect(ox+x,oy+y,1,1); };
-  put(7,7,lit); put(8,8,lit); put(8,7,bark); put(7,8,bark);
-  for(let n=0;n<SEL_ARMS.length;n++){
-    const A=SEL_ARMS[n], dx=A[0], dy=A[1], ln=A[2], wob=A[3], leaves=A[4];
-    const t=(age-n*SEL_STAGGER)/SEL_GROW;
-    if(t<=0) continue;
-    const e=t<1?easeOutBack(t):1;
-    let reach=Math.round(ln*e); if(reach<0) reach=0; if(reach>ln+1) reach=ln+1;
-    if(reach<=0) continue;
-    const bx = dx<0?7:8, by = dy<0?7:8;
-    const fat=Math.max(1,Math.round(ln*0.45));
-    const pts=[];
-    for(let i=1;i<=reach;i++){
-      const w=wob[Math.min(i,wob.length-1)];
-      const x=bx+dx*i+(-dy)*w, y=by+dy*i+dx*w;
-      pts.push([x,y]);
-      const tip=(i===reach && t<1);
-      put(x,y, tip?lit:(i>ln-2?dark:bark));
-      if(i<=fat && !tip) put(x+(-dy), y+dx, i>ln-2?dark:bark);
-    }
-    if(reach>=ln && t>=1){
-      const tp=pts[Math.min(ln,pts.length)-1];
-      put(tp[0]+(-dy), tp[1]+dx, dark);
-    }
-    const rust=Math.floor(G.ui*2.2);
-    for(let k=0;k<leaves.length;k++){
-      const li=leaves[k];
-      if(li>reach || li>pts.length) continue;
-      const lp=pts[li-1];
-      const sw=[[0,0],[1,0],[0,1]][(rust+n+k)%3];
-      const side=(k%2===0)?1:-1;
-      const lx=(-dy)*side, ly=dx*side;
-      put(lp[0]+lx, lp[1]+ly, lfm);
-      put(lp[0]+lx*2+sw[0]*dx, lp[1]+ly*2+sw[1]*dy, lfl);
-      if(k===leaves.length-1) put(lp[0]+lx*2-dx, lp[1]+ly*2-dy, lfd);
-    }
+// six clods thrown up by the dig, on fixed parabolas so they never shimmer
+function digSpecks(x,y,age){
+  if(age<=0 || age>0.5) return;
+  const r=soilRnd(x+7,y+13);
+  for(let i=0;i<6;i++){
+    const dir = r()<.5 ? -1 : 1;
+    const reach = 7+r()*7, up = 4+r()*4, lag = r()*0.06;
+    const t=(age-lag)/0.40;
+    if(t<=0||t>=1) continue;
+    const sx = x + dir*reach*t;
+    const sy = y + 3 - (up*4*t*(1-t));            // up, then back down
+    ctx.fillStyle = (i%3) ? '#7a5636' : '#9c7048';
+    ctx.fillRect(Math.round(sx), Math.round(sy), 1, 1);
   }
+}
+
+// mode: 'hover' | 'armed' | 'bad' | 'selected'
+function plotMark(cx,cy,age,mode){
+  if(age<=0) return;
+  const x=Math.round(cx), y=Math.round(cy);
+  const g=Math.min(1, easeOutBack(age/SEL_GROW));
+  if(mode==='bad'){
+    ctx.globalAlpha=.72; drawSoil(x,y,g,'#c0423c',SOIL_BAD,'bad'); ctx.globalAlpha=1;
+    return;
+  }
+  if(mode==='hover'){
+    ctx.globalAlpha=.5; drawSoil(x,y,g,'#c9a36a',SOIL_TILLED); ctx.globalAlpha=1;
+    return;
+  }
+  // armed or selected: full soil with a gold rim. Only a fresh dig throws dirt.
+  drawSoil(x,y,g,'#ffd452',SOIL_TILLED);
+  if(mode==='armed') digSpecks(x,y,age);
 }
 
 // grow a 1px outline around the art, so it holds up on any background
@@ -1460,21 +1648,35 @@ function draw(){
 
   G.btns=[];
 
-  // placement: vine selector on the cell under the pointer, then the armed plot
+  // placement: the spot under the pointer, then the armed spot with its buttons
   if(G.placing){
     const F=TOWERS[G.placing];
-    if(G.hover>=0 && !(G.ghost && G.ghost.i===G.hover)){
-      const hp=G.plots[G.hover];
-      reticle(hp.x,hp.y,G.hoverAge,true);
-      ring(hp.x,hp.y,F.lv[0].rng,'#ffffff',.28);
+    // what the pointer is over, if it is not already the armed spot
+    let hx=null, hy=null, hok=true;
+    if(PLACEMENT==='open'){
+      const hp=G.hoverPos;
+      if(hp && !(G.ghost && G.ghost.x===hp.x && G.ghost.y===hp.y)){
+        hx=hp.x; hy=hp.y; hok=hp.ok;
+      }
+    } else if(G.hover>=0 && !(G.ghost && G.ghost.i===G.hover)){
+      hx=G.plots[G.hover].x; hy=G.plots[G.hover].y;
+    }
+    if(hx!==null){
+      if(hok){
+        plotMark(hx,hy,G.hoverAge,'hover');
+        // with a free position the range matters more before you commit
+        ring(hx,hy,F.lv[0].rng,'#ffffff',PLACEMENT==='open'?.45:.28);
+      } else {
+        plotMark(hx,hy,G.hoverAge,'bad');
+      }
     }
     if(G.ghost){
-      const gp=G.plots[G.ghost.i], cx=gp.x, cy=gp.y;
+      const cx=G.ghost.x, cy=G.ghost.y;
       ring(cx,cy,F.lv[0].rng,'#ffd452',.85);
-      reticle(cx,cy,G.ghost.age||0,true);
+      plotMark(cx,cy,G.ghost.age||0,'armed');
       const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
       ctx.globalAlpha=.55+drop*.3;
-      drawSprite(F.art,1,cx,cy+Math.round((1-drop)*-4),16,16);
+      drawSprite(F.art,1,cx,cy+TOWER_DY+Math.round((1-drop)*-4),16,16);
       ctx.globalAlpha=1;
       const bs=layoutBtns(cx,cy,[
         {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
@@ -1486,6 +1688,8 @@ function draw(){
 
   if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
     const pl=G.plots[G.selPlot];
+    // the stump is already drawn; this adds the gold rim around it
+    plotMark(pl.x,pl.y,G.selAge||0,'selected');
     const bs=layoutBtns(pl.x,pl.y,[
       {act:'clear', glyph:'coin', side:'right', num:CLEAR_COST, dis:G.gold<CLEAR_COST, plot:G.selPlot}
     ]);
@@ -1496,6 +1700,8 @@ function draw(){
   if(G.selected && G.towers.includes(G.selected)){
     const t=G.selected, F=TOWERS[t.fam], st=statsOf(t);
     ring(t.x,t.y,st.rng,'#ffd452',.7);
+    // same gold rim as an armed spot, so selection reads the same everywhere
+    plotMark(t.x,t.y,G.selAge||0,'selected');
     const sell=Math.floor(t.spent*.6);
     const atFork=!t.branch && t.level===3;
     if(atFork){
@@ -1524,12 +1730,12 @@ function draw(){
     // bed edge underneath, which is what made towers look like they sat high
     const kick=t.kick>0?1:0;
     const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
-    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+bob+kick, 16,16);
-    // level pips sit on the bed's bottom inner row, inside the frame
+    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+TOWER_DY+bob+kick, 16,16);
+    // level pips ride the bed's bottom frame row, under the tower's feet
     const lv=t.level;
     for(let i=0;i<lv;i++){
       ctx.fillStyle = i>=3 ? '#a8ecff' : '#ffd452';
-      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+5), 2,1);
+      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+PIP_Y), 2,1);
     }
     if(st.aura){
       const a=(Math.sin(G.time*3)+1)*.5;
@@ -1619,6 +1825,7 @@ let last=performance.now();
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000); last=now;
   G.ui+=raw; G.hoverAge+=raw;
+  G.selAge = (G.selPlot>=0 || G.selected) ? (G.selAge||0)+raw : 0;
   if(G.ghost) G.ghost.age=(G.ghost.age||0)+raw;
   if(!G.paused && G.phase!=='dead' && G.phase!=='won'){
     let t=raw*G.speed;
@@ -1703,8 +1910,9 @@ function doAction(b){
     const F=TOWERS[b.fam];
     if(G.placing===b.fam){ cancelPlacing(); return; }
     if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
-    G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverAge=0; G.selected=null;
-    toast(F.name+' \u2014 tap a plot to preview');
+    G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.selected=null;
+    toast(F.name+(PLACEMENT==='open' ? ' \u2014 tap the ground to preview'
+                                     : ' \u2014 tap a plot to preview'));
     SFX.tick(); syncUI(); return;
   }
   if(b.act==='ok'){ placeGhost(); return; }
@@ -1725,6 +1933,11 @@ function doAction(b){
   if(b.act==='sell'){
     const val=Math.floor(t.spent*.6);
     if(G.plots[t.plot]) G.plots[t.plot].tower=null;
+    if(PLACEMENT==='open'){      // the bed goes with it, and later plots shift down
+      const gi=t.plot;
+      G.plots.splice(gi,1);
+      for(const o of G.towers) if(o.plot>gi) o.plot--;
+    }
     G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
     addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
     SFX.coin(); syncUI(); return;
@@ -1754,9 +1967,27 @@ cv.addEventListener('pointerdown',ev=>{
   const i=plotAt(p.x,p.y);
 
   if(G.placing){
+    if(PLACEMENT==='open'){
+      // tapping a standing tower says so; anywhere else is a build attempt, so
+      // the only way out is the cross or re-tapping the dock card
+      if(i>=0 && G.plots[i].tower){ toast('Plot taken'); return; }
+      const gx=snapTo(p.x), gy=snapTo(p.y);
+      if(!placeOK(gx,gy)){
+        // leave the red frame standing where they tapped: on a touch screen
+        // there is no hover, so the refusal has to be visible somewhere
+        G.hoverPos={x:gx,y:gy,ok:false}; G.hoverAge=SEL_GROW;
+        toast('No room there'); SFX.bad(); return;
+      }
+      if(!G.ghost||G.ghost.x!==gx||G.ghost.y!==gy){
+        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick(); syncUI();
+      }
+      return;
+    }
     if(i<0){ cancelPlacing(); return; }          // tapping open ground puts it away
     if(freePlot(i)){
-      if(!G.ghost||G.ghost.i!==i){ G.ghost={i,age:0}; SFX.tick(); syncUI(); }
+      if(!G.ghost||G.ghost.i!==i){
+        const q=G.plots[i]; G.ghost={i,x:q.x,y:q.y,age:0}; SFX.tick(); syncUI();
+      }
     } else toast(G.plots[i].tower ? 'Plot taken' : 'Cleared stumps only');
     return;
   }
@@ -1776,28 +2007,46 @@ cv.addEventListener('pointermove',ev=>{
   const p=toArt(ev);
   const b=hitBtn(p.x,p.y);
   G.btnHover=b?b.act:null;
-  if(b){ G.hover=-1; return; }
-  if(!G.placing){ G.hover=-1; return; }
+  if(b){ G.hover=-1; G.hoverPos=null; return; }
+  if(!G.placing){ G.hover=-1; G.hoverPos=null; return; }
+  if(PLACEMENT==='open'){
+    // the frame grows once, when the tower is armed, then tracks the pointer
+    const gx=snapTo(p.x), gy=snapTo(p.y);
+    G.hoverPos={x:gx, y:gy, ok:placeOK(gx,gy)};
+    return;
+  }
   const i=plotAt(p.x,p.y);
   const ok = i>=0 && freePlot(i);
   if(G.hover!==(ok?i:-1)) G.hoverAge=0;
   G.hover = ok ? i : -1;
 });
-cv.addEventListener('pointerleave',()=>{ G.hover=-1; G.btnHover=null; });
+cv.addEventListener('pointerleave',()=>{ G.hover=-1; G.hoverPos=null; G.btnHover=null; });
 
 function placeGhost(){
   if(!G.placing||!G.ghost) return;
-  const fam=G.placing, cost=TOWERS[fam].cost, i=G.ghost.i, pl=G.plots[i];
-  if(!freePlot(i)){ toast('No room there'); return; }
-  if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+  const fam=G.placing, cost=TOWERS[fam].cost;
+  let i=G.ghost.i, pl;
+  if(PLACEMENT==='open'){
+    if(!placeOK(G.ghost.x,G.ghost.y)){ toast('No room there'); SFX.bad(); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    pl={x:G.ghost.x, y:G.ghost.y, blocked:false, tower:null};  // the bed is born here
+    G.plots.push(pl); i=G.plots.length-1;
+  } else {
+    pl=G.plots[i];
+    if(!freePlot(i)){ toast('No room there'); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+  }
   G.gold-=cost;
   const t={fam,plot:i,x:pl.x,y:pl.y,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost};
   G.towers.push(t); pl.tower=t;
   addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:14,ttl:.35,color:'#ffd452'});
-  SFX.place(); G.placing=null; G.ghost=null; G.hover=-1; G.hoverAge=0; G.btnHover=null;
+  SFX.place();
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.btnHover=null;
   syncUI();
 }
-function cancelPlacing(){ G.placing=null; G.ghost=null; G.hover=-1; G.btnHover=null; syncUI(); }
+function cancelPlacing(){
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.btnHover=null; syncUI();
+}
 
 /* ======================================================================
    14. UI
