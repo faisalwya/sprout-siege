@@ -1,0 +1,2238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2b3a2e">
+<title>Sprout Siege</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{height:100%;overflow:hidden;position:fixed;inset:0;background:#12150f;overscroll-behavior:none}
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, #1e2419 0%, #10130d 70%, #0a0c08 100%);
+  }
+  body{
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    color:#fff6e5;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action:none;
+  }
+  #stage{position:relative;line-height:0;border-radius:3px;overflow:hidden}
+  body.framed #stage{
+    box-shadow:0 0 0 1px #39412f, 0 0 0 5px #1b2015, 0 20px 44px rgba(0,0,0,.6);
+  }
+  canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;background:#6cc16b}
+  #rotate{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:.6em;
+    background:#191d19;z-index:50;text-align:center;padding:2em;font-size:14px
+  }
+  @media (orientation:portrait){#rotate{display:flex}#stage{visibility:hidden}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+</div>
+<div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ======================================================================
+   1. CONSTANTS & ART
+   ====================================================================== */
+const VERSION='V33.1';
+const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
+
+const PAL={'.':null,
+  k:'#17141f', K:'#2f2a3d', w:'#ffffff', W:'#ffeedd',
+  s:'#f6c9a0', S:'#d99a6c', r:'#e0524f', R:'#9e2f34',
+  g:'#6cc16b', G:'#3d8a4d', b:'#59b0e6', B:'#2f6fae',
+  y:'#ffd452', Y:'#c98f2b', n:'#a97a4f', N:'#6b4a30',
+  p:'#f58fbf', P:'#a057b8', c:'#cfd3e0', C:'#8d92a8',
+  o:'#ff9a3c', i:'#a8ecff'
+};
+
+function mkSprite(rows){
+  // keep the source rows so a sprite can be re-derived with an outline later
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  for(let j=0;j<h;j++){ const row=rows[j];
+    for(let i=0;i<w;i++){ const col=PAL[row[i]]; if(col){ x.fillStyle=col; x.fillRect(i,j,1,1); } }
+  }
+  c._rows=rows;
+  return c;
+}
+function flipped(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d'); x.translate(src.width,0); x.scale(-1,1); x.drawImage(src,0,0);
+  return c;
+}
+
+const ART={};
+ART.gnome=mkSprite([
+"................","................",".......rr.......","......rrrr......",
+"......rRRr......",".....rrRRrr.....","....rrRRRRrr....","...rrrrrrrrrr...",
+".....ssssss.....",".....skssks.....",".....wwwwww.....","....wwwwwwww....",
+"....bwwwwwwb....","....bbwwwwbb....","....NN....NN....","................"]);
+ART.gnomeA=mkSprite([
+"................",".......b........","......bb........","......bBb.......",
+".....bbBb.......",".....bBBbb......","....bbBBBb......","...bbbbbbbbb....",
+".....ssssss.....",".....sksscs.....",".....wwwwww.....","....wwwwwwww....",
+"....cwwwwwwc....","....ccwwwwcc....","....NN....NN....","................"]);
+ART.gnomeB=mkSprite([
+"................","................","................","......gggg......",
+".....gggggg.....","....gGgggGgg....","...gggggggggg...",".....ssssss.....",
+".....skssks.....",".....swwwws.....","....wwwwwwww....","...gwwwwwwwwg...",
+"...ggwwwwwwgg...","....wwwwwwww....","....NN....NN....","................"]);
+
+ART.sprink=mkSprite([
+"................","................","......cccc......",".....bCccCb.....",
+".....cccccc.....","......cCCc......","......cCCc......","......cccc......",
+"......cCCc......","......cCCc......","......cCCc......",".....CccccC.....",
+"....ccCCCCcc....",".....cccccc.....",".......nn.......","................"]);
+ART.sprinkA=mkSprite([
+"................","....b......b....",".....bb..bb.....","....cccccccc....",
+"...cCcbbbbcCc...","....cccccccc....",".....cCCCCc.....","......cCCc......",
+"......cCCc......","......cCCc......",".....ccCCcc.....","....cCCCCCCc....",
+"....cccccccc....",".....cccccc.....",".......nn.......","................"]);
+ART.sprinkB=mkSprite([
+"................",".....i....i.....","......iiii......",".....icccci.....",
+"...iiccccccii...","....cccccccc....",".....cCCCCc.....","......iCCi......",
+"......cCCc......","......cCCc......",".....ccCCcc.....","....cciiiicc....",
+"....cccccccc....",".....cccccc.....",".......nn.......","................"]);
+
+ART.hive=mkSprite([
+"................","......yyyy......",".....yyyyyy.....","....yYyyyyYy....",
+"....yyyyyyyy....","...yyyyyyyyyy...","...yYyykkyyYy...","...yyyykkyyyy...",
+"...yyyyyyyyyy...","....yyyyyyyy....","....yYyyyyYy....",".....yyyyyy.....",
+"......yyyy......",".......nn.......",".......nn.......","................"]);
+ART.hiveA=mkSprite([
+"................",".....CCCCCC.....","....CCCCCCCC....","...CCCkkkkCCC...",
+"...CCCCCCCCCC...","...CCkkkkkkCC...","...CCCCCCCCCC...","....CCkkkkCC....",
+"....CCCCCCCC....",".....CCCCCC.....","......CCCC......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.hiveB=mkSprite([
+"................",".....p....p.....","....ppp..ppp....","...pppppppppp...",
+"...pppyyyyppp...","...ppyYYYYypp...","...ppyYYYYypp...","...pppyyyyppp...",
+"...pppppppppp...","....ppp..ppp....",".....p.GG.p.....","......gGg.......",
+"......gGg.......","......gGg.......","......gGg.......","................"]);
+
+ART.zap=mkSprite([
+"................",".......cc.......","......cccc......",".....cciicc.....",
+"....cciiiicc....","....ciiwwiic....","....ciwwwwic....","....ciiwwiic....",
+"....cciiiicc....",".....cciicc.....","......cccc......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.zapA=mkSprite([
+"................","..b....cc....b..","...b..cccc..b...",".....cciicc.....",
+"....ciiiiiic....","....ciwwwwic....","...ciiwwwwiic...","....ciwwwwic....",
+"....ciiiiiic....",".....cciicc.....","..b...cccc...b..","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.zapB=mkSprite([
+"................",".......o........","......ooo.......",".......o........",
+"......CCCC......",".....CooooC.....","....CCooooCC....","....CoCooCoC....",
+"....CCooooCC....",".....CooooC.....","......CCCC......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+
+ART.carrot=mkSprite([
+"..g.g..","..ggg..","...G...","..ooo..","..ooo..","...oo..","...o..."]);
+
+ART.grub=mkSprite([
+"............","............","............","....gggg....",
+"...gggggg...","..ggkggkgg..","..gggggggg..","..gGggggGg..",
+"...GGGGGG...","............","............","............"]);
+ART.beetle=mkSprite([
+"............","............","....kkkk....","...kPPPPk...",
+"..kPwPPPPk..","..kPPPPPPk..","..kPPkPPPk..","..kPPkPPPk..",
+"..kkPPPPkk..","...k.kk.k...","............","............"]);
+ART.snail=mkSprite([
+"............","...nnnnn....","..nnYYYnn...",".nnYYnYYnn..",
+".nYYnnnYYn..",".nYYYYYYYn..","..nnnnnnn...","..sssssssss.",
+".ssssssssss.",".sssssssks..","..SSSSSSSS..","............"]);
+ART.moth=mkSprite([
+"............","..w......w..",".www.nn.www.","wwww.nn.wwww",
+"wwwWWnnWWwww","wwww.nn.wwww",".www.nn.www.","..w..kk..w..",
+"............","............","............","............"]);
+ART.slug=mkSprite([
+"................","................","......kk..kk....","......PP..PP....",
+".....PPPPPPPP...","....PPPPPPPPPP..","...PPPwPPPPwPP..","..PPPPPPPPPPPP..",
+"..PPPPPPPPPPPP..",".PPPPiiiiPPPPPP.",".PPPPPPPPPPPPPP.",".PPPPPPPPPPPPPP.",
+"..PPPPPPPPPPPP..","...PPPPPPPPPP...","..iiiiiiiiiiii..","................"]);
+
+// Towers get a 1px dark contour: without it a flat sprite on flat grass reads
+// as a tile rather than as a thing standing in a garden. Enemies stay clean so
+// they keep reading as small and quick.
+['gnome','gnomeA','gnomeB','sprink','sprinkA','sprinkB','zap','zapA','zapB','hive','hiveA','hiveB','carrot']
+  .forEach(k=>{ ART[k]=mkOutlined(ART[k]._rows, PAL, '#241a10'); });
+
+const FLIP={}; ['gnome','gnomeA','gnomeB','grub','beetle','snail','moth','slug'].forEach(k=>FLIP[k]=flipped(ART[k]));
+function whiten(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d'); x.drawImage(src,0,0);
+  x.globalCompositeOperation='source-atop'; x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height);
+  return c;
+}
+const WHITE={}, WHITEF={};
+Object.keys(ART).forEach(k=>{ WHITE[k]=whiten(ART[k]); if(FLIP[k]) WHITEF[k]=whiten(FLIP[k]); });
+
+// 3x5 pixel font: digits, A to Z and a little punctuation. Upper case only;
+// drawText upper-cases what it is given. Punctuation is narrower than 3px so
+// "2.9" does not read as "2 . 9"; every glyph advances its own width plus 1.
+const GLYPH={
+ '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+ '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+ '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+ '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
+ '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+ 'A':['111','101','111','101','101'],'B':['110','101','110','101','110'],
+ 'C':['111','100','100','100','111'],'D':['110','101','101','101','110'],
+ 'E':['111','100','110','100','111'],'F':['111','100','110','100','100'],
+ 'G':['111','100','101','101','111'],'H':['101','101','111','101','101'],
+ 'I':['111','010','010','010','111'],'J':['001','001','001','101','111'],
+ 'K':['101','101','110','101','101'],'L':['100','100','100','100','111'],
+ 'M':['101','111','111','101','101'],'N':['110','101','101','101','101'],
+ 'O':['111','101','101','101','111'],'P':['111','101','111','100','100'],
+ 'Q':['111','101','101','111','001'],'R':['110','101','110','101','101'],
+ 'S':['111','100','111','001','111'],'T':['111','010','010','010','010'],
+ 'U':['101','101','101','101','111'],'V':['101','101','101','101','010'],
+ 'W':['101','101','111','111','101'],'X':['101','101','010','101','101'],
+ 'Y':['101','101','010','010','010'],'Z':['111','001','010','100','111'],
+ '+':['000','010','111','010','000'],'-':['000','000','111','000','000'],
+ '/':['001','001','010','100','100'],'%':['101','001','010','100','101'],
+ '?':['111','001','011','000','010'],
+ ':':['0','1','0','1','0'],'.':['0','0','0','0','1'],
+ ',':['00','00','00','01','10'],'!':['1','1','1','0','1']
+};
+const SPACE_W=3;
+// sc scales every font pixel to an sc x sc block, for headings
+function drawText(x,y,txt,color,shadow,sc){
+  txt=String(txt).toUpperCase(); sc=sc||1;
+  const pass=(ox,oy)=>{
+    let cx=x;
+    for(const ch of txt){
+      const g=GLYPH[ch];
+      if(!g){ cx+=(SPACE_W+1)*sc; continue; }
+      for(let j=0;j<5;j++) for(let i=0;i<g[j].length;i++)
+        if(g[j][i]==='1') ctx.fillRect(cx+i*sc+ox,y+j*sc+oy,sc,sc);
+      cx+=(g[0].length+1)*sc;
+    }
+  };
+  if(shadow){ ctx.fillStyle=shadow; pass(sc,sc); }  // offset copy first, so light text reads on any ground
+  ctx.fillStyle=color; pass(0,0);
+}
+function textW(t,sc){
+  let w=0;
+  for(const ch of String(t).toUpperCase()){ const g=GLYPH[ch]; w+=(g?g[0].length:SPACE_W)+1; }
+  return Math.max(0,w-1)*(sc||1);
+}
+
+/* ======================================================================
+   2. TOWER & ENEMY DATA
+   ====================================================================== */
+const TOWERS={
+  gnome:{
+    name:'Gnome Post', cost:45, art:'gnome', flip:true,
+    blurb:'Steady single-target pebbles.',
+    lv:[ {dmg:12,rng:46,rate:0.90}, {dmg:19,rng:50,rate:1.00,cost:40}, {dmg:28,rng:54,rate:1.10,cost:70} ],
+    forks:{
+      deadeye:{name:'Deadeye Gnome', art:'gnomeA', flip:true, desc:'long shot',
+        lv:[{dmg:85,rng:110,rate:0.55,cost:130},{dmg:150,rng:124,rate:0.60,cost:220}]},
+      rascal:{name:'Rascal Gnome', art:'gnomeB', flip:true, desc:'fast, short',
+        lv:[{dmg:16,rng:54,rate:3.4,cost:130},{dmg:24,rng:58,rate:4.2,cost:220}]}
+    }
+  },
+  sprink:{
+    name:'Sprinkler', cost:70, art:'sprink',
+    blurb:'Splash damage, soaks and slows.',
+    lv:[ {dmg:9,rng:52,rate:0.70,splash:14,slow:.25,slowT:1.2},
+         {dmg:14,rng:56,rate:0.80,splash:16,slow:.25,slowT:1.2,cost:55},
+         {dmg:20,rng:60,rate:0.90,splash:18,slow:.3,slowT:1.4,cost:95} ],
+    forks:{
+      geyser:{name:'Geyser', art:'sprinkA', desc:'big splash',
+        lv:[{dmg:45,rng:66,rate:0.90,splash:26,slow:.2,slowT:1,cost:150},
+            {dmg:75,rng:70,rate:1.00,splash:30,slow:.2,slowT:1,cost:250}]},
+      frost:{name:'Frostmist', art:'sprinkB', desc:'deep slow',
+        lv:[{dmg:12,rng:66,rate:1.20,splash:24,slow:.55,slowT:2.0,cost:150},
+            {dmg:18,rng:72,rate:1.30,splash:28,slow:.68,slowT:2.6,cost:250}]}
+    }
+  },
+  zap:{
+    name:'Zap Lamp', cost:95, art:'zap',
+    blurb:'Arcs between bugs standing too close together.',
+    lv:[ {dmg:14,rng:50,rate:0.80,chain:2,fall:.65},
+         {dmg:20,rng:54,rate:0.90,chain:3,fall:.68,cost:55},
+         {dmg:28,rng:58,rate:1.00,chain:3,fall:.72,cost:95} ],
+    forks:{
+      storm:{name:'Storm Lamp', art:'zapA', desc:'more chains',
+        lv:[{dmg:44,rng:72,rate:1.10,chain:6,fall:.80,cost:155},
+            {dmg:68,rng:78,rate:1.20,chain:8,fall:.85,cost:255}]},
+      jolt:{name:'Jolt Post', art:'zapB', desc:'big hit, stun',
+        lv:[{dmg:120,rng:62,rate:0.80,chain:0,stun:.35,cost:155},
+            {dmg:200,rng:66,rate:0.90,chain:0,stun:.55,cost:255}]}
+    }
+  },
+  hive:{
+    name:'Beehive', cost:85, art:'hive',
+    blurb:'Homing bees that never miss.',
+    lv:[ {dmg:10,rng:58,rate:1.10}, {dmg:15,rng:62,rate:1.30,cost:60}, {dmg:21,rng:66,rate:1.50,cost:100} ],
+    forks:{
+      wasp:{name:'Wasp Nest', art:'hiveA', desc:'fast homing',
+        lv:[{dmg:34,rng:74,rate:2.2,cost:160},{dmg:52,rng:82,rate:2.6,cost:260}]},
+      pollen:{name:'Pollen Bloom', art:'hiveB', desc:'damage aura',
+        lv:[{dmg:26,rng:52,rate:0,aura:true,cost:160},
+            {dmg:45,rng:58,rate:0,aura:true,slow:.2,cost:260}]}
+    }
+  }
+};
+const FAMS=['gnome','sprink','zap','hive'];
+
+const ENEMIES={
+  grub  :{hp:24,  spd:34, bounty:4,  art:'grub',   flip:true, r:4, name:'Grub'},
+  beetle:{hp:58,  spd:26, bounty:7,  art:'beetle', flip:true, r:5, name:'Beetle'},
+  snail :{hp:140, spd:17, bounty:13, art:'snail',  flip:true, r:5, armor:2, name:'Snail'},
+  moth  :{hp:46,  spd:52, bounty:8,  art:'moth',   flip:true, r:5, noSlow:true, name:'Moth'},
+  slug  :{hp:1500,spd:13, bounty:90, art:'slug',   flip:true, r:7, armor:4, slowRes:.7, boss:true, lives:5, name:'Grand Slug'}
+};
+
+// [type, count, gap, delay]: five waves per map, boss on the fifth
+const WAVES_PER_MAP=5;
+const MAPS=[
+ {
+  name:'The Carrot Patch',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
+  wp:[[-2.37,4],[1.38,4],[3.25,2],[8.88,1.63],[15.88,2],[18,4],[17.63,6.5],[14.5,7.38],[8.88,7.38],[6.88,5.75],[7.5,4.13],[10.25,4]],
+  bed:{x:150,y:59,o:'h'},
+  pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
+       dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
+       flowers:['#ffd452','#f58fbf','#ffeedd','#a8ecff']},
+  waves:[
+   {m:1.00,g:[['grub',8,0.85]]},
+   {m:1.10,g:[['grub',12,0.60]]},
+   {m:1.20,g:[['beetle',7,0.90],['grub',8,0.50,4]]},
+   {m:1.30,g:[['moth',8,0.70],['grub',6,0.60,5]]},
+   {m:1.20,g:[['slug',1,1,0],['grub',10,0.50,2]]}
+  ]
+ },
+ {
+  name:'The Long Hedge',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[184,100,1],[12,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[97,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
+  wp:[[21.38,7.25],[17,7.25],[8.25,7.25],[7.38,5.75],[8.88,4.5],[17,4.5],[18.25,3.13],[17,1.75],[8.88,2],[5.13,2.13],[2,3]],
+  bed:{x:6,y:43,o:'h'},
+  pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
+       dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
+       flowers:['#a8ecff','#ffeedd','#c9a0ff','#ffd452']},
+  waves:[
+   {m:1.15,g:[['beetle',9,0.70]]},
+   {m:1.25,g:[['grub',16,0.35],['moth',4,0.70,6]]},
+   {m:1.40,g:[['snail',4,1.20],['beetle',10,0.60,3]]},
+   {m:1.50,g:[['moth',12,0.45],['beetle',9,0.70,4]]},
+   {m:1.35,g:[['slug',1,1,0],['moth',10,0.50,3],['grub',12,0.35,7]]}
+  ]
+ },
+ {
+  name:'The Bramble',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[120,61,1],[202,56,1],[16,68,0],[149,103,0],[259,92,0],[59,90,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[110,89,0],[161,50,0],[65,25,0],[157,20,0],[110,123,0],[220,121,0]],
+  wp:[[-2.37,5.25],[3.25,5.25],[6.38,5.5],[9.5,4],[13.25,2],[17.31,2.63],[18.13,5.25],[15.13,6.88],[12,6],[9.5,4],[6.38,2.5],[3.88,2.38],[1.69,2.38]],
+  bed:{x:6,y:33,o:'h'},
+  pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
+       dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
+       flowers:['#ffd452','#ff9a3c','#ffeedd','#f58fbf']},
+  waves:[
+   {m:1.30,g:[['beetle',10,0.50],['grub',10,0.35,4]]},
+   {m:1.45,g:[['moth',14,0.40],['grub',8,0.40,6]]},
+   {m:1.65,g:[['snail',5,1.00],['beetle',11,0.50,3]]},
+   {m:1.80,g:[['grub',26,0.24],['moth',10,0.45,6]]},
+   {m:1.55,g:[['slug',2,2.5,0],['moth',10,0.40,4],['beetle',10,0.50,8]]}
+  ]
+ }
+];
+function waveDef(n){
+  const M=MAPS[G.map-1];
+  if(n<=M.waves.length) return M.waves[n-1];
+  const k=n-M.waves.length;   // endless, once the last plot has been held
+  return {m:2.6+k*0.45, g:[
+    ['slug',1+Math.floor(k/2),2.5,0],
+    ['moth',10+k*2,0.35,3],
+    ['snail',4+k,0.9,6],
+    ['beetle',12+k*2,0.4,9]
+  ]};
+}
+
+/* ======================================================================
+   3. MAP GEOMETRY: rebuilt at runtime, one map at a time
+   ====================================================================== */
+let WP=[], PTS=[], SEG=[], PATH_LEN=0;
+
+// Centripetal Catmull-Rom through the waypoints: rounds the corners like a trail
+// worn in by feet rather than drawn with a ruler.
+function spline(P,step){
+  const first={x:2*P[0].x-P[1].x, y:2*P[0].y-P[1].y};
+  const last={x:2*P[P.length-1].x-P[P.length-2].x, y:2*P[P.length-1].y-P[P.length-2].y};
+  const cp=[first].concat(P,[last]);
+  const knot=(t,a,b)=>t+Math.pow(Math.hypot(b.x-a.x,b.y-a.y),0.5);
+  const out=[];
+  for(let i=0;i+3<cp.length;i++){
+    const p0=cp[i],p1=cp[i+1],p2=cp[i+2],p3=cp[i+3];
+    const t0=0,t1=knot(t0,p0,p1),t2=knot(t1,p1,p2),t3=knot(t2,p2,p3);
+    const n=Math.max(6,Math.ceil(Math.hypot(p2.x-p1.x,p2.y-p1.y)/step));
+    for(let k=0;k<n;k++){
+      const t=t1+(t2-t1)*(k/n);
+      const L=(a,b,ta,tb)=>({x:((tb-t)*a.x+(t-ta)*b.x)/(tb-ta), y:((tb-t)*a.y+(t-ta)*b.y)/(tb-ta)});
+      const A1=L(p0,p1,t0,t1),A2=L(p1,p2,t1,t2),A3=L(p2,p3,t2,t3);
+      const B1=L(A1,A2,t0,t2),B2=L(A2,A3,t1,t3);
+      out.push(L(B1,B2,t1,t2));
+    }
+  }
+  out.push({x:P[P.length-1].x,y:P[P.length-1].y});
+  return out;
+}
+
+// Gentle meander on top of the curve, faded out at both ends so the entry and
+// the garden gate still line up.
+function meander(pts){
+  const src=pts.map(q=>({x:q.x,y:q.y}));
+  let run=0; const off=[];
+  for(let i=0;i<src.length;i++){
+    if(i) run+=Math.hypot(src[i].x-src[i-1].x, src[i].y-src[i-1].y);
+    off.push(Math.sin(run*0.085)*2.2 + Math.sin(run*0.031+2.1)*1.6 + Math.sin(run*0.19+0.7)*0.45);
+  }
+  for(let i=0;i<pts.length;i++){
+    const a=src[Math.max(0,i-1)], b=src[Math.min(src.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+    const fade=Math.min(1, Math.min(i,pts.length-1-i)/12);
+    pts[i].x=src[i].x + (-dy/L)*off[i]*fade;
+    pts[i].y=src[i].y + ( dx/L)*off[i]*fade;
+  }
+}
+
+function buildGeometry(wpTiles){
+  WP=wpTiles.map(p=>({x:(p[0]+0.5)*TILE, y:(p[1]+0.5)*TILE}));
+  PTS=spline(WP,3);
+  meander(PTS);
+  SEG=[]; PATH_LEN=0;
+  for(let i=0;i<PTS.length-1;i++){
+    const a=PTS[i], b=PTS[i+1];
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1e-6;
+    SEG.push({a,b,dx:dx/len,dy:dy/len,len,s:PATH_LEN});
+    PATH_LEN+=len;
+  }
+}
+
+function posAt(d){
+  if(d<=0){ const s=SEG[0]; return {x:s.a.x,y:s.a.y,dx:s.dx,dy:s.dy}; }
+  if(d>=PATH_LEN){ const s=SEG[SEG.length-1]; return {x:s.b.x,y:s.b.y,dx:s.dx,dy:s.dy}; }
+  let lo=0,hi=SEG.length-1;
+  while(lo<hi){ const mid=(lo+hi)>>1; if(SEG[mid].s+SEG[mid].len<d) lo=mid+1; else hi=mid; }
+  const s=SEG[lo], t=d-s.s;
+  return {x:s.a.x+s.dx*t, y:s.a.y+s.dy*t, dx:s.dx, dy:s.dy};
+}
+function distToPath(px,py){
+  let best=1e9;
+  for(const s of SEG){
+    let t=((px-s.a.x)*s.dx+(py-s.a.y)*s.dy);
+    t=t<0?0:(t>s.len?s.len:t);
+    const ex=px-(s.a.x+s.dx*t), ey=py-(s.a.y+s.dy*t);
+    const d=ex*ex+ey*ey;
+    if(d<best) best=d;
+  }
+  return Math.sqrt(best);
+}
+
+/* ======================================================================
+   4. BACKGROUND: the 320x144 playfield sits inside a larger decorated
+   canvas, so the garden runs to the edges of the screen instead of
+   floating in a letterbox. OX/OY are the margin; world coords are unchanged.
+   ====================================================================== */
+let ARTW=W, ARTH=H, OX=0, OY=0;
+// Wider than the game (Safari's toolbars eat height): plain bars at the sides,
+// so the trail and carrot patch sit exactly where the home-screen app puts
+// them. Taller than the game still grows garden above and below.
+const MAX_PAD_X=0, MAX_PAD_Y=52;
+
+let seed=1337;
+function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
+
+const bg=document.createElement('canvas'); bg.width=W; bg.height=H;
+
+// crisp pixel disc, filled by scanline so the edges stay hard
+function disc(q,cx,cy,r,col){
+  q.fillStyle=col;
+  for(let py=Math.floor(cy-r);py<=Math.ceil(cy+r);py++){
+    const dy=py+0.5-cy, k=r*r-dy*dy; if(k<0) continue;
+    const hw=Math.sqrt(k), x0=Math.round(cx-hw), x1=Math.round(cx+hw);
+    if(x1>x0) q.fillRect(x0,py,x1-x0,1);
+  }
+}
+
+// ---- small bits of garden clutter, drawn in canvas space
+function stone(q,x,y,pal){
+  disc(q,x,y,1.8,'#87907f'); disc(q,x,y-0.5,1.1,'#a3ab98');
+}
+function mushroom(q,x,y){
+  q.fillStyle='#e0524f'; q.fillRect(x-2,y-3,5,2); q.fillRect(x-1,y-4,3,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x-1,y-3,1,1); q.fillRect(x+1,y-2,1,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x,y-1,1,2);
+}
+function tuft(q,x,y,col,col2){
+  q.fillStyle=col;  q.fillRect(x,y-3,1,3); q.fillRect(x-2,y-2,1,2); q.fillRect(x+2,y-2,1,2);
+  q.fillStyle=col2; q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-2,1,2);
+}
+function clover(q,x,y,col){
+  q.fillStyle=col; q.fillRect(x,y,1,1); q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-1,1,1); q.fillRect(x,y-2,1,1);
+}
+// a plus, not a block; a solid 3x3 at this scale reads as a floating blob
+function bloom(q,x,y,pet,mid){
+  q.fillStyle=pet;
+  q.fillRect(x,y-1,1,1); q.fillRect(x-1,y,1,1); q.fillRect(x+1,y,1,1); q.fillRect(x,y+1,1,1);
+  q.fillStyle=mid; q.fillRect(x,y,1,1);
+}
+
+function paintBG(pal){
+  const q=bg.getContext('2d');
+  q.clearRect(0,0,ARTW,ARTH);
+
+  // ---- ground: a few broad, low-contrast washes. Many small discs read as
+  // polka dots; a handful of big ones reads as a meadow.
+  q.fillStyle=pal.g1; q.fillRect(0,0,ARTW,ARTH);
+  for(let i=0;i<26;i++) disc(q, rnd()*ARTW, rnd()*ARTH, 10+rnd()*16, pal.g2);
+  for(let i=0;i<14;i++) disc(q, rnd()*ARTW, rnd()*ARTH,  7+rnd()*11, pal.speck);
+  for(let i=0;i<7;i++)  disc(q, rnd()*ARTW, rnd()*ARTH,  6+rnd()*9,  pal.bright);
+
+  const onPath=(x,y)=>distToPath(x-OX,y-OY)<10;
+
+  // ---- speckle, clover and blooms across the whole canvas
+  for(let i=0;i<420;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py)) continue;
+    const k=rnd();
+    if(k<.50){ q.fillStyle=pal.speck; q.fillRect(px,py,1,1); }
+    else if(k<.80){ q.fillStyle=pal.bright; q.fillRect(px,py,1,1); }
+    else if(k<.97){ q.fillStyle=pal.dark; q.fillRect(px,py,1,2); }
+    else { clover(q,px,py,pal.speck); }
+  }
+  for(let i=0;i<26;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py)) continue;
+    bloom(q,px,py,pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+  }
+
+  // ---- clutter, kept to the margin and the two decorative rows so it never
+  // sits where a tower goes
+  const inField=(x,y)=>x>OX+TILE*0 && x<OX+W && y>OY+TILE && y<OY+H-TILE;
+  for(let i=0;i<130;i++){
+    const px=Math.floor(rnd()*ARTW), py=Math.floor(rnd()*ARTH);
+    if(onPath(px,py) || inField(px,py)) continue;
+    const k=rnd();
+    if(k<.48) tuft(q,px,py,pal.dark,pal.bright);
+    else if(k<.62) stone(q,px,py,pal);
+    else if(k<.71) mushroom(q,px,py);
+    else { disc(q,px,py,1+rnd()*2,pal.dark); }
+  }
+
+  // ---- hedge runs along the true top and bottom of the canvas
+  for(let c=0;c<ARTW;c+=5){
+    for(let i=0;i<3;i++){
+      const px=c+Math.floor(rnd()*6), py=Math.floor(rnd()*9);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; disc(q,px,py,2.6,i?pal.hedgeB:pal.hedgeA);
+    }
+    for(let i=0;i<3;i++){
+      const px=c+Math.floor(rnd()*6), py=ARTH-1-Math.floor(rnd()*9);
+      q.fillStyle=i?pal.hedgeB:pal.hedgeA; disc(q,px,py,2.6,i?pal.hedgeB:pal.hedgeA);
+    }
+  }
+  for(let i=0;i<34;i++){
+    const px=Math.floor(rnd()*ARTW);
+    bloom(q,px,2+Math.floor(rnd()*6),pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+    bloom(q,Math.floor(rnd()*ARTW),ARTH-8+Math.floor(rnd()*6),pal.flowers[Math.floor(rnd()*pal.flowers.length)],'#ffeedd');
+  }
+
+  // ---- the trail, in world space
+  q.save(); q.translate(OX,OY);
+  // The walked path starts just past a phone's edge. A screen with more margin
+  // shows more, so the drawn trail carries on straight to the canvas edge. It
+  // ends inside the carrot bed, which is painted over its last stretch. Bugs
+  // fade in at the start and out among the carrots.
+  const T=PTS.slice();
+  {
+    const k=Math.min(6,PTS.length-1), ux=PTS[k].x-PTS[0].x, uy=PTS[k].y-PTS[0].y, ul=Math.hypot(ux,uy)||1;
+    for(let n=1; n<60 && PTS[0].x-ux/ul*3*n > -OX-10; n++)
+      T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
+  }
+  const ext=T.length-PTS.length;
+  const widths=[]; let run=-3*ext;
+  for(let i=0;i<T.length;i++){
+    if(i) run+=Math.hypot(T[i].x-T[i-1].x, T[i].y-T[i-1].y);
+    widths.push(6.1 + Math.sin(run*0.105)*0.85 + Math.sin(run*0.047+1.7)*0.75 + Math.sin(run*0.29+0.4)*0.3);
+  }
+  for(let i=0;i<T.length;i++) disc(q,T[i].x,T[i].y,widths[i]+1.5,pal.edge);
+  for(let i=0;i<T.length;i++) disc(q,T[i].x,T[i].y,widths[i],pal.dirt);
+  for(let i=0;i<T.length;i++){
+    const a=T[Math.max(0,i-1)], b=T[Math.min(T.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, n=i-ext;
+    const sway=Math.sin(n*0.06)*1.8+Math.sin(n*0.017+1)*1.2;
+    disc(q,T[i].x+(-dy/L)*sway, T[i].y+(dx/L)*sway, widths[i]*0.42, pal.inner);
+  }
+  function specks(i){
+    const a=T[Math.max(0,i-1)], b=T[Math.min(T.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+    const nx=-dy/L, ny=dx/L, w=widths[i];
+    for(let j=0;j<2;j++){
+      const t=(rnd()*2-1)*w*0.85;
+      q.fillStyle=rnd()<.5?pal.edge:pal.inner;
+      q.fillRect(Math.round(T[i].x+nx*t), Math.round(T[i].y+ny*t),1,1);
+    }
+    if(rnd()<.34){
+      const side=rnd()<.5?-1:1, t=(w+0.5+rnd()*1.4)*side;
+      q.fillStyle=rnd()<.5?pal.speck:pal.dark;
+      q.fillRect(Math.round(T[i].x+nx*t), Math.round(T[i].y+ny*t),1,rnd()<.4?2:1);
+    }
+    if(rnd()<.05){
+      const t=(rnd()*2-1)*w*0.6;
+      disc(q,T[i].x+nx*t,T[i].y+ny*t,1.6,pal.edge);
+    }
+  }
+  for(let i=ext;i<T.length;i++) specks(i);
+  const sv=seed;                    // the extension's specks must not shift the
+  for(let i=0;i<ext;i++) specks(i); // random draws the bed below depends on
+  seed=sv;
+
+  // ---- The carrot bed. Soil, stones, sprouts and fence are static so they stay
+  // baked here; the carrots themselves are live state and draw every frame.
+  const B=BED, bx0=B.x, by0=B.y, bw=B.w, bh=B.h;
+  q.fillStyle='#6b4630'; q.fillRect(bx0,by0,bw,bh);
+  for(let i=0;i<bw;i+=3){                       // chewed edge, not a clean rectangle
+    if(rnd()<.55) q.fillRect(bx0+i,by0-1,3,1);
+    if(rnd()<.55) q.fillRect(bx0+i,by0+bh,3,1);
+  }
+  for(let i=0;i<(bw*bh)/7;i++){                 // three soil tones, dithered
+    const px=bx0+Math.floor(rnd()*bw), py=by0+Math.floor(rnd()*bh), k=rnd();
+    q.fillStyle = k<.45?'#7d5238':(k<.85?'#5a3a27':'#8a6242');
+    q.fillRect(px,py,1,1);
+  }
+  const sx=bw/48, sy=bh/60;                     // laid out for the old 48x60 bed
+  // a stone or sprout on a carrot's spot would hide its bites
+  const clear=(x,y)=>CARROT_SLOTS.every(c=>Math.abs(c.x-x)>4||Math.abs(c.y-y)>5);
+  [[6,15],[33,22],[4,44],[30,52]].forEach(st=>{
+    const x=bx0+Math.round(st[0]*sx), y=by0+Math.round(st[1]*sy);
+    if(!clear(x,y)) return;
+    q.fillStyle='#8e9285'; q.fillRect(x,y,3,2);
+    q.fillStyle='#b3b8a8'; q.fillRect(x,y,2,1);
+  });
+  [[19,20],[20,38],[3,26],[36,33],[17,54]].forEach(sp=>{
+    const x=bx0+Math.round(sp[0]*sx), y=by0+Math.round(sp[1]*sy);
+    if(!clear(x,y)) return;
+    q.fillStyle='#4f9d4a'; q.fillRect(x,y,1,1);
+    q.fillStyle='#2f6b36'; q.fillRect(x-1,y-1,1,1);
+    q.fillStyle='#7fd07c'; q.fillRect(x+1,y-1,1,1);
+  });
+  // A picket fence round the bed, open where the trail comes in.
+  const gate=bedGate();
+  const open=(side,t)=>gate.side===side && Math.abs(t-gate.t)<9;
+  const post=(x,y)=>{ q.fillStyle='#c9ab80'; q.fillRect(x-1,y-1,4,4); q.fillStyle='#e2c9a0'; q.fillRect(x-1,y-1,4,1); };
+  const fl=bx0-3, fr=bx0+bw+1, ft=by0-4, fb=by0+bh+2;
+  for(let x=fl; x<=fr+1; x++){
+    if(!open('t',x)){ q.fillStyle='#e2c9a0'; q.fillRect(x,ft,1,2); q.fillStyle='#a88d63'; q.fillRect(x,ft+2,1,1); }
+    if(!open('b',x)){ q.fillStyle='#e2c9a0'; q.fillRect(x,fb,1,2); q.fillStyle='#a88d63'; q.fillRect(x,fb+2,1,1); }
+  }
+  for(let y=ft; y<=fb+2; y++){
+    if(!open('l',y)){ q.fillStyle='#e2c9a0'; q.fillRect(fl,y,2,1); q.fillStyle='#a88d63'; q.fillRect(fl+2,y,1,1); }
+    if(!open('r',y)){ q.fillStyle='#e2c9a0'; q.fillRect(fr,y,2,1); q.fillStyle='#a88d63'; q.fillRect(fr+2,y,1,1); }
+  }
+  for(let x=fl; x<=fr; x+=14){ if(!open('t',x)) post(x,ft); if(!open('b',x)) post(x,fb); }
+  for(let y=ft; y<=fb; y+=14){ if(!open('l',y)) post(fl,y); if(!open('r',y)) post(fr,y); }
+  post(fr,fb); post(fl,fb); post(fr,ft); post(fl,ft);
+  q.restore();
+}
+
+/* ======================================================================
+   4b. THE CARROTS: one per life, eaten from the gate inward
+   ====================================================================== */
+// 20 lives, drawn as 10 carrots: each carrot takes two bites, whole, half
+// eaten, gone. Every number the player reads (top bar, screens) counts lives;
+// only the bed shows them in halves, which keeps it small.
+const MAX_LIVES=20, BITES=2, MAX_CARROTS=MAX_LIVES/BITES;
+let CARROT_SLOTS=[];
+function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitter
+  let sd=7777;
+  const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
+  const cols=BED.o==='h'?5:2, rows=BED.o==='h'?2:5;
+  // centred in the bed: a carrot covers x-2..x+3 and y-2..y+3 of its slot
+  const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
+  const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
+  CARROT_SLOTS=[];
+  for(let row=0;row<rows;row++) for(let col=0;col<cols;col++)
+    CARROT_SLOTS.push({x:x0+col*10+Math.round(r()*2-1), y:y0+row*11+Math.round(r()*2-1)});
+}
+function sortCarrots(){          // nearest the gate is eaten first, so the damage
+  const g=bedGate();             // visibly advances inward from where bugs break in
+  CARROT_SLOTS.sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y));
+}
+function drawCarrot(x,y,s){
+  ctx.fillStyle='#3f2a1c'; ctx.fillRect(x-1,y+3,4,1);      // the hole it sits in
+  if(s<=0) return;
+  if(s<0.55){                                              // half eaten: a stub
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y+1,2,1);
+    ctx.fillStyle='#e07a22'; ctx.fillRect(x,y+2,1,1);
+    return;
+  }
+  ctx.fillStyle='#ff9a3c'; ctx.fillRect(x,y+1,2,2);
+  ctx.fillStyle='#e07a22'; ctx.fillRect(x+1,y+1,1,2); ctx.fillRect(x,y+3,1,1);
+  ctx.fillStyle='#ffc27a'; ctx.fillRect(x,y+1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-1,y,4,1);
+  ctx.fillStyle='#2f6b36'; ctx.fillRect(x,y-1,2,1);
+  ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
+}
+/* ---------------------------------------------------------------------------
+   PLOT GEOMETRY. One source of truth, and now purely logical: these numbers
+   drive spacing, the tap target and the button keep-out box, but nothing is
+   drawn as a rectangle any more.
+
+   The bed went through three shapes. Square was wrong because tower art is
+   13px tall and only 9-11px wide. A wide tilled strip seated the tower
+   properly but still read as an object dropped on the lawn, sixteen identical
+   rectangles to a map. What is drawn now is a scuff of turned earth: an
+   irregular patch with a ragged edge, seeded from its own position so no two
+   are alike. Ground, not furniture.
+--------------------------------------------------------------------------- */
+const BED_W=20, BED_H=14;        // logical footprint, for spacing and hit-tests
+const BED_L=-10, BED_T=-4;       // relative to the anchor
+const BED_R=BED_L+BED_W-1;       // +9
+const BED_B=BED_T+BED_H-1;       // +9, four rows of soil in front of the feet
+const TOWER_DY=-2;               // sprite centre, so the feet land on the soil
+const PIP_Y=7;                   // level pips sit on the apron, clear of the feet
+
+/* PLACEMENT MODE.
+   'open'  - build anywhere off the trail. No bed exists until a tower stands
+             in it, so the lawn stays clean and every bed on screen is there
+             because the player put it there.
+   'plots' - the authored sixteen beds per map, visible from the start. Keeps
+             position as a real decision (coverage varies about 2.5x across
+             the set) at the cost of sixteen identical rectangles sitting on
+             the grass before anything is built.
+   The authored arrays stay in MAPS either way, so this is a one-word switch
+   while the mechanics and the art direction are still moving. */
+const PLACEMENT='open';
+const SNAP=2;                    // placements land on even pixels, so beds align
+const TRAIL_CLEAR=10;            // the drawn trail runs ~9.5px either side
+const BED_GAP=3;                 // breathing room between two beds
+
+/* ---- the soil ------------------------------------------------------------
+   A patch is the union of eleven small overlapping discs along a shallow
+   line, with a bite out of the top and the bottom so the silhouette never
+   closes into a neat oval. Everything is seeded from the patch's own
+   position, so a patch is identical every frame (nothing shimmers) and
+   different at every spot (nothing looks stamped from the same die).
+
+   It is rendered into a small cached canvas rather than drawn disc by disc,
+   because the outline has to be grown around the finished union. Drawing a
+   rim per disc puts rim pixels through the interior wherever a later disc
+   overlaps an earlier one, which is what made the first attempt read as a
+   handful of dark rocks instead of turned earth. */
+function soilRnd(x,y){
+  let s=((((x|0)*73856093) ^ ((y|0)*19349663) ^ 0x9e3779b9)>>>0);
+  return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+}
+const SOIL_CACHE=new Map();
+function soilLobes(x,y){
+  const key=x+','+y;
+  let L=SOIL_CACHE.get(key);
+  if(L) return L;
+  if(SOIL_CACHE.size>512) SOIL_CACHE.clear();   // the hover walks the whole map
+  const r=soilRnd(x,y);
+  L=[];
+  for(let i=0;i<9;i++){
+    const t=i/8*2-1;                            // -1 .. 1 across the patch
+    L.push({dx:t*7.4+(r()*1.3-0.65),
+            dy:4.0+(r()*1.3-0.65)+Math.abs(t)*0.4,
+            r :4.1-Math.abs(t)*0.9+r()*0.7});
+  }
+  L.push({dx:r()*9-4.5, dy:1.0+r()*1.1, r:2.3+r()*1.1});
+  L.push({dx:r()*11-5.5, dy:7.2+r()*0.9, r:2.0+r()*1.1});
+  // crumbs, the light ones biased high so the patch reads as lit from above
+  L.crumbs=[];
+  for(let i=0;i<16;i++){
+    const lit=r()<.5;
+    L.crumbs.push([Math.round(r()*19-9.5),
+                   Math.round(lit ? 1+r()*4 : 4+r()*5), lit]);
+  }
+  SOIL_CACHE.set(key,L);
+  return L;
+}
+
+/* [edge, fill, light crumb, dark crumb].
+   Derived from the map's own trail palette rather than fixed. A patch in
+   colours of its own reads as an object dropped on the lawn, which is what
+   the bed kept doing; in the path's colours it reads as the same earth, just
+   turned over. It also means a theme swap carries the soil with it. */
+let SOIL_TILLED=[], SOIL_ROUGH=[], SOIL_BAD=[];
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16), c=i=>
+    Math.max(0,Math.min(255,Math.round(((n>>i)&255)*f)));
+  return '#'+((1<<24)|(c(16)<<16)|(c(8)<<8)|c(0)).toString(16).slice(1);
+}
+function buildSoilPals(P){
+  SOIL_TILLED=[shade(P.edge,.72), shade(P.dirt,.92), P.inner,        shade(P.edge,.86)];
+  SOIL_ROUGH =[shade(P.edge,.50), shade(P.dirt,.60), shade(P.dirt,.80), shade(P.edge,.42)];
+  SOIL_BAD   =['#7e3330','#a85450','#c97d78','#8f3f3b'];
+  PATCH_CACHE.clear();
+}
+
+const PATCH_W=30, PATCH_H=22, PATCH_AX=15, PATCH_AY=7;
+const PATCH_CACHE=new Map();
+function rgb3(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function soilPatch(x,y,step,pal,halo,palKey){
+  const key=x+','+y+','+step+','+palKey+','+(halo||'-');
+  let c=PATCH_CACHE.get(key);
+  if(c) return c;
+  if(PATCH_CACHE.size>320) PATCH_CACHE.clear();
+  const g=step/8, L=soilLobes(x,y);
+  c=document.createElement('canvas'); c.width=PATCH_W; c.height=PATCH_H;
+  const q=c.getContext('2d');
+  for(const b of L) disc(q, PATCH_AX+b.dx, PATCH_AY+b.dy, b.r*g, pal[1]);
+  if(g>=0.8){
+    for(const cr of L.crumbs){
+      const px=PATCH_AX+cr[0], py=PATCH_AY+cr[1];
+      if(px<1||py<1||px>=PATCH_W-1||py>=PATCH_H-1) continue;
+      let inside=false;
+      for(const b of L){
+        const ex=px+0.5-(PATCH_AX+b.dx), ey=py+0.5-(PATCH_AY+b.dy);
+        if(ex*ex+ey*ey <= (b.r*g-1.2)*(b.r*g-1.2)){ inside=true; break; }
+      }
+      if(!inside) continue;
+      q.fillStyle = cr[2]?pal[2]:pal[3];
+      q.fillRect(px,py,1,1);
+    }
+  }
+  // one outline grown around the finished union, then the halo ring outside it
+  const im=q.getImageData(0,0,PATCH_W,PATCH_H), d=im.data;
+  let on=new Uint8Array(PATCH_W*PATCH_H);
+  for(let i=0;i<on.length;i++) on[i]= d[i*4+3] ? 1 : 0;
+  const ring=(src,col)=>{
+    const add=[];
+    for(let py=0;py<PATCH_H;py++) for(let px=0;px<PATCH_W;px++){
+      const i=py*PATCH_W+px;
+      if(src[i]) continue;
+      if((px>0&&src[i-1]) || (px<PATCH_W-1&&src[i+1]) ||
+         (py>0&&src[i-PATCH_W]) || (py<PATCH_H-1&&src[i+PATCH_W])) add.push(i);
+    }
+    const nx=Uint8Array.from(src);
+    for(const i of add){
+      d[i*4]=col[0]; d[i*4+1]=col[1]; d[i*4+2]=col[2]; d[i*4+3]=255; nx[i]=1;
+    }
+    return nx;
+  };
+  on=ring(on, rgb3(pal[0]));
+  if(halo) ring(on, rgb3(halo));
+  q.putImageData(im,0,0);
+  PATCH_CACHE.set(key,c);
+  return c;
+}
+// halo is a 1px rim in the patch's own shape: a selection marker shaped like
+// the thing it marks, which a rectangle around an irregular patch never was
+function drawSoil(x,y,grow,halo,pal,palKey){
+  const g=(grow===undefined)?1:grow;
+  if(g<=0.1) return;
+  const step=Math.max(1,Math.min(8,Math.round(g*8)));
+  ctx.drawImage(soilPatch(x,y,step,pal||SOIL_TILLED,halo,palKey||('t'+G.map)),
+                x-PATCH_AX, y-PATCH_AY);
+}
+
+function drawPlot(p){
+  const x=Math.round(p.x), y=Math.round(p.y);
+  if(p.blocked){                                  // a stump: pay to clear it
+    drawSoil(x,y,1,null,SOIL_ROUGH,'r'+G.map);
+    ctx.fillStyle='#3a2617'; ctx.fillRect(x-5,y-3,10,8);      // the cut trunk
+    ctx.fillStyle='#6b4630'; ctx.fillRect(x-4,y-2,8,6);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-3,8,3);       // sawn face
+    ctx.fillStyle='#b08454'; ctx.fillRect(x-3,y-3,6,2);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-1,y-3,2,1);       // growth rings
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-3,y,1,3); ctx.fillRect(x+2,y+1,1,2);
+    ctx.fillStyle='#2f6b36';                                  // weeds beside it
+    ctx.fillRect(x-7,y+1,1,3); ctx.fillRect(x+6,y+2,1,2);
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-8,y+1,1,1); ctx.fillRect(x+7,y+2,1,1);
+    return;
+  }
+  drawSoil(x,y,1,null,SOIL_TILLED);
+}
+function drawPlots(){
+  for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
+}
+
+/* Open placement: is this a legal spot for a bed?
+   Five tests, cheapest first. The trail test samples the bed on a 2px lattice
+   rather than measuring rectangle-to-polyline properly; the bed is 18x10, so
+   45 samples is exact enough and only ever runs for the one spot under the
+   pointer. */
+function clearOfTrail(x,y){
+  if(distToPath(x,y) >= TRAIL_CLEAR+10.3) return true;   // whole bed is far
+  for(let ix=x+BED_L; ix<=x+BED_R; ix+=2)
+    for(let iy=y+BED_T; iy<=y+BED_B; iy+=2)
+      if(distToPath(ix,iy) < TRAIL_CLEAR) return false;
+  return true;
+}
+// The carrot bed: where the map puts it, upright (2 x 5 carrots) or wide (5 x 2).
+// Its fence and a margin are no-build ground.
+let BED={x:278,y:66,w:28,h:60,o:'v'}, CARROT_BOX={l:272,t:58,r:312,b:132};
+function setBed(b){
+  const w=b.o==='h'?58:28, h=b.o==='h'?27:60;
+  BED={x:b.x,y:b.y,w,h,o:b.o};
+  CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
+}
+// where the trail crosses into the bed: which side, and how far along it
+function bedGate(){
+  const inside=p=>p.x>=BED.x&&p.x<=BED.x+BED.w&&p.y>=BED.y&&p.y<=BED.y+BED.h;
+  let i=PTS.length-1;
+  while(i>0 && inside(PTS[i])) i--;
+  const p=PTS[Math.min(PTS.length-1,i+1)];
+  const d={l:p.x-BED.x, r:BED.x+BED.w-p.x, t:p.y-BED.y, b:BED.y+BED.h-p.y};
+  const side=Object.keys(d).reduce((a,k)=>d[k]<d[a]?k:a,'l');
+  return {side, t:(side==='l'||side==='r')?p.y:p.x, x:p.x, y:p.y};
+}
+function overUI(x,y){
+  const L=x+BED_L, R=x+BED_R, T=y+BED_T, B=y+BED_B;
+  if(T < -OY+15 && (L < -OX+124 || R > W+OX-72)) return true;   // the top ribbon
+  if(T < plqTop()+PLQ_H+1 && R > PLQ_L && L < PLQ_R) return true; // the info plaque
+  const dockTop=H+OY-3-(DOCK_W+9);
+  if(B > dockTop-2 && L < -OX+dockWidthArt()+2) return true;    // the dock
+  return false;
+}
+function placeOK(x,y){
+  if(x+BED_L < -OX+2 || x+BED_R > W+OX-3) return false;
+  if(y+BED_T < -OY+2 || y+BED_B > H+OY-3) return false;
+  if(x+BED_R > CARROT_BOX.l && x+BED_L < CARROT_BOX.r &&
+     y+BED_B > CARROT_BOX.t && y+BED_T < CARROT_BOX.b) return false;
+  for(const p of G.plots)
+    if(Math.abs(p.x-x) < BED_W+BED_GAP && Math.abs(p.y-y) < BED_H+BED_GAP) return false;
+  if(overUI(x,y)) return false;
+  return clearOfTrail(x,y);
+}
+function snapTo(v){ return Math.round(v/SNAP)*SNAP; }
+function drawCarrots(){
+  const lost=MAX_LIVES-G.lives;       // bites taken, nearest the gate first
+  for(let i=0;i<MAX_CARROTS;i++){
+    const left=1-Math.min(BITES,Math.max(0,lost-i*BITES))/BITES;
+    if(left<=0) continue;
+    const sl=CARROT_SLOTS[i];
+    drawCarrot(sl.x, sl.y+Math.round(Math.sin(G.ui*1.1+i)*0.4), left);
+  }
+}
+
+/* ======================================================================
+   5. STATE
+   ====================================================================== */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+cv.width=W; cv.height=H; ctx.imageSmoothingEnabled=false;
+
+const G={
+  gold:150, lives:MAX_LIVES, map:1, pack:0, wave:0, phase:'idle', // idle | wave | rift | dead | won
+  speed:1, paused:true, started:false,
+  towers:[], foes:[], shots:[], fx:[], flies:[],
+  queue:[], qt:0, shake:0, flash:0, time:0,
+  plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
+  hoverPos:null, selAge:0,
+  btns:[], btnHover:null, ui:0, toast:null, screen:'title'
+};
+
+// Lives carry across maps. Towers do not: the grid is a different shape on the
+// other side. Gold resets so each map stays its own clean puzzle, plus a bounty
+// on the carrots you kept, which is what makes protecting them matter.
+// Two compounding levers, both tunable here.
+// Carrots are worth more the deeper you go, and you pack a slice of your kit
+// through the rift, so a strong earlier map actually pays for the next one.
+const CARROT_BONUS=[0,0,6,8];     // by map number: map2 = 6/carrot, map3 = 8/carrot
+const PACK_REFUND=0.20;           // share of standing tower value carried over
+const MAP_BASE_GOLD=130;
+function carrotRate(n){ return CARROT_BONUS[n] || CARROT_BONUS[CARROT_BONUS.length-1]; }
+let curPal=MAPS[0].pal;
+function loadMap(n){
+  G.map=n;
+  const M=MAPS[n-1];
+  curPal=M.pal;
+  buildSoilPals(curPal);
+  seed=1337+n*7919;
+  buildGeometry(M.wp);
+  setBed(M.bed); layoutCarrots(); sortCarrots();
+  paintBG(M.pal);
+  // in open mode a plot comes into existence when a tower is planted in it
+  G.plots = (PLACEMENT==='plots')
+    ? M.plots.map(q=>({x:q[0],y:q[1],blocked:!!q[2],tower:null}))
+    : [];
+  G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
+  G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null; G.hoverPos=null;
+  G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
+  G.gold = (n===1) ? 150 : MAP_BASE_GOLD + carrotRate(n)*G.lives + (G.pack||0);
+  G.pack=0;
+}
+loadMap(1);
+
+const BUTTERFLIES=[];
+for(let i=0;i<7;i++) BUTTERFLIES.push({x:rnd()*W,y:10+rnd()*(H-20),a:rnd()*6.28,sp:6+rnd()*8,c:['#ffd452','#f58fbf','#ffffff'][i%3]});
+
+/* ======================================================================
+   6. AUDIO
+   ====================================================================== */
+let AC=null, sndOn=true, lastTick=0;
+function actx(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function tone(f,dur,type,vol,f2){
+  if(!sndOn) return; const a=actx(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,a.currentTime);
+  if(f2) o.frequency.exponentialRampToValueAtTime(f2,a.currentTime+dur);
+  g.gain.setValueAtTime(vol||.06,a.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);
+  o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur+.02);
+}
+const SFX={
+  place(){ tone(320,.07,'square',.07); setTimeout(()=>tone(520,.09,'square',.07),60); },
+  up(){ tone(440,.06,'square',.07); setTimeout(()=>tone(660,.06,'square',.07),55); setTimeout(()=>tone(880,.1,'square',.07),110); },
+  shoot(){ const t=performance.now(); if(t-lastTick<90) return; lastTick=t; tone(700,.03,'square',.02,420); },
+  pop(){ tone(220,.06,'triangle',.045,90); },
+  coin(){ tone(980,.05,'square',.03); },
+  hurt(){ tone(200,.22,'sawtooth',.08,60); },
+  boom(){ tone(120,.18,'sawtooth',.06,50); },
+  wave(){ tone(392,.09,'square',.07); setTimeout(()=>tone(523,.09,'square',.07),90); setTimeout(()=>tone(659,.14,'square',.07),180); },
+  bad(){ tone(160,.3,'sawtooth',.09,70); },
+  tick(){ tone(620,.02,'square',.025); },
+  zap(){ tone(1500,.07,'square',.045,240); }
+};
+
+/* ======================================================================
+   7. HELPERS
+   ====================================================================== */
+function statsOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].lv[t.level-4] : F.lv[t.level-1];
+}
+function artOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].art : F.art;
+}
+function nameOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].name : F.name;
+}
+function nextCost(t){
+  const F=TOWERS[t.fam];
+  if(t.branch) return t.level>=5 ? null : F.forks[t.branch].lv[t.level-3].cost;
+  if(t.level<3) return F.lv[t.level].cost;
+  return null; // fork point
+}
+// ---- plots ----------------------------------------------------------------
+// The tap target is the bed itself, grown by PLOT_PAD so a thumb still lands
+// on it. A radius no longer works now that the bed is wide and shallow: it
+// would either miss the ends or swallow the ground above and below.
+const PLOT_PAD=4;
+const CLEAR_COST=60;
+function plotAt(ax,ay){
+  let best=-1, bd=1e9;
+  const hw=BED_W/2+PLOT_PAD, hh=BED_H/2+PLOT_PAD;
+  for(let i=0;i<G.plots.length;i++){
+    const p=G.plots[i], dx=ax-p.x, dy=ay-(p.y+0.5);
+    if(Math.abs(dx)>hw || Math.abs(dy)>hh) continue;
+    // normalise so the nearest plot wins consistently across the two axes
+    const d=(dx/hw)*(dx/hw)+(dy/hh)*(dy/hh);
+    if(d<bd){ bd=d; best=i; }
+  }
+  return best;
+}
+function freePlot(i){ const p=G.plots[i]; return !!p && !p.blocked && !p.tower; }
+function towerAt(i){ const p=G.plots[i]; return p ? p.tower : null; }
+function addFx(o){ G.fx.push(Object.assign({life:0,ttl:.6},o)); }
+// painted by drawPlaque, in the plaque's spot, for TOAST_T seconds of real time
+const TOAST_T=1.1;
+function toast(msg){ G.toast={msg, t:G.ui}; }
+
+/* ======================================================================
+   8. WAVES
+   ====================================================================== */
+function startWave(){
+  if(G.phase!=='idle') return;
+  G.wave++;
+  const def=waveDef(G.wave);
+  G.queue=[]; G.qt=0;
+  def.g.forEach(grp=>{
+    const [type,count,gap,delay]=grp;
+    for(let i=0;i<count;i++) G.queue.push({type,t:(delay||0)+i*gap,m:def.m});
+  });
+  G.queue.sort((a,b)=>a.t-b.t);
+  G.phase='wave';
+  SFX.wave();
+}
+function spawn(type,m){
+  const E=ENEMIES[type];
+  G.foes.push({
+    type,E, hp:E.hp*m, max:E.hp*m, d:0, x:PTS[0].x, y:PTS[0].y,
+    slow:0, slowT:0, stunT:0, bob:Math.random()*6.28, hit:0, dead:false
+  });
+}
+function waveDone(){
+  const bonus=30+G.wave*7+(G.map-1)*25;
+  G.gold+=bonus;
+  addFx({type:'txt',x:W/2,y:40,txt:'+'+bonus,color:'#ffd452',ttl:1.2,vy:-14});
+  SFX.coin();
+  if(G.wave>=WAVES_PER_MAP && !G.endless){
+    if(G.map<MAPS.length){
+      // a slice of the standing kit comes through the rift; loadMap spends it
+      G.pack=Math.floor(G.towers.reduce((a,t)=>a+t.spent,0)*PACK_REFUND);
+      G.phase='rift'; showOver('rift');
+    }
+    else { G.phase='won'; showOver('won'); }
+  } else G.phase='idle';
+}
+
+/* ======================================================================
+   9. UPDATE
+   ====================================================================== */
+function damage(f,amt,src){
+  const armor=f.E.armor||0;
+  const real=Math.max(1,amt-armor);
+  f.hp-=real; f.hit=.12;
+  if(f.hp<=0 && !f.dead){
+    f.dead=true; G.gold+=f.E.bounty;
+    addFx({type:'txt',x:f.x,y:f.y-6,txt:'+'+f.E.bounty,color:'#ffd452',ttl:.8,vy:-16});
+    for(let i=0;i<(f.E.boss?14:6);i++) addFx({type:'bit',x:f.x,y:f.y,vx:(Math.random()-.5)*40,vy:-10-Math.random()*30,ttl:.5,color:f.E.boss?'#a057b8':'#8fdc8b'});
+    SFX.pop(); if(f.E.boss){ SFX.boom(); G.shake=4; }
+  }
+}
+function applyStun(f,dur){
+  const d=dur*(1-(f.E.slowRes||0));
+  if(d>f.stunT) f.stunT=d;
+}
+function jag(pts){
+  const out=[pts[0]];
+  for(let i=1;i<pts.length;i++){
+    const a=out[out.length-1], b=pts[i];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, n=Math.max(2,Math.round(L/6));
+    for(let k=1;k<n;k++){
+      const t=k/n, off=(Math.random()-.5)*3.4;
+      out.push({x:a.x+dx*t+(-dy/L)*off, y:a.y+dy*t+(dx/L)*off});
+    }
+    out.push({x:b.x,y:b.y});
+  }
+  return out;
+}
+function applySlow(f,amt,dur){
+  if(f.E.noSlow) return;
+  const eff=amt*(1-(f.E.slowRes||0));
+  if(eff>=f.slow){ f.slow=eff; f.slowT=Math.max(f.slowT,dur); }
+}
+function pickTarget(t,st){
+  let best=null,bd=-1;
+  const r2=st.rng*st.rng;
+  for(const f of G.foes){
+    if(f.dead) continue;
+    const dx=f.x-t.x, dy=f.y-t.y;
+    if(dx*dx+dy*dy<=r2 && f.d>bd){ bd=f.d; best=f; }
+  }
+  return best;
+}
+
+function step(dt){
+  G.time+=dt;
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt*14);
+  if(G.flash>0) G.flash=Math.max(0,G.flash-dt*3);
+
+  // butterflies
+  for(const b of BUTTERFLIES){
+    b.a+=(Math.random()-.5)*dt*4; b.x+=Math.cos(b.a)*b.sp*dt; b.y+=Math.sin(b.a)*b.sp*dt*.6;
+    if(b.x<-OX+3||b.x>W+OX-3) b.a=Math.PI-b.a; if(b.y<-OY+3||b.y>H+OY-3) b.a=-b.a;
+  }
+
+  // spawning
+  if(G.phase==='wave'){
+    G.qt+=dt;
+    while(G.queue.length && G.queue[0].t<=G.qt){ const q=G.queue.shift(); spawn(q.type,q.m); }
+  }
+
+  // enemies
+  for(const f of G.foes){
+    if(f.dead) continue;
+    if(f.slowT>0){ f.slowT-=dt; if(f.slowT<=0) f.slow=0; }
+    let sp=f.E.spd*(1-f.slow);
+    if(f.stunT>0){ f.stunT-=dt; sp=0; }
+    f.d+=sp*dt;
+    f.bob+=dt*(f.type==='moth'?18:7);
+    if(f.hit>0) f.hit-=dt;
+    const p=posAt(f.d); f.x=p.x; f.y=p.y; f.face=p.dx<0?-1:1;
+    if(f.d>=PATH_LEN){
+      f.dead=true; f.leaked=true;
+      const loss=(f.E.lives||1);
+      const from=MAX_LIVES-G.lives;
+      G.lives=Math.max(0,G.lives-loss);
+      const to=MAX_LIVES-G.lives;
+      const bitten=new Set();
+      for(let b=from; b<to; b++) bitten.add(Math.floor(b/BITES));
+      for(const ci of bitten){                               // show each bite land
+        const sl=CARROT_SLOTS[ci]; if(!sl) continue;
+        addFx({type:'eaten',x:sl.x,y:sl.y,ttl:.45});
+        for(let k=0;k<5;k++) addFx({type:'bit',x:sl.x+1,y:sl.y,
+          vx:(Math.random()-.5)*34, vy:-16-Math.random()*16, ttl:.5,
+          color:k<3?'#ff9a3c':'#4f9d4a'});
+      }
+      G.shake=5; G.flash=1; SFX.hurt();
+      addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
+      if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
+    }
+  }
+
+  // towers
+  for(const t of G.towers){
+    const st=statsOf(t);
+    t.bob=(t.bob||0)+dt;
+    if(st.aura){
+      t.cd-=dt;
+      if(t.cd<=0){
+        t.cd=.25;
+        const r2=st.rng*st.rng; let any=false;
+        for(const f of G.foes){
+          if(f.dead) continue;
+          const dx=f.x-t.x, dy=f.y-t.y;
+          if(dx*dx+dy*dy<=r2){ damage(f,st.dmg*.25); if(st.slow) applySlow(f,st.slow,.4); any=true; }
+        }
+        if(any){ addFx({type:'bit',x:t.x+(Math.random()-.5)*st.rng,y:t.y+(Math.random()-.5)*st.rng,vx:0,vy:-6,ttl:.6,color:'#ffd452'}); }
+      }
+      continue;
+    }
+    t.cd-=dt;
+    if(t.cd<=0){
+      const tg=pickTarget(t,st);
+      if(tg && t.fam==='zap'){
+        t.cd=1/st.rate; t.face=tg.x<t.x?-1:1; t.kick=.12;
+        const chain=[tg]; let cur=tg, dmg=st.dmg;
+        damage(tg,dmg);
+        if(st.stun) applyStun(tg,st.stun);
+        for(let n=0;n<(st.chain||0);n++){
+          let best=null, bd=34*34;
+          for(const f of G.foes){
+            if(f.dead||chain.indexOf(f)>=0) continue;
+            const dx=f.x-cur.x, dy=f.y-cur.y, d=dx*dx+dy*dy;
+            if(d<bd){ bd=d; best=f; }
+          }
+          if(!best) break;
+          dmg*=st.fall; damage(best,dmg); chain.push(best); cur=best;
+        }
+        addFx({type:'bolt', pts:jag([{x:t.x,y:t.y-3}].concat(chain.map(f=>({x:f.x,y:f.y})))), ttl:.22});
+        SFX.zap();
+      } else if(tg){
+        t.cd=1/st.rate; t.face=tg.x<t.x?-1:1; t.kick=.12;
+        const kind = t.fam==='hive'?'bee' : (t.fam==='sprink'?'drop':'pebble');
+        let ax=tg.x, ay=tg.y;
+        if(kind==='drop'){ // lead the shot so fast bugs still get soaked
+          const flight=Math.hypot(tg.x-t.x,tg.y-t.y)/95;
+          const lp=posAt(tg.d+tg.E.spd*(1-tg.slow)*flight); ax=lp.x; ay=lp.y;
+        }
+        G.shots.push({
+          kind, x:t.x, y:t.y-4, tx:ax, ty:ay, tgt:tg,
+          sp: kind==='drop'?95:(kind==='bee'?70:130),
+          dmg:st.dmg, splash:st.splash||0, slow:st.slow||0, slowT:st.slowT||0,
+          life:0, wob:Math.random()*6.28,
+          col: t.fam==='hive' ? (t.branch==='wasp'?'#cfd3e0':'#ffd452') : (t.branch==='frost'?'#a8ecff':(t.branch==='geyser'?'#59b0e6':'#c9a06a'))
+        });
+        SFX.shoot();
+      } else t.cd=0;
+    }
+    if(t.kick>0) t.kick-=dt;
+  }
+
+  // projectiles
+  for(const s of G.shots){
+    s.life+=dt; s.wob+=dt*14;
+    if(s.kind!=='drop' && s.tgt && !s.tgt.dead){ s.tx=s.tgt.x; s.ty=s.tgt.y; }
+    const dx=s.tx-s.x, dy=s.ty-s.y, d=Math.hypot(dx,dy);
+    const mv=s.sp*dt;
+    if(d<=mv+1 || s.life>3){
+      s.done=true;
+      if(s.splash){
+        addFx({type:'ring',x:s.tx,y:s.ty,r:2,rmax:s.splash,ttl:.32,color:s.col});
+        const r2=s.splash*s.splash;
+        for(const f of G.foes){ if(f.dead) continue;
+          const ex=f.x-s.tx, ey=f.y-s.ty;
+          if(ex*ex+ey*ey<=r2){ damage(f,s.dmg); if(s.slow) applySlow(f,s.slow,s.slowT); }
+        }
+        SFX.boom();
+      } else if(s.tgt && !s.tgt.dead){
+        damage(s.tgt,s.dmg);
+        addFx({type:'bit',x:s.tx,y:s.ty,vx:(Math.random()-.5)*30,vy:-14,ttl:.25,color:s.col});
+      }
+    } else { s.x+=dx/d*mv; s.y+=dy/d*mv; }
+  }
+
+  // effects
+  for(const e of G.fx){
+    e.life+=dt;
+    if(e.vx!==undefined) e.x+=e.vx*dt;
+    if(e.vy!==undefined){ e.y+=e.vy*dt; if(e.type==='bit') e.vy+=90*dt; }
+  }
+
+  G.shots=G.shots.filter(s=>!s.done);
+  G.fx=G.fx.filter(e=>e.life<e.ttl);
+  G.foes=G.foes.filter(f=>!f.dead);
+
+  if(G.phase==='wave' && !G.queue.length && !G.foes.length) waveDone();
+}
+
+/* ======================================================================
+   10. DRAW
+   ====================================================================== */
+function ring(cx,cy,rad,color,alpha){
+  ctx.fillStyle=color; ctx.globalAlpha=alpha===undefined?1:alpha;
+  const steps=Math.max(16,Math.floor(rad*2.2));
+  for(let i=0;i<steps;i++){
+    const a=i/steps*Math.PI*2;
+    ctx.fillRect(Math.round(cx+Math.cos(a)*rad),Math.round(cy+Math.sin(a)*rad),1,1);
+  }
+  ctx.globalAlpha=1;
+}
+/* ---------- in-world pixel UI: glyph icons, plates and buttons ---------- */
+const GL={
+  check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
+  cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
+  up:["..x..",".xxx.","xxxxx","..x..","..x.."],      // upgrade: an arrow, not a diamond
+  coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
+  note:["...xx","..xxx","..x..","xxx..","xxx.."],
+  pause:["x.x","x.x","x.x","x.x","x.x"],
+  play:["x..","xx.","xxx","xx.","x.."],
+  back:["..x",".xx","xxx",".xx","..x"],
+  flag:["x...","xxx.","xxxx","x...","x..."],    // map; a 3px M reads as H
+  wave:[".....",".x...","x.x.x","...x.","....."] // wave; so does a 3px W
+};
+function glyph(rows,x,y,col,shadow){
+  if(shadow){
+    ctx.fillStyle=shadow;
+    for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+      if(rows[j][i]==='x') ctx.fillRect(x+i+1,y+j+1,1,1);
+  }
+  ctx.fillStyle=col;
+  for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+    if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
+}
+function plate(x,y,w,h,fill,edge){
+  ctx.fillStyle='rgba(0,0,0,.28)'; ctx.fillRect(x+1,y+h,w-2,2);
+  ctx.fillStyle=edge; ctx.fillRect(x+1,y,w-2,h); ctx.fillRect(x,y+1,w,h-2);
+  ctx.fillStyle=fill; ctx.fillRect(x+2,y+1,w-4,h-2); ctx.fillRect(x+1,y+2,w-2,h-4);
+}
+const BTN_SKIN={
+  ok   :['#4f9d4a','#82d17c'], no   :['#3a3f3a','#6a706a'],
+  up   :['#3d5f8f','#7aa6dd'], sell :['#8a5a3d','#c99a76'],
+  close:['#3a3f3a','#6a706a'], fork :['#2f4a3a','#6fb98a']
+};
+// Place each action around the plot: try its preferred side, then the others,
+// rejecting anything off-frame, overlapping the plot, or overlapping a button
+// already placed. Falls back to sliding along the free axis.
+function rectsHit(a,b){
+  return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+}
+// The keep-out box is the bed plus its selection frame plus the tower
+// silhouette standing in it, not a 16px tile. Buttons that cleared a tile
+// still landed on the gnome's hat.
+const KEEP_L=BED_L-1, KEEP_R=BED_R+1, KEEP_T=TOWER_DY-9, KEEP_B=BED_B+1;
+function layoutBtns(cx,cy,specs){
+  const gap=2, minX=-OX+1, maxX=W+OX-1, minY=-OY+1, maxY=H+OY-1;
+  const tile={x:cx+KEEP_L, y:cy+KEEP_T, w:KEEP_R-KEEP_L+1, h:KEEP_B-KEEP_T+1};
+  const midY=cy+(BED_T+BED_B)/2;      // vertical centre of the bed, not the box
+  const placed=[], out=[];
+  const posFor=(side,w,h)=>{
+    if(side==='right') return {x:cx+KEEP_R+1+gap, y:midY-h/2};
+    if(side==='left')  return {x:cx+KEEP_L-gap-w, y:midY-h/2};
+    if(side==='up')    return {x:cx-w/2, y:cy+KEEP_T-gap-h};
+    return {x:cx-w/2, y:cy+KEEP_B+1+gap};
+  };
+  const okAt=(x,y,w,h)=>{
+    if(x<minX||x+w>maxX||y<minY||y+h>maxY) return false;
+    const r={x,y,w,h};
+    if(rectsHit(r,tile)) return false;
+    return !placed.some(q=>rectsHit(r,q));
+  };
+  const ORDER=['right','left','up','down'];
+  specs.forEach(sp=>{
+    const w=sp.w||11, h=sp.h||11;
+    const sides=[sp.side].concat(ORDER.filter(x=>x!==sp.side));
+    let found=null;
+    for(const side of sides){
+      const p=posFor(side,w,h);
+      const x=Math.round(p.x), y=Math.round(p.y);
+      if(okAt(x,y,w,h)){ found={x,y}; break; }
+      // slide along the axis this side leaves free
+      const vertical = (side==='right'||side==='left');
+      for(let k=1;k<=3&&!found;k++){
+        for(const dir of [-1,1]){
+          const nx=vertical? x : x+dir*k*(w+gap);
+          const ny=vertical? y+dir*k*(h+gap) : y;
+          if(okAt(nx,ny,w,h)){ found={x:nx,y:ny}; break; }
+        }
+      }
+      if(found) break;
+    }
+    if(!found){   // last resort: clamp the preferred side into frame
+      const p=posFor(sp.side,w,h);
+      found={x:Math.max(minX,Math.min(maxX-w,Math.round(p.x))),
+             y:Math.max(minY,Math.min(maxY-h,Math.round(p.y)))};
+    }
+    placed.push({x:found.x,y:found.y,w,h});
+    out.push(Object.assign({},sp,{x:found.x,y:found.y,w,h}));
+  });
+  return out;
+}
+function drawBtn(b){
+  const press=(G.btnHover===b.act)?1:0;
+  const y=b.y+press;
+  if(b.sprite){
+    plate(b.x,y,b.w,b.h,BTN_SKIN.fork[0],BTN_SKIN.fork[1]);
+    ctx.globalAlpha=b.dis?.45:1;
+    ctx.drawImage(ART[b.sprite], b.x+1, y+1);
+    ctx.globalAlpha=1;
+  } else {
+    const sk=BTN_SKIN[b.act]||BTN_SKIN.no;
+    plate(b.x,y,b.w,b.h,sk[0],sk[1]);
+    glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':(b.act==='sell'?'#ffd452':'#ffffff'));
+  }
+  if(b.num!==undefined){
+    // A price tag, not loose text. It used to be a translucent smear that the
+    // trail showed straight through; now it is an opaque chip with a rim, and
+    // it flips to whichever side of the button has room inside the frame.
+    const t=String(b.num), tw=textW(t);
+    let bx=Math.round(b.x+b.w/2-tw/2);
+    let by=(b.side==='up'||b.side==='left'||b.side==='right') ? y-8 : y+b.h+1;
+    if(by<-OY+1) by=y+b.h+1;
+    if(by+7>H+OY-1) by=y-8;
+    bx=Math.max(-OX+3, Math.min(W+OX-4-tw, bx));
+    plate(bx-2, by-1, tw+4, 9, '#2a2f28', '#4b5248');
+    // money back reads green, money out reads yellow
+    drawText(bx, by+1, t, b.dis?'#8d92a8':(b.act==='sell'?'#8ee88a':'#ffd452'));
+  }
+}
+// The dock used to be <button> elements. Native button rendering, focus rings
+// and canvas filters all put a faint box around each card that no amount of
+// background:none removed, so it is drawn here instead: sprite, price, nothing.
+const DOCK_W=18, DOCK_GAP=6, DOCK_PAD=4;
+function dockWidthArt(){ return DOCK_PAD + FAMS.length*(DOCK_W+DOCK_GAP); }
+function dockSlots(){
+  const cellH=DOCK_W+9;
+  const top=H+OY-3-cellH;
+  return FAMS.map((fam,i)=>({
+    act:'card', fam,
+    x:Math.round(-OX+DOCK_PAD+i*(DOCK_W+DOCK_GAP)),
+    y:Math.round(top), w:DOCK_W, h:cellH
+  }));
+}
+function drawDock(){
+  const slots=dockSlots();
+  slots.forEach(sl=>{
+    const F=TOWERS[sl.fam], img=ART[F.art];
+    const sel=G.placing===sl.fam, poor=G.gold<F.cost;
+    const lift=sel?2:0;
+    if(sel){                                  // a small gold shelf marks the armed one
+      ctx.fillStyle='#ffd452';
+      ctx.fillRect(sl.x+1, sl.y+DOCK_W, DOCK_W-2, 1);
+      ctx.fillStyle='rgba(255,212,82,.35)';
+      ctx.fillRect(sl.x+3, sl.y+DOCK_W+1, DOCK_W-6, 1);
+    }
+    ctx.globalAlpha=(poor&&!sel)?0.42:1;
+    ctx.drawImage(img, Math.round(sl.x+(DOCK_W-img.width)/2), Math.round(sl.y-lift));
+    ctx.globalAlpha=1;
+    const t=String(F.cost), wTot=6+textW(t);
+    const px=Math.round(sl.x+(DOCK_W-wTot)/2), py=sl.y+DOCK_W+3;
+    ctx.fillStyle='rgba(18,22,18,.5)'; ctx.fillRect(px-1,py-1,wTot+2,7);
+    glyph(GL.coin,px,py,poor?'#8d92a8':'#c98f2b');
+    drawText(px+6,py,t, sel?'#ffeedd':(poor?'#8d92a8':'#ffd452'));
+  });
+  return slots;
+}
+
+// The HUD used to be HTML chips. Painted here instead, it shares the dock's
+// language exactly: sprites and pixel digits sitting on the grass for the
+// read-outs, plates only for the things you can actually tap.
+function drawHUD(){
+  const SH='#17200f';                         // the shadow every read-out carries
+  const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
+  const car=ART.carrot;
+  ctx.drawImage(car, x0, y0+1);
+  let x=x0+car.width+1;
+  drawText(x, y0+3, String(G.lives), '#ffffff', SH);
+  x+=textW(String(G.lives))+7;
+  glyph(GL.coin, x, y0+3, '#ffd452', SH);
+  x+=7;
+  drawText(x, y0+3, String(G.gold), '#ffd452', SH);
+  x+=textW(String(G.gold))+8;
+  glyph(GL.flag, x, y0+3, '#e8dcc4', SH);
+  x+=6;
+  drawText(x, y0+3, String(G.map), '#e8dcc4', SH);
+  x+=textW(String(G.map))+6;
+  glyph(GL.wave, x, y0+3, '#ffffff', SH);
+  x+=7;
+  const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
+  const wv=String(shown)+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
+  drawText(x, y0+3, wv, '#ffffff', SH);
+
+  // controls, right to left. Taller than the read-outs so they stay thumb-sized.
+  const bh=13, by=y0-2;
+  const st=actionState();
+  const out=[];
+  let rx=Math.round(W+OX-3);
+  const aw=(st==='send') ? textW('GO')+8 : 13;
+  rx-=aw; out.push({act:'hud_action', x:rx, y:by, w:aw, h:bh, state:st});
+  const sl=String(G.speed)+'X', sw=textW(sl)+8;
+  rx-=sw+3; out.push({act:'hud_speed', x:rx, y:by, w:sw, h:bh, label:sl});
+  rx-=13+3; out.push({act:'hud_sound', x:rx, y:by, w:13, h:bh});
+
+  out.forEach(b=>{
+    const hot=(G.btnHover===b.act)?1:0;
+    const y=b.y+hot;
+    if(b.act==='hud_action' && b.state==='send'){
+      plate(b.x,y,b.w,b.h,'#4f9d4a','#82d17c');
+      drawText(b.x+4, y+4, 'GO', '#ffffff', '#2c5c2a');
+    } else {
+      plate(b.x,y,b.w,b.h,'#2f3329','#5d6455');
+      if(b.act==='hud_action'){
+        const g = b.state==='resume' ? GL.play : GL.pause;
+        glyph(g, b.x+5, y+4, b.state==='resume' ? '#e2c06a' : '#c2cfbe');
+      } else if(b.act==='hud_speed'){
+        drawText(b.x+4, y+4, b.label, '#dfe8db', '#181c14');
+      } else {
+        glyph(GL.note, b.x+4, y+4, sndOn ? '#c2cfbe' : '#5d6455');
+      }
+    }
+  });
+  return out;
+}
+
+function hitBtn(ax,ay){
+  for(const b of G.btns) if(ax>=b.x-3&&ax<=b.x+b.w+3&&ay>=b.y-3&&ay<=b.y+b.h+3) return b;
+  return null;
+}
+
+/* ---------------- the placement mark ----------------
+   Third attempt, and the first one that is not an object laid over the world.
+   Vines lost because they sprouted from exactly where the tower stands. The
+   frame lost because it drew a rectangle around something that is not
+   rectangular. What marks a spot now is the ground itself being turned over:
+   the soil patch grows out of nothing with easeOutBack, a few clods of dirt
+   kick up and fall back, and a 1px rim in the patch's own shape says whose
+   spot it is. One animation, at the moment of choosing, which is the only
+   moment that needed marking. Deliberately small, so it can be built on. */
+const SEL_GROW=0.22;
+function easeOutBack(t,k){ k=k||1.9; t=t<0?0:(t>1?1:t);
+  return 1+(k+1)*Math.pow(t-1,3)+k*Math.pow(t-1,2); }
+
+// six clods thrown up by the dig, on fixed parabolas so they never shimmer
+function digSpecks(x,y,age){
+  if(age<=0 || age>0.5) return;
+  const r=soilRnd(x+7,y+13);
+  for(let i=0;i<6;i++){
+    const dir = r()<.5 ? -1 : 1;
+    const reach = 7+r()*7, up = 4+r()*4, lag = r()*0.06;
+    const t=(age-lag)/0.40;
+    if(t<=0||t>=1) continue;
+    const sx = x + dir*reach*t;
+    const sy = y + 3 - (up*4*t*(1-t));            // up, then back down
+    ctx.fillStyle = (i%3) ? '#7a5636' : '#9c7048';
+    ctx.fillRect(Math.round(sx), Math.round(sy), 1, 1);
+  }
+}
+
+// mode: 'hover' | 'armed' | 'bad' | 'selected'
+function plotMark(cx,cy,age,mode){
+  if(age<=0) return;
+  const x=Math.round(cx), y=Math.round(cy);
+  const g=Math.min(1, easeOutBack(age/SEL_GROW));
+  if(mode==='bad'){
+    ctx.globalAlpha=.72; drawSoil(x,y,g,'#c0423c',SOIL_BAD,'bad'); ctx.globalAlpha=1;
+    return;
+  }
+  if(mode==='hover'){
+    ctx.globalAlpha=.5; drawSoil(x,y,g,'#c9a36a',SOIL_TILLED); ctx.globalAlpha=1;
+    return;
+  }
+  // armed or selected: full soil with a gold rim. Only a fresh dig throws dirt.
+  drawSoil(x,y,g,'#ffd452',SOIL_TILLED);
+  if(mode==='armed') digSpecks(x,y,age);
+}
+
+// grow a 1px outline around the art, so it holds up on any background
+function mkOutlined(rows,pal,outline){
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w+2; c.height=h+2;
+  const x=c.getContext('2d');
+  const on=(i,j)=> i>=0&&j>=0&&i<w&&j<h && !!pal[rows[j][i]];
+  x.fillStyle=outline;
+  for(let j=-1;j<=h;j++) for(let i=-1;i<=w;i++){
+    if(on(i,j)) continue;
+    if(on(i-1,j)||on(i+1,j)||on(i,j-1)||on(i,j+1)) x.fillRect(i+1,j+1,1,1);
+  }
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){
+    const col=pal[rows[j][i]];
+    if(col){ x.fillStyle=col; x.fillRect(i+1,j+1,1,1); }
+  }
+  return c;
+}
+function pxLine(x0,y0,x1,y1,col){
+  x0=Math.round(x0); y0=Math.round(y0); x1=Math.round(x1); y1=Math.round(y1);
+  const dx=Math.abs(x1-x0), sx=x0<x1?1:-1, dy=-Math.abs(y1-y0), sy=y0<y1?1:-1;
+  let err=dx+dy;
+  ctx.fillStyle=col;
+  for(let i=0;i<200;i++){
+    ctx.fillRect(x0,y0,1,1);
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>=dy){ err+=dy; x0+=sx; }
+    if(e2<=dx){ err+=dx; y0+=sy; }
+  }
+}
+function shadow(x,y,w){
+  ctx.fillStyle='rgba(0,0,0,.18)';
+  ctx.fillRect(Math.round(x-w/2),Math.round(y),w,1);
+  ctx.fillRect(Math.round(x-w/2)+1,Math.round(y)+1,w-2,1);
+}
+function drawSprite(key,flip,x,y,w,h){
+  const img=(flip===-1?FLIP[key]:ART[key])||ART[key];
+  ctx.drawImage(img, Math.round(x-img.width/2), Math.round(y-img.height/2));
+}
+
+function draw(){
+  let pending=[];      // in-world buttons, drawn last so nothing covers them
+  ctx.save();
+  if(G.shake>0) ctx.translate(Math.round((Math.random()-.5)*G.shake), Math.round((Math.random()-.5)*G.shake));
+  ctx.drawImage(bg,0,0);
+  ctx.translate(OX,OY);
+
+  // butterflies (behind everything)
+  for(const b of BUTTERFLIES){
+    const f=Math.sin(G.time*18+b.x)>0?1:0;
+    ctx.fillStyle=b.c;
+    ctx.fillRect(Math.round(b.x),Math.round(b.y),1,1);
+    ctx.fillRect(Math.round(b.x)-1,Math.round(b.y)-f,1,1);
+    ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)-f,1,1);
+  }
+
+  drawPlots();
+  drawCarrots();
+
+  G.btns=[];
+
+  // placement: the spot under the pointer, then the armed spot with its buttons
+  if(G.placing){
+    const F=TOWERS[G.placing];
+    // what the pointer is over, if it is not already the armed spot
+    let hx=null, hy=null, hok=true;
+    if(PLACEMENT==='open'){
+      const hp=G.hoverPos;
+      if(hp && !(G.ghost && G.ghost.x===hp.x && G.ghost.y===hp.y)){
+        hx=hp.x; hy=hp.y; hok=hp.ok;
+      }
+    } else if(G.hover>=0 && !(G.ghost && G.ghost.i===G.hover)){
+      hx=G.plots[G.hover].x; hy=G.plots[G.hover].y;
+    }
+    if(hx!==null){
+      if(hok){
+        plotMark(hx,hy,G.hoverAge,'hover');
+        // with a free position the range matters more before you commit
+        ring(hx,hy,F.lv[0].rng,'#ffffff',PLACEMENT==='open'?.45:.28);
+      } else {
+        plotMark(hx,hy,G.hoverAge,'bad');
+      }
+    }
+    if(G.ghost){
+      const cx=G.ghost.x, cy=G.ghost.y;
+      ring(cx,cy,F.lv[0].rng,'#ffd452',.85);
+      plotMark(cx,cy,G.ghost.age||0,'armed');
+      const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
+      ctx.globalAlpha=.55+drop*.3;
+      drawSprite(F.art,1,cx,cy+TOWER_DY+Math.round((1-drop)*-4),16,16);
+      ctx.globalAlpha=1;
+      const bs=layoutBtns(cx,cy,[
+        {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
+        {act:'no', glyph:'cross', side:'left'}
+      ]);
+      G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+    }
+  }
+
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    const pl=G.plots[G.selPlot];
+    // the stump is already drawn; this adds the gold rim around it
+    plotMark(pl.x,pl.y,G.selAge||0,'selected');
+    const bs=layoutBtns(pl.x,pl.y,[
+      {act:'clear', glyph:'coin', side:'right', num:CLEAR_COST, dis:G.gold<CLEAR_COST, plot:G.selPlot}
+    ]);
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+  }
+
+  // selected tower: range ring plus its actions, arranged around the plot
+  if(G.selected && G.towers.includes(G.selected)){
+    const t=G.selected, F=TOWERS[t.fam], st=statsOf(t);
+    ring(t.x,t.y,st.rng,'#ffd452',.7);
+    // same gold rim as an armed spot, so selection reads the same everywhere
+    plotMark(t.x,t.y,G.selAge||0,'selected');
+    const sell=Math.floor(t.spent*.6);
+    const atFork=!t.branch && t.level===3;
+    if(atFork){
+      const keys=Object.keys(F.forks);
+      const A=F.forks[keys[0]], B=F.forks[keys[1]];
+      // tapping anywhere else already deselects, so no close button is needed
+      var bs=layoutBtns(t.x,t.y,[
+        {act:'forkA', side:'left',  w:20,h:20, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
+        {act:'forkB', side:'right', w:20,h:20, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
+        {act:'sell',  side:'up',    glyph:'coin', num:sell}
+      ]);
+    } else {
+      const cost=nextCost(t);
+      const specs=[{act:'sell', glyph:'coin', side:'left', num:sell}];
+      if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
+      var bs=layoutBtns(t.x,t.y,specs);
+    }
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+  }
+
+  // towers
+  const sorted=G.towers.slice().sort((a,b)=>a.y-b.y);
+  for(const t of sorted){
+    const st=statsOf(t);
+    // no ground shadow: it stands on a bed now, and the shadow read as extra
+    // bed edge underneath, which is what made towers look like they sat high
+    const kick=t.kick>0?1:0;
+    const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
+    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+TOWER_DY+bob+kick, 16,16);
+    // level pips ride the bed's bottom frame row, under the tower's feet
+    const lv=t.level;
+    for(let i=0;i<lv;i++){
+      ctx.fillStyle = i>=3 ? '#a8ecff' : '#ffd452';
+      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+PIP_Y), 2,1);
+    }
+    if(st.aura){
+      const a=(Math.sin(G.time*3)+1)*.5;
+      ring(t.x,t.y,st.rng-1,'#ffd452',.10+a*.10);
+    }
+  }
+
+  // enemies
+  for(const f of G.foes){
+    const E=f.E, w=E.boss?16:12;
+    const fa=Math.max(0,Math.min(1, f.d/16, (PATH_LEN-f.d)/16));   // trail ends
+    ctx.globalAlpha=fa;
+    const bob=E.boss?0:Math.round(Math.sin(f.bob)* (f.type==='moth'?1.5:0.6));
+    shadow(f.x, f.y+ (E.boss?7:5), E.boss?14:9);
+    const fl=(E.flip&&f.face===-1)?-1:1;
+    drawSprite(E.art, fl, f.x, f.y-1+bob, w,w);
+    if(f.hit>0){
+      const img=fl===-1?WHITEF[E.art]:WHITE[E.art];
+      ctx.globalAlpha=fa*Math.min(.85,f.hit*6);
+      ctx.drawImage(img, Math.round(f.x-w/2), Math.round(f.y-1+bob-w/2));
+      ctx.globalAlpha=fa;
+    }
+    if(f.stunT>0){
+      ctx.fillStyle='#ffd452';
+      const a=G.time*9;
+      ctx.fillRect(Math.round(f.x+Math.cos(a)*4),Math.round(f.y-w/2-3+Math.sin(a)*1.5),1,1);
+      ctx.fillRect(Math.round(f.x+Math.cos(a+2.1)*4),Math.round(f.y-w/2-3+Math.sin(a+2.1)*1.5),1,1);
+      ctx.fillRect(Math.round(f.x+Math.cos(a+4.2)*4),Math.round(f.y-w/2-3+Math.sin(a+4.2)*1.5),1,1);
+    }
+    if(f.slow>0){ ctx.fillStyle='rgba(168,236,255,.5)'; ctx.fillRect(Math.round(f.x-3),Math.round(f.y-w/2-3),1,1); ctx.fillRect(Math.round(f.x+2),Math.round(f.y-w/2-4),1,1); }
+    // health bar
+    if(f.hp<f.max){
+      const bw=E.boss?18:11, hp=Math.max(0,f.hp/f.max);
+      const bx=Math.round(f.x-bw/2), by=Math.round(f.y-w/2-4);
+      ctx.fillStyle='#1c1b24'; ctx.fillRect(bx-1,by-1,bw+2,3);
+      ctx.fillStyle=hp>.5?'#6cc16b':(hp>.25?'#ffd452':'#e0524f');
+      ctx.fillRect(bx,by,Math.ceil(bw*hp),1);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // projectiles
+  for(const s of G.shots){
+    ctx.fillStyle=s.col;
+    if(s.kind==='bee'){
+      const o=Math.round(Math.sin(s.wob)*1.2);
+      ctx.fillRect(Math.round(s.x),Math.round(s.y+o),2,2);
+      ctx.fillStyle='rgba(255,255,255,.7)';
+      ctx.fillRect(Math.round(s.x)-1,Math.round(s.y+o)-1,1,1);
+      ctx.fillRect(Math.round(s.x)+2,Math.round(s.y+o)-1,1,1);
+    } else if(s.kind==='drop'){
+      ctx.fillRect(Math.round(s.x)-1,Math.round(s.y),3,2);
+      ctx.fillRect(Math.round(s.x),Math.round(s.y)-1,1,4);
+    } else {
+      ctx.fillRect(Math.round(s.x),Math.round(s.y),2,2);
+    }
+  }
+
+  // effects
+  for(const e of G.fx){
+    const k=e.life/e.ttl;
+    if(e.type==='bit'){ ctx.globalAlpha=1-k; ctx.fillStyle=e.color; ctx.fillRect(Math.round(e.x),Math.round(e.y),1,1); ctx.globalAlpha=1; }
+    else if(e.type==='ring'){ ring(e.x,e.y,e.r+(e.rmax-e.r)*k,e.color,1-k); }
+    else if(e.type==='eaten'){ drawCarrot(e.x,e.y,1-e.life/e.ttl); }
+    else if(e.type==='bolt'){
+      ctx.globalAlpha=Math.min(1,(1-k)*2.2);
+      for(let i=1;i<e.pts.length;i++) pxLine(e.pts[i-1].x,e.pts[i-1].y+1,e.pts[i].x,e.pts[i].y+1,'#3b8fd4');
+      for(let i=1;i<e.pts.length;i++) pxLine(e.pts[i-1].x,e.pts[i-1].y,e.pts[i].x,e.pts[i].y,'#a8ecff');
+      if(k<.5) for(let i=1;i<e.pts.length;i+=2) pxLine(e.pts[i-1].x,e.pts[i-1].y,e.pts[i].x,e.pts[i].y,'#ffffff');
+      ctx.globalAlpha=1;
+    }
+    else if(e.type==='txt'){ ctx.globalAlpha=Math.min(1,(1-k)*2); drawText(Math.round(e.x-textW(e.txt)/2),Math.round(e.y),e.txt,e.color); ctx.globalAlpha=1; }
+  }
+
+  drawPlaque();
+  pending.forEach(drawBtn);
+
+  // dock last so it paints over the field, but appended last so in-world
+  // buttons keep hit priority where they overlap
+  G.btns=G.btns.concat(drawDock());
+  G.btns=G.btns.concat(drawHUD());
+
+  if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(-OX,-OY,ARTW,ARTH); }
+  if(G.screen) G.btns=drawScreen(G.screen);   // on top of everything, and takes every tap
+  ctx.restore();
+}
+
+/* ======================================================================
+   11. LOOP
+   ====================================================================== */
+const SHAKE_SETTLE=2;   // shake units per second while paused: 4 settles in 2s
+let last=performance.now();
+function frame(now){
+  const raw=Math.min(.05,(now-last)/1000); last=now;
+  G.ui+=raw; G.hoverAge+=raw;
+  G.selAge = (G.selPlot>=0 || G.selected) ? (G.selAge||0)+raw : 0;
+  if(G.ghost) G.ghost.age=(G.ghost.age||0)+raw;
+  if(!G.paused && G.phase!=='dead' && G.phase!=='won'){
+    let t=raw*G.speed;
+    while(t>0){ const d=Math.min(1/60,t); step(d); t-=d; }
+  } else if(!G.paused){ G.time+=raw; }
+  // A paused game (a screen is up, or the pause button) runs no step(), so the
+  // shake would freeze at whatever the last hit left. Let it settle in real
+  // time instead, slowly, so a boss kill still rumbles under the map-cleared
+  // screen for a moment and then goes still.
+  if(G.paused && G.shake>0) G.shake=Math.max(0,G.shake-raw*SHAKE_SETTLE);
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ======================================================================
+   12. LAYOUT
+   ====================================================================== */
+const stage=document.getElementById('stage');
+const MAX_SCALE=8;   // sanity ceiling for very large displays only; normally never reached
+
+function applyPad(vw,vh){
+  const want=vw/vh, px0=OX, py0=OY;
+  let px=0, py=0;
+  if(want > W/H) px=Math.min(MAX_PAD_X, Math.round((H*want-W)/2));
+  else           py=Math.min(MAX_PAD_Y, Math.round((W/want-H)/2));
+  if(px===px0 && py===py0 && cv.width===ARTW) return false;
+  OX=px; OY=py; ARTW=W+2*px; ARTH=H+2*py;
+  cv.width=ARTW; cv.height=ARTH;           // resizing clears context state
+  ctx.imageSmoothingEnabled=false;
+  bg.width=ARTW; bg.height=ARTH;
+  seed=1337+G.map*7919;
+  paintBG(curPal);
+  return true;
+}
+
+function layout(){
+  const cs=getComputedStyle(document.body);
+  const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  const padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const vv=window.visualViewport;
+  const vw=(vv?vv.width:window.innerWidth)-padX;
+  const vh=(vv?vv.height:window.innerHeight)-padY;
+  const dpr=window.devicePixelRatio||1;
+  applyPad(Math.max(1,vw), Math.max(1,vh));
+
+  // Fit, then cap.
+  let raw=Math.min(vw/ARTW, vh/ARTH, MAX_SCALE);
+
+  // Snap so one art pixel covers a whole number of DEVICE pixels; that is what
+  // keeps the edges hard. Size beats crispness though, so only take the snap when
+  // it is nearly free (within 5%). On a 2x display the snap costs ~2% and is taken;
+  // on a 3x phone it would cost 12%, so we fill and let the unevenness go unnoticed
+  // at that density.
+  const snapped=Math.floor(raw*dpr)/dpr;
+  const s=(snapped>=0.5 && snapped>=raw*0.95) ? snapped : raw;
+
+  const cw=ARTW*s, ch=ARTH*s;
+  cv.style.width=cw+'px'; cv.style.height=ch+'px';
+  stage.style.width=cw+'px'; stage.style.height=ch+'px';
+  document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
+}
+window.addEventListener('resize',layout);
+window.addEventListener('orientationchange',()=>setTimeout(layout,250));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',layout);
+layout();
+
+/* ======================================================================
+   13. INPUT
+   ====================================================================== */
+function toArt(ev){
+  const r=cv.getBoundingClientRect();
+  return { x:(ev.clientX-r.left)/r.width*ARTW-OX, y:(ev.clientY-r.top)/r.height*ARTH-OY };
+}
+
+function doAction(b){
+  if(b.act==='hud_sound'){ sndOn=!sndOn; SFX.tick(); return; }
+  if(b.act==='hud_speed'){ G.speed = G.speed===1?2:(G.speed===2?3:1); SFX.tick(); return; }
+  if(b.act==='hud_action'){
+    const st=actionState();
+    if(st==='send') startWave(); else G.paused=(st==='pause');
+    return;
+  }
+  if(b.act==='card'){
+    const F=TOWERS[b.fam];
+    if(G.placing===b.fam){ cancelPlacing(); return; }
+    if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
+    G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.selected=null;
+    toast(PLACEMENT==='open' ? 'Tap the ground to preview' : 'Tap a plot to preview');
+    SFX.tick(); return;
+  }
+  if(b.act==='ok'){ placeGhost(); return; }
+  if(b.act==='no'){ cancelPlacing(); return; }   // cross leaves build mode entirely
+  if(b.act==='clear'){
+    if(G.gold<CLEAR_COST){ toast('Not enough coins'); SFX.bad(); return; }
+    const pl=G.plots[b.plot];
+    G.gold-=CLEAR_COST; pl.blocked=false; G.selPlot=-1;
+    G.shake=3; SFX.up();
+    addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:18,ttl:.45,color:'#a97a4f'});
+    for(let k=0;k<8;k++) addFx({type:'bit',x:pl.x,y:pl.y,
+      vx:(Math.random()-.5)*40, vy:-14-Math.random()*20, ttl:.5, color:k<5?'#8a6242':'#5c4433'});
+    return;
+  }
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return;
+  if(b.act==='sell'){
+    const val=Math.floor(t.spent*.6);
+    if(G.plots[t.plot]) G.plots[t.plot].tower=null;
+    if(PLACEMENT==='open'){      // the bed goes with it, and later plots shift down
+      const gi=t.plot;
+      G.plots.splice(gi,1);
+      for(const o of G.towers) if(o.plot>gi) o.plot--;
+    }
+    G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
+    addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
+    SFX.coin(); return;
+  }
+  if(b.act==='up'){
+    const cost=nextCost(t);
+    if(cost===null) return;
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=cost; t.spent+=cost; t.level++; SFX.up();
+    if(t.level===3 && !t.branch) toast('Pick a path: permanent');
+    return;
+  }
+  if(b.act==='forkA'||b.act==='forkB'){
+    const F=TOWERS[t.fam], B=F.forks[b.branch], c0=B.lv[0].cost;
+    if(G.gold<c0){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=c0; t.spent+=c0; t.branch=b.branch; t.level=4;
+    SFX.up(); G.shake=2;
+    addFx({type:'ring',x:t.x,y:t.y,r:2,rmax:22,ttl:.5,color:'#ffd452'});
+    return;
+  }
+}
+cv.addEventListener('pointerdown',ev=>{
+  ev.preventDefault();
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  if(G.screen){ if(b) screenAction(b.act); return; }
+  if(b){ if(b.dis){ toast('Not enough coins'); SFX.bad(); } else doAction(b); return; }
+
+  const i=plotAt(p.x,p.y);
+
+  if(G.placing){
+    if(PLACEMENT==='open'){
+      // tapping a standing tower says so; anywhere else is a build attempt, so
+      // the only way out is the cross or re-tapping the dock card
+      if(i>=0 && G.plots[i].tower){ toast('Plot taken'); return; }
+      const gx=snapTo(p.x), gy=snapTo(p.y);
+      if(!placeOK(gx,gy)){
+        // leave the red frame standing where they tapped: on a touch screen
+        // there is no hover, so the refusal has to be visible somewhere
+        G.hoverPos={x:gx,y:gy,ok:false}; G.hoverAge=SEL_GROW;
+        toast('No room there'); SFX.bad(); return;
+      }
+      if(!G.ghost||G.ghost.x!==gx||G.ghost.y!==gy){
+        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick();
+      }
+      return;
+    }
+    if(i<0){ cancelPlacing(); return; }          // tapping open ground puts it away
+    if(freePlot(i)){
+      if(!G.ghost||G.ghost.i!==i){
+        const q=G.plots[i]; G.ghost={i,x:q.x,y:q.y,age:0}; SFX.tick();
+      }
+    } else toast(G.plots[i].tower ? 'Plot taken' : 'Cleared stumps only');
+    return;
+  }
+  if(i<0){ G.selected=null; G.selPlot=-1; return; }
+  const p2=G.plots[i];
+  if(p2.tower){
+    G.selPlot=-1;
+    G.selected=(p2.tower===G.selected)?null:p2.tower;
+  } else if(p2.blocked){
+    G.selected=null;
+    G.selPlot=(G.selPlot===i)?-1:i;
+  } else { G.selected=null; G.selPlot=-1; }
+},{passive:false});
+
+cv.addEventListener('pointermove',ev=>{
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  G.btnHover=b?b.act:null;
+  if(b){ G.hover=-1; G.hoverPos=null; return; }
+  if(!G.placing){ G.hover=-1; G.hoverPos=null; return; }
+  if(PLACEMENT==='open'){
+    // the frame grows once, when the tower is armed, then tracks the pointer
+    const gx=snapTo(p.x), gy=snapTo(p.y);
+    G.hoverPos={x:gx, y:gy, ok:placeOK(gx,gy)};
+    return;
+  }
+  const i=plotAt(p.x,p.y);
+  const ok = i>=0 && freePlot(i);
+  if(G.hover!==(ok?i:-1)) G.hoverAge=0;
+  G.hover = ok ? i : -1;
+});
+cv.addEventListener('pointerleave',()=>{ G.hover=-1; G.hoverPos=null; G.btnHover=null; });
+
+function placeGhost(){
+  if(!G.placing||!G.ghost) return;
+  const fam=G.placing, cost=TOWERS[fam].cost;
+  let i=G.ghost.i, pl;
+  if(PLACEMENT==='open'){
+    if(!placeOK(G.ghost.x,G.ghost.y)){ toast('No room there'); SFX.bad(); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    pl={x:G.ghost.x, y:G.ghost.y, blocked:false, tower:null};  // the bed is born here
+    G.plots.push(pl); i=G.plots.length-1;
+  } else {
+    pl=G.plots[i];
+    if(!freePlot(i)){ toast('No room there'); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+  }
+  G.gold-=cost;
+  const t={fam,plot:i,x:pl.x,y:pl.y,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost};
+  G.towers.push(t); pl.tower=t;
+  addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:14,ttl:.35,color:'#ffd452'});
+  SFX.place();
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.btnHover=null;
+}
+function cancelPlacing(){
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.btnHover=null;
+}
+
+/* ======================================================================
+   14. UI
+   ====================================================================== */
+// state of the single action control: paused is checked before idle, so a tab
+// that lost focus between waves offers resume before it offers the next wave
+function actionState(){
+  if(!G.started) return 'pause';
+  if(G.paused) return 'resume';
+  if(G.phase==='idle') return 'send';
+  return 'pause';
+}
+
+// what a tower does beyond plain damage, for the plaque's first line
+function effects(st){
+  const x=[];
+  if(st.chain) x.push('CHAIN '+(st.chain+1));
+  if(st.stun) x.push('STUN');
+  if(st.splash) x.push('SPLASH');
+  if(st.slow) x.push('SLOW '+Math.round(st.slow*100)+'%');
+  return x.length ? ' '+x.join(' ') : '';
+}
+function numbers(st){
+  return 'DMG '+st.dmg+' RNG '+(st.rng/TILE).toFixed(1)+' '+(st.aura?'AURA':'DPS '+Math.round(st.dmg*st.rate));
+}
+
+// The info plaque used to be a DOM panel over the field, and it hid part of
+// map 1's bottom loop. It is painted now, in the one spot that is clear of the
+// trail on all three maps at every screen shape: the top band between the
+// read-outs and the buttons. Measured in v31: two lines fit there, three do
+// not fit anywhere on map 3, so every plaque is two lines, and there is no
+// room for a tower picture beside them: the tower is lit up on the field.
+// Line one says what it is and does, line two gives the numbers.
+// A line is a list of segments: [text,colour] or {glyph,colour}.
+const PLQ_L=146, PLQ_R=266, PLQ_H=18;
+const PLQ_NAME='#ffeedd', PLQ_STAT='#cbb495', PLQ_GOLD='#ffd452', PLQ_SH='#241a10';
+function plqTop(){ return -OY+1; }
+function plaqueContent(){
+  if(G.placing){
+    const F=TOWERS[G.placing], st=F.lv[0];
+    return {lines:[[[F.name,PLQ_NAME],[effects(st),PLQ_STAT]],
+      [{glyph:'coin',col:PLQ_GOLD},[F.cost+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
+  }
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    return {lines:[[['Overgrown plot',PLQ_NAME]],
+      [['Clear the stump: ',PLQ_STAT],{glyph:'coin',col:PLQ_GOLD},[String(CLEAR_COST),PLQ_GOLD]]]};
+  }
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return null;
+  const F=TOWERS[t.fam];
+  if(!t.branch && t.level===3){
+    // one line per path, on the same side as its button
+    const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
+    return {lines:[
+      [{glyph:'back',col:PLQ_GOLD},[' '+A.name+': ',PLQ_NAME],[A.desc,PLQ_STAT]],
+      [[B.name+': ',PLQ_NAME],[B.desc+' ',PLQ_STAT],{glyph:'play',col:PLQ_GOLD}]
+    ]};
+  }
+  const st=statsOf(t);
+  return {lines:[[[nameOf(t),PLQ_NAME],[effects(st),PLQ_STAT]],
+    [['LV '+t.level+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
+}
+function segW(s){ return s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
+function lineW(l){ return l.reduce((w,s)=>w+segW(s),0); }
+function drawLine(l,x,y,sh){
+  sh=sh||PLQ_SH;
+  for(const s of l){
+    if(s.glyph) glyph(GL[s.glyph],x,y,s.col,sh);
+    else drawText(x,y,s[0],s[1],sh);
+    x+=segW(s);
+  }
+}
+function plaqueW(c){ return 7+Math.max.apply(null,c.lines.map(lineW)); }
+function drawPlaque(){
+  const y=plqTop();
+  if(G.toast && G.ui-G.toast.t < TOAST_T){         // a toast takes the plaque's spot
+    const age=G.ui-G.toast.t, w=textW(G.toast.msg)+9, h=11;
+    const x=Math.round((PLQ_L+PLQ_R-w)/2);
+    ctx.globalAlpha=Math.min(1,(TOAST_T-age)/0.18);
+    plate(x,y,w,h,'#1f251e','#4b5248');
+    drawText(x+4,y+3,G.toast.msg,'#fff6e5','#0e120e');
+    ctx.globalAlpha=1;
+    return;
+  }
+  const c=plaqueContent();
+  if(!c) return;
+  const w=plaqueW(c), x=Math.round((PLQ_L+PLQ_R-w)/2);
+  plate(x,y,w,PLQ_H,'#3b2a1b','#6b4a30');
+  const tx=x+3;
+  drawLine(c.lines[0],tx,y+3);
+  if(c.lines[1]) drawLine(c.lines[1],tx,y+10);
+}
+
+/* ======================================================================
+   15. SCREENS: title, map cleared, lost, won. They used to be DOM text in a
+   system font over the field; painted here they share the game's pixel font
+   and plates. A screen dims the field and takes every tap while it is up.
+   ====================================================================== */
+const SC_TITLE='#ffd452', SC_HEAD='#ffeedd', SC_BODY='#cbb495', SC_GOLD='#ffd452';
+const SC_SKIN={go:['#4f9d4a','#82d17c','#2c5c2a'], alt:['#3d5f8f','#7aa6dd','#23395a']};
+const SC_MAXW=236;                 // body text wraps here, in art px
+// words of [text,colour] runs, packed into lines no wider than w; a '\n'
+// word starts a new line
+function wrapRuns(runs,w){
+  const lines=[]; let line=[], lw=0;
+  for(const [txt,col] of runs) for(const word of String(txt).split(' ')){
+    if(!word) continue;
+    if(word==='\n'){ if(line.length) lines.push(line); line=[]; lw=0; continue; }
+    const ww=textW(word), sp=line.length?SPACE_W+1:0;
+    if(line.length && lw+sp+ww>w){ lines.push(line); line=[]; lw=0; }
+    const last=line[line.length-1], lead=line.length?' ':'';
+    if(last && last[1]===col) last[0]+=lead+word; else line.push([lead+word,col]);
+    lw+=(line.length>1||lead?sp:0)+ww;
+  }
+  if(line.length) lines.push(line);
+  return lines;
+}
+// same number of lines, but as even as they can be, so no word sits alone
+function wrapEven(runs,w){
+  const n=wrapRuns(runs,w).length;
+  let lo=40, hi=w;
+  while(lo<hi){ const m=(lo+hi)>>1; if(wrapRuns(runs,m).length<=n) hi=m; else lo=m+1; }
+  return wrapRuns(runs,lo);
+}
+function screenContent(kind){
+  const M=MAPS[G.map-1];
+  if(kind==='title') return {
+    title:'Sprout Siege', col:SC_TITLE, shade:'#7a4a12',
+    body:[['Bugs are marching on your carrot patch. \n Tap a card, then any open ground to plant. \n Level 3 picks a specialty. GO sends the next wave.',SC_BODY]],
+    btns:[{act:'sc_start',label:'Start',skin:'go'}], ver:true };
+  if(kind==='rift'){
+    const nx=MAPS[G.map], rate=carrotRate(G.map+1);
+    const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
+    return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
+      head:M.name+' cleared: '+G.lives+' lives carried',
+      body:[['You pack up the kit and step through: '+G.lives+' lives at '+rate+
+        ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
+        [arrive+'.',SC_GOLD]],
+      btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
+  }
+  if(kind==='dead') return { title:'Patch eaten', col:'#ff7b7b', shade:'#5c1f1f',
+      head:M.name+', wave '+Math.max(1,G.wave),
+      body:[['The bugs got through. Replant and try a different mix of specialties.',SC_BODY]],
+      btns:[{act:'sc_again',label:'Plant again',skin:'go'}] };
+  const hp=G.lives;
+  const line = hp>=20 ? 'Not one carrot lost.'
+             : hp>=13 ? 'Chewed at the edges, still standing.'
+             : hp>=6  ? 'More stem than carrot now, but it held.'
+             :          'Down to the last row. That was close.';
+  return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
+    head:'All '+MAPS.length+' plots held, '+hp+' lives left',
+    body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
+    btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
+}
+const SC_T=3, BTN_H=13;            // heading scale, button height
+function drawScreen(kind){
+  const c=screenContent(kind);
+  ctx.fillStyle='rgba(14,18,14,.82)'; ctx.fillRect(-OX,-OY,ARTW,ARTH);
+  const body=wrapEven(c.body,SC_MAXW);
+  const btnW=b=>textW(b.label)+12+(b.arrow?6:0);
+  const rowW=c.btns.reduce((w,b)=>w+btnW(b),0)+(c.btns.length-1)*6;
+  const tw=textW(c.title,SC_T);
+  const innerW=Math.max(tw, c.head?textW(c.head):0, ...body.map(lineW), rowW);
+  const h=5*SC_T+(c.head?12:0)+9+body.length*7+6+BTN_H;
+  const pw=innerW+20, ph=h+18;
+  const px=Math.round((W-pw)/2), py=Math.round((H-ph)/2);
+  plate(px,py,pw,ph,'#3b2a1b','#6b4a30');
+  let y=py+8;
+  drawText(Math.round((W-tw)/2),y,c.title,c.col,c.shade,SC_T);
+  y+=5*SC_T+6;
+  if(c.head){ drawText(Math.round((W-textW(c.head))/2),y,c.head,SC_HEAD,PLQ_SH); y+=12; } else y+=3;
+  for(const l of body){ drawLine(l,Math.round((W-lineW(l))/2),y); y+=7; }
+  y+=6;
+  const out=[]; let bx=Math.round((W-rowW)/2);
+  for(const b of c.btns){
+    const w=btnW(b), sk=SC_SKIN[b.skin], press=G.btnHover===b.act?1:0;
+    plate(bx,y+press,w,BTN_H,sk[0],sk[1]);
+    drawText(bx+6,y+4+press,b.label,'#ffffff',sk[2]);
+    if(b.arrow) glyph(GL.play,bx+w-9,y+4+press,'#ffffff',sk[2]);
+    out.push({act:b.act,x:bx,y,w,h:BTN_H});
+    bx+=w+6;
+  }
+  if(c.ver) drawText(W+OX-3-textW(VERSION),H+OY-8,VERSION,'#6f7a6c');
+  return out;
+}
+function screenAction(act){
+  if(act==='sc_start'){ actx(); G.started=true; G.paused=false; G.phase='idle'; }
+  else if(act==='sc_next'){ loadMap(G.map+1); G.paused=false; SFX.wave(); }
+  else if(act==='sc_again'){ reset(); }
+  else if(act==='sc_endless'){ G.endless=true; G.phase='idle'; G.paused=false; }
+  else return;
+  G.screen=null; G.btnHover=null;
+}
+function showOver(kind){
+  G.paused=true; G.screen=kind; G.selected=null; G.placing=null; G.ghost=null;
+  if(kind==='rift'||kind==='won') SFX.up(); else SFX.bad();
+}
+function reset(){
+  G.lives=MAX_LIVES; G.endless=false; G.pack=0;
+  loadMap(1);
+  G.paused=false;
+}
+
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; } });
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('dblclick',e=>e.preventDefault());
+
+})();
+</script>
+</body>
+</html>
