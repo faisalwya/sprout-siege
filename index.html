@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V33.1';
+const VERSION='V33.2';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 
 const PAL={'.':null,
@@ -1316,8 +1316,9 @@ function glyph(rows,x,y,col,shadow){
   for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
     if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
 }
+// No drop shadow: translucent black on grass read as a murky green band under
+// every plate (removed in v33.2). The light rim is enough to lift it.
 function plate(x,y,w,h,fill,edge){
-  ctx.fillStyle='rgba(0,0,0,.28)'; ctx.fillRect(x+1,y+h,w-2,2);
   ctx.fillStyle=edge; ctx.fillRect(x+1,y,w-2,h); ctx.fillRect(x,y+1,w,h-2);
   ctx.fillStyle=fill; ctx.fillRect(x+2,y+1,w-4,h-2); ctx.fillRect(x+1,y+2,w-2,h-4);
 }
