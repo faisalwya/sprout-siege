@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v33. Read this
+Working document for continuing the build. Last updated with v33.1. Read this
 first; it replaces re-reading the chat.
 
 ---
@@ -15,7 +15,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v33** |
+| Current version | **v33.1** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
 
 ### Campaign
@@ -35,10 +35,11 @@ specialisations at level 3, reaching level 5.
 | Beehive | 85 | Swarm | Wasp Nest (fast single target) / Pollen Bloom (damage aura) |
 
 ### Lives
-20 carrots in a fenced bed whose place each map sets (since v32). Bugs
-break in through the gate where the trail meets the fence. Each life lost
-eats one carrot, **nearest the gate first**, so damage visibly advances
-inward from the breach.
+20 lives, shown as 10 carrots in a fenced bed whose place each map sets
+(since v32). Each carrot takes two bites (v33.1): whole, half eaten, gone.
+Bugs break in through the gate where the trail meets the fence and eat
+**nearest the gate first**, so damage visibly advances inward from the
+breach.
 The HUD counter is a carrot icon, not a heart.
 
 ---
@@ -70,6 +71,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v33.1** | 10 carrots worth 2 lives each (Faisal's call): a bite leaves a half-eaten carrot, beds are half the size (wide 58x27, upright 28x60), freeing ground for towers. Top bar and screens count carrots ("7 and a half carrots"); economy unchanged. |
 | **v33** | Title, map-cleared, won and lost screens painted on the canvas in the pixel font, on a wooden plate, with canvas buttons. The page is now only the canvas (plus the portrait notice). The version label is `const VERSION`, drawn on the title. |
 | **v32** | New maps, picked by Faisal from nine rendered mocks: 1 is a spiral into a bed in the middle, 2 is three long hedge rows from the bottom-right to a bed top-left, 3 is a figure eight that crosses itself, bed top-left. The bed's place comes from map data and is fenced, with a gate where the trail enters. |
 | **v31** | The last DOM in play is gone: toast and info plaque are painted on the canvas, in a band at the top that is clear of the trail on all three maps. Full A to Z pixel font. Upgrade is an arrow; sell is the top bar's gold coin (Faisal's call over a coin with a plus, which read as obscure), refunds green. |
@@ -89,7 +91,12 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    that tries the preferred side then the others, rejecting anything off-frame
    or overlapping.
 4. **Towers level 1 to 3, fork, then 4 to 5.** The fork is permanent.
-5. **Carrots are lives**, eaten gate-first. Numbers stay in the HUD alongside.
+5. **Carrots are lives**, eaten gate-first, **two lives per carrot** (v33.1,
+   Faisal's call: 20 carrots made the bed too big). Lives stay 20 inside the
+   game (`MAX_LIVES`, `BITES`); the HUD and screens count carrots, with a
+   half-eaten icon and "and a half" when a carrot is bitten, so the number
+   always matches the bed. Coins per carrot are doubled, so economy is
+   unchanged.
 6. **Scaling: fill, do not letterbox.** Integer-snap only when it costs under
    5% of size, otherwise fill and accept uneven pixels. An adaptive margin
    (`ARTW/ARTH/OX/OY`) extends the world into taller-than-game screens

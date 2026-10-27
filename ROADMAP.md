@@ -129,6 +129,13 @@ like one thing.
 **Done when:** no DOM is visible at any point in landscape; smoke test
 drives the screens through canvas taps and passes.
 
+## v33.1: Half the carrots [x]
+
+Faisal, 27 Oct: the bed was too big. 10 carrots, each worth 2 lives; a bite
+leaves a half-eaten carrot. Beds shrink to fit (wide 5x2, upright 2x5),
+freeing ground for towers. Top bar and screens count carrots. Economy
+unchanged.
+
 ## v34: Armor and balance [ ]
 
 1. **Armor bug:** armor is a flat cut per hit, so small fast hits are gutted.

@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V33';
+const VERSION='V33.1';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 
 const PAL={'.':null,
@@ -308,7 +308,7 @@ const MAPS=[
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
   wp:[[-2.37,4],[1.38,4],[3.25,2],[8.88,1.63],[15.88,2],[18,4],[17.63,6.5],[14.5,7.38],[8.88,7.38],[6.88,5.75],[7.5,4.13],[10.25,4]],
-  bed:{x:150,y:52,o:'h'},
+  bed:{x:150,y:59,o:'h'},
   pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
        dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
        flowers:['#ffd452','#f58fbf','#ffeedd','#a8ecff']},
@@ -325,7 +325,7 @@ const MAPS=[
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[184,100,1],[12,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[97,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
   wp:[[21.38,7.25],[17,7.25],[8.25,7.25],[7.38,5.75],[8.88,4.5],[17,4.5],[18.25,3.13],[17,1.75],[8.88,2],[5.13,2.13],[2,3]],
-  bed:{x:6,y:34,o:'h'},
+  bed:{x:6,y:43,o:'h'},
   pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
        dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
        flowers:['#a8ecff','#ffeedd','#c9a0ff','#ffd452']},
@@ -342,7 +342,7 @@ const MAPS=[
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[120,61,1],[202,56,1],[16,68,0],[149,103,0],[259,92,0],[59,90,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[110,89,0],[161,50,0],[65,25,0],[157,20,0],[110,123,0],[220,121,0]],
   wp:[[-2.37,5.25],[3.25,5.25],[6.38,5.5],[9.5,4],[13.25,2],[17.31,2.63],[18.13,5.25],[15.13,6.88],[12,6],[9.5,4],[6.38,2.5],[3.88,2.38],[1.69,2.38]],
-  bed:{x:6,y:22,o:'h'},
+  bed:{x:6,y:33,o:'h'},
   pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
        dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
        flowers:['#ffd452','#ff9a3c','#ffeedd','#f58fbf']},
@@ -618,14 +618,18 @@ function paintBG(pal){
     q.fillStyle = k<.45?'#7d5238':(k<.85?'#5a3a27':'#8a6242');
     q.fillRect(px,py,1,1);
   }
-  const sx=bw/48, sy=bh/60;                     // laid out for the upright bed
+  const sx=bw/48, sy=bh/60;                     // laid out for the old 48x60 bed
+  // a stone or sprout on a carrot's spot would hide its bites
+  const clear=(x,y)=>CARROT_SLOTS.every(c=>Math.abs(c.x-x)>4||Math.abs(c.y-y)>5);
   [[6,15],[33,22],[4,44],[30,52]].forEach(st=>{
     const x=bx0+Math.round(st[0]*sx), y=by0+Math.round(st[1]*sy);
+    if(!clear(x,y)) return;
     q.fillStyle='#8e9285'; q.fillRect(x,y,3,2);
     q.fillStyle='#b3b8a8'; q.fillRect(x,y,2,1);
   });
   [[19,20],[20,38],[3,26],[36,33],[17,54]].forEach(sp=>{
     const x=bx0+Math.round(sp[0]*sx), y=by0+Math.round(sp[1]*sy);
+    if(!clear(x,y)) return;
     q.fillStyle='#4f9d4a'; q.fillRect(x,y,1,1);
     q.fillStyle='#2f6b36'; q.fillRect(x-1,y-1,1,1);
     q.fillStyle='#7fd07c'; q.fillRect(x+1,y-1,1,1);
@@ -652,12 +656,25 @@ function paintBG(pal){
 /* ======================================================================
    4b. THE CARROTS: one per life, eaten from the gate inward
    ====================================================================== */
-const MAX_CARROTS=20;
+// 20 lives, 10 carrots: each carrot takes two bites, whole, half eaten, gone.
+// The top bar and the screens count carrots, so they match the bed.
+const MAX_LIVES=20, BITES=2, MAX_CARROTS=MAX_LIVES/BITES;
 let CARROT_SLOTS=[];
-function layoutCarrots(){        // 4 x 5 grid (5 x 4 in a wide bed), fixed jitter
+// how many lives' worth of carrot is left, in words: "9 and a half carrots"
+function carrotWords(lives){
+  const whole=Math.floor(lives/BITES), half=lives%BITES;
+  if(!whole) return half ? 'half a carrot' : 'no carrots';
+  return whole+(half?' and a half':'')+(whole===1&&!half?' carrot':' carrots');
+}
+// the same as a short number for floating text: 2, 1/2, 2 1/2
+function carrotNum(lives){
+  const whole=Math.floor(lives/BITES), half=lives%BITES;
+  return (whole?String(whole):'')+(whole&&half?' ':'')+(half?'1/2':'');
+}
+function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitter
   let sd=7777;
   const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
-  const cols=BED.o==='h'?5:4, rows=BED.o==='h'?4:5;
+  const cols=BED.o==='h'?5:2, rows=BED.o==='h'?2:5;
   // centred in the bed: a carrot covers x-2..x+3 and y-2..y+3 of its slot
   const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
   const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
@@ -873,11 +890,11 @@ function clearOfTrail(x,y){
       if(distToPath(ix,iy) < TRAIL_CLEAR) return false;
   return true;
 }
-// The carrot bed: where the map puts it, upright (4 x 5 carrots) or wide (5 x 4).
+// The carrot bed: where the map puts it, upright (2 x 5 carrots) or wide (5 x 2).
 // Its fence and a margin are no-build ground.
-let BED={x:278,y:66,w:48,h:60,o:'v'}, CARROT_BOX={l:272,t:62,r:332,b:130};
+let BED={x:278,y:66,w:28,h:60,o:'v'}, CARROT_BOX={l:272,t:58,r:312,b:132};
 function setBed(b){
-  const w=b.o==='h'?58:48, h=b.o==='h'?49:60;
+  const w=b.o==='h'?58:28, h=b.o==='h'?27:60;
   BED={x:b.x,y:b.y,w,h,o:b.o};
   CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
 }
@@ -911,10 +928,12 @@ function placeOK(x,y){
 }
 function snapTo(v){ return Math.round(v/SNAP)*SNAP; }
 function drawCarrots(){
-  const eaten=Math.max(0,MAX_CARROTS-G.lives);
-  for(let i=eaten;i<MAX_CARROTS;i++){
+  const lost=MAX_LIVES-G.lives;       // bites taken, nearest the gate first
+  for(let i=0;i<MAX_CARROTS;i++){
+    const left=1-Math.min(BITES,Math.max(0,lost-i*BITES))/BITES;
+    if(left<=0) continue;
     const sl=CARROT_SLOTS[i];
-    drawCarrot(sl.x, sl.y+Math.round(Math.sin(G.ui*1.1+i)*0.4), 1);
+    drawCarrot(sl.x, sl.y+Math.round(Math.sin(G.ui*1.1+i)*0.4), left);
   }
 }
 
@@ -925,7 +944,7 @@ const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 cv.width=W; cv.height=H; ctx.imageSmoothingEnabled=false;
 
 const G={
-  gold:150, lives:20, map:1, pack:0, wave:0, phase:'idle', // idle | wave | rift | dead | won
+  gold:150, lives:MAX_LIVES, map:1, pack:0, wave:0, phase:'idle', // idle | wave | rift | dead | won
   speed:1, paused:true, started:false,
   towers:[], foes:[], shots:[], fx:[], flies:[],
   queue:[], qt:0, shake:0, flash:0, time:0,
@@ -1158,18 +1177,20 @@ function step(dt){
     if(f.d>=PATH_LEN){
       f.dead=true; f.leaked=true;
       const loss=(f.E.lives||1);
-      const from=Math.max(0,MAX_CARROTS-G.lives);
+      const from=MAX_LIVES-G.lives;
       G.lives=Math.max(0,G.lives-loss);
-      const to=Math.max(0,MAX_CARROTS-G.lives);
-      for(let ci=from; ci<to && ci<MAX_CARROTS; ci++){      // show each one go
-        const sl=CARROT_SLOTS[ci];
+      const to=MAX_LIVES-G.lives;
+      const bitten=new Set();
+      for(let b=from; b<to; b++) bitten.add(Math.floor(b/BITES));
+      for(const ci of bitten){                               // show each bite land
+        const sl=CARROT_SLOTS[ci]; if(!sl) continue;
         addFx({type:'eaten',x:sl.x,y:sl.y,ttl:.45});
         for(let k=0;k<5;k++) addFx({type:'bit',x:sl.x+1,y:sl.y,
           vx:(Math.random()-.5)*34, vy:-16-Math.random()*16, ttl:.5,
           color:k<3?'#ff9a3c':'#4f9d4a'});
       }
       G.shake=5; G.flash=1; SFX.hurt();
-      addFx({type:'txt',x:W-40,y:H/2-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
+      addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+carrotNum(loss),color:'#ff7b7b',ttl:1,vy:-14});
       if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
     }
   }
@@ -1444,11 +1465,14 @@ function drawDock(){
 function drawHUD(){
   const SH='#17200f';                         // the shadow every read-out carries
   const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
-  const car=ART.carrot;
-  ctx.drawImage(car, x0, y0+1);
+  const car=ART.carrot, left=String(Math.ceil(G.lives/BITES));
+  if(G.lives%BITES){                          // a half-eaten carrot: its root is gone
+    ctx.save(); ctx.beginPath(); ctx.rect(x0,y0+1,car.width,6); ctx.clip();
+    ctx.drawImage(car, x0, y0+1); ctx.restore();
+  } else ctx.drawImage(car, x0, y0+1);
   let x=x0+car.width+1;
-  drawText(x, y0+3, String(G.lives), '#ffffff', SH);
-  x+=textW(String(G.lives))+7;
+  drawText(x, y0+3, left, '#ffffff', SH);
+  x+=textW(left)+7;
   glyph(GL.coin, x, y0+3, '#ffd452', SH);
   x+=7;
   drawText(x, y0+3, String(G.gold), '#ffd452', SH);
@@ -2148,8 +2172,8 @@ function screenContent(kind){
     const nx=MAPS[G.map], rate=carrotRate(G.map+1);
     const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
     return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
-      head:M.name+' cleared: '+G.lives+' carrots carried',
-      body:[['You pack up the kit and step through: '+G.lives+' carrots at '+rate+
+      head:M.name+' cleared: '+carrotWords(G.lives)+' carried',
+      body:[['You pack up the kit and step through: '+carrotWords(G.lives)+' at '+rate*BITES+
         ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
         [arrive+'.',SC_GOLD]],
       btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
@@ -2164,7 +2188,7 @@ function screenContent(kind){
              : hp>=6  ? 'More stem than carrot now, but it held.'
              :          'Down to the last row. That was close.';
   return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
-    head:'All '+MAPS.length+' plots held, '+hp+' carrots left',
+    head:'All '+MAPS.length+' plots held, '+carrotWords(hp)+' left',
     body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
     btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
 }
@@ -2212,7 +2236,7 @@ function showOver(kind){
   if(kind==='rift'||kind==='won') SFX.up(); else SFX.bad();
 }
 function reset(){
-  G.lives=20; G.endless=false; G.pack=0;
+  G.lives=MAX_LIVES; G.endless=false; G.pack=0;
   loadMap(1);
   G.paused=false;
 }
