@@ -136,6 +136,11 @@ Faisal, 27 Oct: the bed was too big. Still 20 lives, drawn as 10 carrots of
 5x2, upright 2x5), freeing ground for towers. Top bar and screens keep
 counting lives.
 
+## v33.2: No plate shadow [x]
+
+Faisal, 27 Oct: the 2px translucent shadow under every plate (buttons,
+panels, price chips) read as a murky green band on grass. Removed.
+
 ## v34: Armor and balance [ ]
 
 1. **Armor bug:** armor is a flat cut per hit, so small fast hits are gutted.
