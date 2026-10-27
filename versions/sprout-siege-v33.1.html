@@ -656,21 +656,11 @@ function paintBG(pal){
 /* ======================================================================
    4b. THE CARROTS: one per life, eaten from the gate inward
    ====================================================================== */
-// 20 lives, 10 carrots: each carrot takes two bites, whole, half eaten, gone.
-// The top bar and the screens count carrots, so they match the bed.
+// 20 lives, drawn as 10 carrots: each carrot takes two bites, whole, half
+// eaten, gone. Every number the player reads (top bar, screens) counts lives;
+// only the bed shows them in halves, which keeps it small.
 const MAX_LIVES=20, BITES=2, MAX_CARROTS=MAX_LIVES/BITES;
 let CARROT_SLOTS=[];
-// how many lives' worth of carrot is left, in words: "9 and a half carrots"
-function carrotWords(lives){
-  const whole=Math.floor(lives/BITES), half=lives%BITES;
-  if(!whole) return half ? 'half a carrot' : 'no carrots';
-  return whole+(half?' and a half':'')+(whole===1&&!half?' carrot':' carrots');
-}
-// the same as a short number for floating text: 2, 1/2, 2 1/2
-function carrotNum(lives){
-  const whole=Math.floor(lives/BITES), half=lives%BITES;
-  return (whole?String(whole):'')+(whole&&half?' ':'')+(half?'1/2':'');
-}
 function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitter
   let sd=7777;
   const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
@@ -1190,7 +1180,7 @@ function step(dt){
           color:k<3?'#ff9a3c':'#4f9d4a'});
       }
       G.shake=5; G.flash=1; SFX.hurt();
-      addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+carrotNum(loss),color:'#ff7b7b',ttl:1,vy:-14});
+      addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
       if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
     }
   }
@@ -1465,14 +1455,11 @@ function drawDock(){
 function drawHUD(){
   const SH='#17200f';                         // the shadow every read-out carries
   const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
-  const car=ART.carrot, left=String(Math.ceil(G.lives/BITES));
-  if(G.lives%BITES){                          // a half-eaten carrot: its root is gone
-    ctx.save(); ctx.beginPath(); ctx.rect(x0,y0+1,car.width,6); ctx.clip();
-    ctx.drawImage(car, x0, y0+1); ctx.restore();
-  } else ctx.drawImage(car, x0, y0+1);
+  const car=ART.carrot;
+  ctx.drawImage(car, x0, y0+1);
   let x=x0+car.width+1;
-  drawText(x, y0+3, left, '#ffffff', SH);
-  x+=textW(left)+7;
+  drawText(x, y0+3, String(G.lives), '#ffffff', SH);
+  x+=textW(String(G.lives))+7;
   glyph(GL.coin, x, y0+3, '#ffd452', SH);
   x+=7;
   drawText(x, y0+3, String(G.gold), '#ffd452', SH);
@@ -2172,8 +2159,8 @@ function screenContent(kind){
     const nx=MAPS[G.map], rate=carrotRate(G.map+1);
     const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
     return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
-      head:M.name+' cleared: '+carrotWords(G.lives)+' carried',
-      body:[['You pack up the kit and step through: '+carrotWords(G.lives)+' at '+rate*BITES+
+      head:M.name+' cleared: '+G.lives+' lives carried',
+      body:[['You pack up the kit and step through: '+G.lives+' lives at '+rate+
         ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
         [arrive+'.',SC_GOLD]],
       btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
@@ -2188,7 +2175,7 @@ function screenContent(kind){
              : hp>=6  ? 'More stem than carrot now, but it held.'
              :          'Down to the last row. That was close.';
   return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
-    head:'All '+MAPS.length+' plots held, '+carrotWords(hp)+' left',
+    head:'All '+MAPS.length+' plots held, '+hp+' lives left',
     body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
     btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
 }

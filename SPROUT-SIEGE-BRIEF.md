@@ -71,7 +71,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
-| **v33.1** | 10 carrots worth 2 lives each (Faisal's call): a bite leaves a half-eaten carrot, beds are half the size (wide 58x27, upright 28x60), freeing ground for towers. Top bar and screens count carrots ("7 and a half carrots"); economy unchanged. |
+| **v33.1** | Still 20 lives, drawn as 10 carrots of 2 bites each (Faisal's call): a bite leaves a half-eaten carrot, beds are half the size (wide 58x27, upright 28x60), freeing ground for towers. Top bar and screens count lives. |
 | **v33** | Title, map-cleared, won and lost screens painted on the canvas in the pixel font, on a wooden plate, with canvas buttons. The page is now only the canvas (plus the portrait notice). The version label is `const VERSION`, drawn on the title. |
 | **v32** | New maps, picked by Faisal from nine rendered mocks: 1 is a spiral into a bed in the middle, 2 is three long hedge rows from the bottom-right to a bed top-left, 3 is a figure eight that crosses itself, bed top-left. The bed's place comes from map data and is fenced, with a gate where the trail enters. |
 | **v31** | The last DOM in play is gone: toast and info plaque are painted on the canvas, in a band at the top that is clear of the trail on all three maps. Full A to Z pixel font. Upgrade is an arrow; sell is the top bar's gold coin (Faisal's call over a coin with a plus, which read as obscure), refunds green. |
@@ -91,12 +91,12 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    that tries the preferred side then the others, rejecting anything off-frame
    or overlapping.
 4. **Towers level 1 to 3, fork, then 4 to 5.** The fork is permanent.
-5. **Carrots are lives**, eaten gate-first, **two lives per carrot** (v33.1,
-   Faisal's call: 20 carrots made the bed too big). Lives stay 20 inside the
-   game (`MAX_LIVES`, `BITES`); the HUD and screens count carrots, with a
-   half-eaten icon and "and a half" when a carrot is bitten, so the number
-   always matches the bed. Coins per carrot are doubled, so economy is
-   unchanged.
+5. **Carrots are lives**, eaten gate-first, **drawn two lives per carrot**
+   (v33.1, Faisal's call: 20 carrots made the bed too big). There are 20
+   lives (`MAX_LIVES`) and every number the player reads counts them: HUD,
+   screens, the red "-N". Only the bed shows them in halves (`BITES`): 10
+   carrots, whole, half eaten, gone. Counting carrots in the HUD was tried
+   in the same version and dropped: Faisal wants the total to read 20.
 6. **Scaling: fill, do not letterbox.** Integer-snap only when it costs under
    5% of size, otherwise fill and accept uneven pixels. An adaptive margin
    (`ARTW/ARTH/OX/OY`) extends the world into taller-than-game screens
