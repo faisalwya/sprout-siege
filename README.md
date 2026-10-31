@@ -5,8 +5,8 @@ trail toward your carrot patch; plant gnomes, sprinklers, zap lamps and
 beehives to stop them. Three maps, five waves each, towers that fork into
 specialities at level 3.
 
-**Play:** https://faisalwya.github.io/sprout-siege/ (built for iPhone in
-landscape).
+**Play:** https://faisalwya.github.io/sprout-siege/ or
+https://sprout-siege.netlify.app (built for iPhone in landscape).
 
 ## Which file decides what
 

@@ -16,7 +16,7 @@ patch; you plant garden-themed towers along the way to stop them.
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
 | Current version | **v33.2** |
-| Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages, serves `main`). See section 9. |
+| Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages) and `sprout-siege.netlify.app` (Netlify), both serve `main`. See section 9. |
 
 ### Campaign
 Three maps, five waves each. Lives carry between maps, towers do not. Gold
@@ -53,7 +53,7 @@ This is a standing requirement, not a one-off.
 |---|---|
 | v1 | First playable. Single map. |
 | v2 | Confirm-before-place preview. Catmull-Rom spline trail with perpendicular meander. Text scaling fix. |
-| **v3** | Deployed to Netlify. That site is retired; GitHub Pages replaced it. |
+| **v3** | First Netlify deploy. Netlify now auto-deploys `main` alongside GitHub Pages. |
 | v4 | Scaling pass. Initially a regression: scale was capped at 4x and framed, losing 13%. Fixed by raising the cap to 8 and tightening snap tolerance to 95%. |
 | v6 | Wave button folded into the top-right play/pause control. Static size, green, labelled GO. |
 | v8 | Campaign: three maps, map-to-map transition. |
@@ -301,16 +301,24 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 
 ## 9. Deployment
 
-- **Live:** https://faisalwya.github.io/sprout-siege/ via GitHub Pages,
-  publishing `index.html` from `main`. **Merging a pull request is the
-  deploy**: the site updates a minute or two later.
+- **Live, two places, both from `main`:**
+  - https://faisalwya.github.io/sprout-siege/ via GitHub Pages.
+  - https://sprout-siege.netlify.app via Netlify, linked to the GitHub repo
+    on 31 Oct 2026 (no build command, publish directory `.`).
+  **Merging a pull request is the deploy**: both sites update a minute or
+  two later. Everything in the repo is published, so `versions/` and
+  `labs/` pages are reachable on both.
 - **Preview before merging:** Pages only shows `main`, so each pull request
   gets a private Claude artifact of its `index.html` for phone testing.
 - **Rollback:** copy the previous `versions/sprout-siege-vN.html` over
   `index.html` and merge that.
-- Cloud sessions cannot open `github.io` (egress 403), so the live site can
-  only be checked from a phone or computer.
-- Netlify (`sprout-siege.netlify.app`) is retired; ignore it.
+- Netlify also builds a preview for each pull request. Previews sit behind
+  the Netlify team login (production does not), so they only open for
+  Faisal when signed in to Netlify; the Claude artifact stays the default.
+- Cloud sessions cannot open `github.io` or `netlify.app` (egress 403), so
+  the live sites can only be checked from a phone or computer. The Netlify
+  connector can still read deploy status (which commit is live, ready or
+  failed).
 
 ---
 
