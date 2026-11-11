@@ -1,0 +1,2771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2b3a2e">
+<title>Sprout Siege</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{height:100%;overflow:hidden;position:fixed;inset:0;background:#12150f;overscroll-behavior:none}
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, #1e2419 0%, #10130d 70%, #0a0c08 100%);
+  }
+  body{
+    display:flex;align-items:center;justify-content:center;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    color:#fff6e5;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action:none;
+  }
+  #stage{position:relative;line-height:0;border-radius:3px;overflow:hidden}
+  body.framed #stage{
+    box-shadow:0 0 0 1px #39412f, 0 0 0 5px #1b2015, 0 20px 44px rgba(0,0,0,.6);
+  }
+  canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;background:#6cc16b}
+  #rotate{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:.6em;
+    background:#191d19;z-index:50;text-align:center;padding:2em;font-size:14px
+  }
+  @media (orientation:portrait){#rotate{display:flex}#stage{visibility:hidden}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+</div>
+<div id="rotate"><div style="font-size:2em">&#128241;</div><div>Turn your phone sideways</div></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ======================================================================
+   1. CONSTANTS & ART
+   ====================================================================== */
+const VERSION='V34 P9';
+const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
+// v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
+// logic, layout and input stay in game units; only drawing gets finer. Art
+// starts as the B (1x) art, doubled with Scale2x so curves lose their stairs,
+// then FINE adds detail that only exists at 2x.
+const ART_RES=2, FINE=true;   // P5: the ground is painted natively at 2x; FINE now only adds sprite glints
+
+const PAL={'.':null,
+  k:'#17141f', K:'#2f2a3d', w:'#ffffff', W:'#ffeedd',
+  s:'#f6c9a0', S:'#d99a6c', r:'#e0524f', R:'#9e2f34',
+  g:'#6cc16b', G:'#3d8a4d', b:'#59b0e6', B:'#2f6fae',
+  y:'#ffd452', Y:'#c98f2b', n:'#a97a4f', N:'#6b4a30',
+  p:'#f58fbf', P:'#a057b8', c:'#cfd3e0', C:'#8d92a8',
+  o:'#ff9a3c', i:'#a8ecff'
+};
+
+// v34 look: shared light and outline ink (see the LOOK PASS note by paintBG)
+const INK=[29,24,40];
+const LIGHT=(()=>{ const v=[-0.5,-0.65,0.57], n=Math.hypot(v[0],v[1],v[2]); return v.map(c=>c/n); })();
+const RAMP_TH={5:[-0.25,0.30,0.72,0.93], 4:[-0.2,0.38,0.85], 3:[0.0,0.7]};
+
+function scale2x(src){
+  const w=src.width, h=src.height;
+  const d=src.getContext('2d').getImageData(0,0,w,h).data;
+  const o=document.createElement('canvas'); o.width=w*2; o.height=h*2; o._s=2;
+  const oc=o.getContext('2d'), im=oc.createImageData(w*2,h*2), D=im.data;
+  const px=(x,y)=>{ x=x<0?0:(x>=w?w-1:x); y=y<0?0:(y>=h?h-1:y); return (y*w+x)*4; };
+  const eq=(a,b)=>d[a]===d[b]&&d[a+1]===d[b+1]&&d[a+2]===d[b+2]&&d[a+3]===d[b+3];
+  const put=(x,y,s)=>{ const i=(y*w*2+x)*4; D[i]=d[s];D[i+1]=d[s+1];D[i+2]=d[s+2];D[i+3]=d[s+3]; };
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const P=px(x,y), A=px(x,y-1), B=px(x+1,y), C=px(x-1,y), Dd=px(x,y+1);
+    put(2*x,  2*y,   (eq(C,A)&&!eq(C,Dd)&&!eq(A,B))?A:P);
+    put(2*x+1,2*y,   (eq(A,B)&&!eq(A,C)&&!eq(B,Dd))?B:P);
+    put(2*x,  2*y+1, (eq(Dd,C)&&!eq(Dd,B)&&!eq(C,A))?C:P);
+    put(2*x+1,2*y+1, (eq(B,Dd)&&!eq(B,A)&&!eq(Dd,C))?Dd:P);
+  }
+  oc.putImageData(im,0,0);
+  return o;
+}
+// FINE: a one-pixel glint on each eye and on the brightest patch of a sprite,
+// the kind of detail a 2x grid can hold and 1x cannot.
+function glint(c){
+  if(!FINE) return c;
+  const w=c.width, h=c.height, x=c.getContext('2d'), im=x.getImageData(0,0,w,h), d=im.data;
+  const lum=i=>d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11;
+  let best=-1, bi=-1;
+  const eyes=[];
+  for(let y=0;y<h-1;y++) for(let X=0;X<w-1;X++){
+    const i=(y*w+X)*4; if(!d[i+3]) continue;
+    // eye: a 2x2 block of the near-black eye colour (#1d1828)
+    if(d[i]===29&&d[i+1]===24&&d[i+2]===40){
+      const r=i+4, b=i+w*4;
+      if(d[r]===29&&d[b]===29 && (X%2===0) && (y%2===0)) eyes.push(i);
+    }
+    const L=lum(i); if(L>best && d[i+3]){ best=L; bi=i; }
+  }
+  for(const i of eyes){ d[i]=255; d[i+1]=250; d[i+2]=240; }
+  if(bi>=0 && best<250){ d[bi]=Math.min(255,d[bi]+60); d[bi+1]=Math.min(255,d[bi+1]+60); d[bi+2]=Math.min(255,d[bi+2]+50); }
+  x.putImageData(im,0,0);
+  return c;
+}
+
+function mkSprite(rows){
+  // keep the source rows so a sprite can be re-derived with an outline later
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  for(let j=0;j<h;j++){ const row=rows[j];
+    for(let i=0;i<w;i++){ const col=PAL[row[i]]; if(col){ x.fillStyle=col; x.fillRect(i,j,1,1); } }
+  }
+  c._rows=rows;
+  return c;
+}
+function flipped(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  c._s=src._s; const x=c.getContext('2d'); x.translate(src.width,0); x.scale(-1,1); x.drawImage(src,0,0);
+  return c;
+}
+
+const ART={};
+ART.gnome=mkSprite([
+"................","................",".......rr.......","......rrrr......",
+"......rRRr......",".....rrRRrr.....","....rrRRRRrr....","...rrrrrrrrrr...",
+".....ssssss.....",".....skssks.....",".....wwwwww.....","....wwwwwwww....",
+"....bwwwwwwb....","....bbwwwwbb....","....NN....NN....","................"]);
+ART.gnomeA=mkSprite([
+"................",".......b........","......bb........","......bBb.......",
+".....bbBb.......",".....bBBbb......","....bbBBBb......","...bbbbbbbbb....",
+".....ssssss.....",".....sksscs.....",".....wwwwww.....","....wwwwwwww....",
+"....cwwwwwwc....","....ccwwwwcc....","....NN....NN....","................"]);
+ART.gnomeB=mkSprite([
+"................","................","................","......gggg......",
+".....gggggg.....","....gGgggGgg....","...gggggggggg...",".....ssssss.....",
+".....skssks.....",".....swwwws.....","....wwwwwwww....","...gwwwwwwwwg...",
+"...ggwwwwwwgg...","....wwwwwwww....","....NN....NN....","................"]);
+
+ART.sprink=mkSprite([
+"................","................","......cccc......",".....bCccCb.....",
+".....cccccc.....","......cCCc......","......cCCc......","......cccc......",
+"......cCCc......","......cCCc......","......cCCc......",".....CccccC.....",
+"....ccCCCCcc....",".....cccccc.....",".......nn.......","................"]);
+ART.sprinkA=mkSprite([
+"................","....b......b....",".....bb..bb.....","....cccccccc....",
+"...cCcbbbbcCc...","....cccccccc....",".....cCCCCc.....","......cCCc......",
+"......cCCc......","......cCCc......",".....ccCCcc.....","....cCCCCCCc....",
+"....cccccccc....",".....cccccc.....",".......nn.......","................"]);
+ART.sprinkB=mkSprite([
+"................",".....i....i.....","......iiii......",".....icccci.....",
+"...iiccccccii...","....cccccccc....",".....cCCCCc.....","......iCCi......",
+"......cCCc......","......cCCc......",".....ccCCcc.....","....cciiiicc....",
+"....cccccccc....",".....cccccc.....",".......nn.......","................"]);
+
+ART.hive=mkSprite([
+"................","......yyyy......",".....yyyyyy.....","....yYyyyyYy....",
+"....yyyyyyyy....","...yyyyyyyyyy...","...yYyykkyyYy...","...yyyykkyyyy...",
+"...yyyyyyyyyy...","....yyyyyyyy....","....yYyyyyYy....",".....yyyyyy.....",
+"......yyyy......",".......nn.......",".......nn.......","................"]);
+ART.hiveA=mkSprite([
+"................",".....CCCCCC.....","....CCCCCCCC....","...CCCkkkkCCC...",
+"...CCCCCCCCCC...","...CCkkkkkkCC...","...CCCCCCCCCC...","....CCkkkkCC....",
+"....CCCCCCCC....",".....CCCCCC.....","......CCCC......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.hiveB=mkSprite([
+"................",".....p....p.....","....ppp..ppp....","...pppppppppp...",
+"...pppyyyyppp...","...ppyYYYYypp...","...ppyYYYYypp...","...pppyyyyppp...",
+"...pppppppppp...","....ppp..ppp....",".....p.GG.p.....","......gGg.......",
+"......gGg.......","......gGg.......","......gGg.......","................"]);
+
+ART.zap=mkSprite([
+"................",".......cc.......","......cccc......",".....cciicc.....",
+"....cciiiicc....","....ciiwwiic....","....ciwwwwic....","....ciiwwiic....",
+"....cciiiicc....",".....cciicc.....","......cccc......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.zapA=mkSprite([
+"................","..b....cc....b..","...b..cccc..b...",".....cciicc.....",
+"....ciiiiiic....","....ciwwwwic....","...ciiwwwwiic...","....ciwwwwic....",
+"....ciiiiiic....",".....cciicc.....","..b...cccc...b..","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+ART.zapB=mkSprite([
+"................",".......o........","......ooo.......",".......o........",
+"......CCCC......",".....CooooC.....","....CCooooCC....","....CoCooCoC....",
+"....CCooooCC....",".....CooooC.....","......CCCC......","......nnnn......",
+"......nnnn......",".......nn.......",".......nn.......","................"]);
+
+ART.carrot=mkSprite([
+"..g.g..","..ggg..","...G...","..ooo..","..ooo..","...oo..","...o..."]);
+
+ART.grub=mkSprite([
+"............","............","............","....gggg....",
+"...gggggg...","..ggkggkgg..","..gggggggg..","..gGggggGg..",
+"...GGGGGG...","............","............","............"]);
+ART.beetle=mkSprite([
+"............","............","....kkkk....","...kPPPPk...",
+"..kPwPPPPk..","..kPPPPPPk..","..kPPkPPPk..","..kPPkPPPk..",
+"..kkPPPPkk..","...k.kk.k...","............","............"]);
+ART.snail=mkSprite([
+"............","...nnnnn....","..nnYYYnn...",".nnYYnYYnn..",
+".nYYnnnYYn..",".nYYYYYYYn..","..nnnnnnn...","..sssssssss.",
+".ssssssssss.",".sssssssks..","..SSSSSSSS..","............"]);
+ART.moth=mkSprite([
+"............","..w......w..",".www.nn.www.","wwww.nn.wwww",
+"wwwWWnnWWwww","wwww.nn.wwww",".www.nn.www.","..w..kk..w..",
+"............","............","............","............"]);
+ART.slug=mkSprite([
+"................","................","......kk..kk....","......PP..PP....",
+".....PPPPPPPP...","....PPPPPPPPPP..","...PPPwPPPPwPP..","..PPPPPPPPPPPP..",
+"..PPPPPPPPPPPP..",".PPPPiiiiPPPPPP.",".PPPPPPPPPPPPPP.",".PPPPPPPPPPPPPP.",
+"..PPPPPPPPPPPP..","...PPPPPPPPPP...","..iiiiiiiiiiii..","................"]);
+
+// Towers get a 1px dark contour: without it a flat sprite on flat grass reads
+// as a tile rather than as a thing standing in a garden. Enemies stay clean so
+// they keep reading as small and quick.
+['gnome','gnomeA','gnomeB','sprink','sprinkA','sprinkB','zap','zapA','zapB','hive','hiveA','hiveB','carrot']
+  .forEach(k=>{ ART[k]=mkOutlined(ART[k]._rows, PAL); });
+
+
+// v34 look pass: placeholder shaded base towers and all five bugs, drawn to the B
+// direction (one light from the top left, ramps, coloured outlines). They are
+// stand-ins so the new ground can be judged; hand-drawn sprites replace them.
+// Fork art keeps its old pixels but takes the new outline.
+// P2: bugs reshaded (side view, facing right; the moth stays top down).
+const BUG_OUTLINE=true;   // brief: bugs were unoutlined to read small and quick; re-test
+const SPR_B={};
+SPR_B.gnome=[["..................", "..................", "..................", "..........a.......", ".........abc......", "........adbec.....", ".......adbffc.....", "......abdbffc.....", ".....abdbbffec....", "....aadffffeec....", "...afffffeeeaac...", "....ccghijhklc....", "....mnopgpkqrm....", "...mstuuuuuustv...", "...mwxuuuuunwtv...", "...kjxtquuuxtgl...", "...kgpttuuxxgpl...", "....llxxxummvl....", "....yzzAyzzzAB....", ".....BBBBBBBB.....", "..................", "..................", "..................", ".................."],{"a": "#7d172b", "b": "#e37558", "c": "#481829", "d": "#ed9e74", "e": "#ab2830", "f": "#d84a3e", "g": "#efbd94", "h": "#1d1828", "i": "#f7e4b3", "j": "#f3d2a3", "k": "#8b5448", "l": "#4e3336", "m": "#18286f", "n": "#7e756b", "o": "#eeede6", "p": "#bd856b", "q": "#aba59b", "r": "#494246", "s": "#72c3e3", "t": "#3c78c0", "u": "#d9d6cf", "v": "#1b1f48", "w": "#569ed1", "x": "#284c98", "y": "#401c17", "z": "#6e4a32", "A": "#573123", "B": "#2d1a20"}];
+SPR_B.sprink=[["..................", "..................", "..................", ".....ab.cc.ba.....", "...b...cdef...b...", "..a...gchcfg...a..", ".....giijkllm.....", "....gljjlllkkm....", ".....mllkkkgm.....", "......mmjlmm......", ".......gjlm.......", ".......gjlm.......", ".......gjlm.......", ".......gjlm.......", ".......gjlm.......", ".......gjlm.......", ".....ccgjlmcc.....", "....cddddeehhf....", ".....feehhhcf.....", "......ffffff......", "..................", "..................", "..................", ".................."],{"a": "#81e3f2", "b": "#67c8ea", "c": "#2f3043", "d": "#80889a", "e": "#5d6273", "f": "#252334", "g": "#4b516a", "h": "#45485b", "i": "#bfd0de", "j": "#a9b8ca", "k": "#6d7790", "l": "#93a0b6", "m": "#323246"}];
+SPR_B.zap=[["..................", "..................", "..................", "......aaaaaa......", ".....abbcccde.....", ".....fgddaahi.....", "....fggggggjhi....", "....fggkkklhhi....", "....fggkkklhmi....", "....fjgkklghmi....", "....fhhhlghmmi....", ".....ihhhmmmi.....", ".....accccdae.....", "......eebcee......", ".......abce.......", ".......abce.......", "......aabcea......", ".....annbccde.....", ".....acccddae.....", "......eeeeee......", "..................", "..................", "..................", ".................."],{"a": "#2f3043", "b": "#80889a", "c": "#5d6273", "d": "#45485b", "e": "#252334", "f": "#3c638c", "g": "#a6fcfa", "h": "#7fd6f2", "i": "#2b3a55", "j": "#92ecf7", "k": "#fff8ec", "l": "#c8f6ff", "m": "#5b99bf", "n": "#a6b0c0"}];
+SPR_B.hive=[["..................", "..................", "..................", "........aa........", "......aabcda......", ".....abbbcced.....", ".....afceeacd.g...", "....abbbccceed....", "....afcceeeaed....", "...abbbbbccceed...", "....dcccceeead....", "...abbbaaaaceed...", "...acccccceeead...", "...abfeehhaaeed...", "...acccchheeead...", "....ddeeeeaadd....", "......ddijkd......", "......llmmkl......", ".....ljmjjjlk.....", "......kkkkkk......", "..................", "..................", "..................", ".................."],{"a": "#873d0c", "b": "#efcd48", "c": "#e9a92c", "d": "#4d291b", "e": "#b86d1a", "f": "#f5e966", "g": "#f9ee72", "h": "#42200a", "i": "#b6935f", "j": "#7a4830", "k": "#382024", "l": "#592a1f", "m": "#9a6c45"}];
+SPR_B.grub=[["............", "............", "............", "........aa..", "...aaaaabcd.", "..abcebebccd", ".aebbbcbcfgd", ".acccccccggd", "..dggggggad.", "...ddddddd..", "............", "............"],{"a": "#2c7123", "b": "#a0d367", "c": "#7cc24f", "d": "#244026", "e": "#c2e482", "f": "#1d1828", "g": "#509937"}];
+SPR_B.grubClean=[["............", "............", "............", "............", "........ab..", "...abcacabb.", "..caaababde.", "..bbbbbbbee.", "...eeeeeef..", "............", "............", "............"],{"a": "#a0d367", "b": "#7cc24f", "c": "#c2e482", "d": "#1d1828", "e": "#509937", "f": "#2c7123"}];
+SPR_B.beetle=[["............", "............", "............", "...aaaaaa...", "..abccadde..", ".abcbbaddfeg", ".adbbdadhhij", ".addddafkkjg", "..efffafajgl", "...emmmmmml.", "....m.m.m...", "............"],{"a": "#3e2466", "b": "#b268c6", "c": "#d584db", "d": "#8f4fb0", "e": "#2c1d44", "f": "#63378b", "g": "#2f3043", "h": "#80889a", "i": "#fff8ec", "j": "#45485b", "k": "#5d6273", "l": "#252334", "m": "#1d1828"}];
+SPR_B.beetleClean=[["............", "............", "............", "............", "...abbcdd...", "..abaacdde..", "..daadcdffgh", "..ddddceiihj", "...eeecechj.", "....k.k.k...", "............", "............"],{"a": "#b268c6", "b": "#d584db", "c": "#3e2466", "d": "#8f4fb0", "e": "#63378b", "f": "#80889a", "g": "#fff8ec", "h": "#45485b", "i": "#5d6273", "j": "#2f3043", "k": "#1d1828"}];
+SPR_B.snail=[["............", "............", "....aaaa....", "...abccde.f.", "..abbaadgehi", ".adccdadgeji", ".addaaaggei.", "..eddaggaeff", "..fkgggalllm", ".fllllllmmmf", "..iimmmmffii", "....iiiiii.."],{"a": "#7e4319", "b": "#eee076", "c": "#e3c45a", "d": "#d9a441", "e": "#492b21", "f": "#875e4f", "g": "#ab702b", "h": "#eed8ae", "i": "#4d383a", "j": "#1d1828", "k": "#f3e8bd", "l": "#e8c6a0", "m": "#b78f75"}];
+SPR_B.snailClean=[["............", "............", "............", "....abbc....", "...aaddce.f.", "..cbbcdce.g.", "..ccdddee...", "...ccdeed...", "...heeediiij", "..iiiiiijjjk", "....jjjjkk..", "............"],{"a": "#eee076", "b": "#e3c45a", "c": "#d9a441", "d": "#7e4319", "e": "#ab702b", "f": "#eed8ae", "g": "#1d1828", "h": "#f3e8bd", "i": "#e8c6a0", "j": "#b78f75", "k": "#875e4f"}];
+SPR_B.moth=[["............", ".....a.a....", "..bbacacabb.", ".bdefcacdefg", "gedefhideffh", "gffjfhiefjhh", ".gfhhiklfhhg", "..gefkkcfhg.", "..bfhhlffhg.", "..bhbbcbbbg.", "...gggmggg..", "............"],{"a": "#000000", "b": "#7c768b", "c": "#502e28", "d": "#f5eff8", "e": "#efeaf4", "f": "#e9e4f0", "g": "#484255", "h": "#b1abbe", "i": "#aa906f", "j": "#8f4fb0", "k": "#8a6a52", "l": "#6d4a3b", "m": "#342228"}];
+SPR_B.mothClean=[["............", "............", ".....a.a....", "..bcda.abcd.", ".cbcdefbcdde", ".ddgdefcdgee", "..deefhidee.", "...cdhhade..", "...deeidde..", "...ejjajjj..", "............", "............"],{"a": "#502e28", "b": "#f5eff8", "c": "#efeaf4", "d": "#e9e4f0", "e": "#b1abbe", "f": "#aa906f", "g": "#8f4fb0", "h": "#8a6a52", "i": "#6d4a3b", "j": "#7c768b"}];
+SPR_B.slug=[["................", "................", "............aaa.", "...........abcbd", "...........aeded", "....aaaaaaaaeded", "..aafffccggfeged", ".acfffcecgffcged", ".accceccgeccgged", "agccccgggggggead", ".dggeggegeeeead.", ".aegggeeeeeeahi.", "jkkeeeeeeeaahhji", ".ihhhhaaahhjjji.", "..iiiijjjjiiii..", "......iiii......"],{"a": "#452a6b", "b": "#1d1828", "c": "#bb73cc", "d": "#2f2046", "e": "#6d4191", "f": "#db8edf", "g": "#9a5bb8", "h": "#89afbf", "i": "#3a4355", "j": "#5d788c", "k": "#b9e9f2"}];
+SPR_B.slugClean=[["................", "................", "................", "............aba.", "............c.c.", "............c.c.", "....dddbbeedcec.", "..bdddbcbeddbec.", "..bbbcbbecbbeec.", ".ebbbbeeeeeeecf.", "..eeceececcccf..", "..ceeeccccccfg..", ".hhcccccccffggi.", "..ggggfffggiii..", "......iiii......", "................"],{"a": "#1d1828", "b": "#bb73cc", "c": "#6d4191", "d": "#db8edf", "e": "#9a5bb8", "f": "#452a6b", "g": "#89afbf", "h": "#b9e9f2", "i": "#5d788c"}];
+function mkSpriteP(rows,pal){
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){ const col=pal[rows[j][i]]; if(col){ x.fillStyle=col; x.fillRect(i,j,1,1); } }
+  return c;
+}
+['gnome','sprink','zap','hive'].forEach(k=>{ ART[k]=mkSpriteP(SPR_B[k][0],SPR_B[k][1]); });
+['grub','beetle','snail','moth','slug'].forEach(k=>{
+  ART[k]=mkSpriteP.apply(null, BUG_OUTLINE?SPR_B[k]:SPR_B[k+'Clean']);
+});
+// shaded coin for the top bar and the dock (the plaque keeps the glyph)
+const COIN_ROWS=[".ddd.","dlyyd","dyyYd","dyYYd",".ddd."];
+const COIN=mkSpriteP(COIN_ROWS,{d:'#94611b',l:'#fff0b0',y:'#f2c23c',Y:'#cf8f24'});
+const COIN_DIM=mkSpriteP(COIN_ROWS,{d:'#5a5e6e',l:'#c9cdd8',y:'#9aa0b0',Y:'#7a7f90'});
+
+Object.keys(ART).forEach(k=>{ ART[k]=glint(scale2x(ART[k])); });
+// P9: base towers 10% smaller, drawn natively at 2x with a 2px outline
+// (placeholders; fork art at levels 4 and 5 keeps its old size for now)
+ART.gnome=mkSpriteP(["....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", ".....................a..............", "....................aaa.............", "...................aabcc............", "..................aadecc............", ".................aafdecc............", "................aaffdebcc...........", "...............aadfddebcc...........", "..............aadffddeebcc..........", "..............aaffddeeebcc..........", ".............aafffddeeebcc..........", "............aadffdddeeebbcc.........", "...........aadfffdddeeeebcc.........", ".........aaadfffddddeeeebcc.........", "........aaaedddeeeeeeebbbbcc........", ".......aaeeeeeeeeeebbbbbbaacc.......", "........acbbbbbgbbbbgaaaaacc........", ".........cccchhhhiihjjklccc.........", ".........mccclhhhnhjjkllccm.........", "........mmmmoppjjjjkkqrsmmmm........", ".......mmtuvtpppwwwqqqrxtuvyy.......", ".......mmtuvxqqqqqqqqqqutuvyy.......", ".......mmuvvxqqqqqqqqqruuvvyy.......", "......mmvvvxxqqqqqqqqqovvvxmyy......", ".......myvxxmurrqqqqqoxvvxxyy.......", ".......kkinhvvvrqqqqoxxxinhll.......", ".......kkhhjvvvvvqqqxxxmhhjll.......", "........kljkxxxxxxqxxxmmjjll........", ".........lllzxxxxxxxmmmABll.........", ".........CCDDDmxxmmmmmAAEBB.........", ".........CCAAAEEEByAAAEECBB.........", "..........CBEECCBByBEECCBB..........", "...........BBBBBB..BBBBBB...........", "............BBBB....BBBB............", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "...................................."],{"a": "#7d172b", "b": "#ab2830", "c": "#481829", "d": "#e37558", "e": "#d84a3e", "f": "#ed9e74", "g": "#1d1828", "h": "#efbd94", "i": "#f7e4b3", "j": "#bd856b", "k": "#8b5448", "l": "#4e3336", "m": "#18286f", "n": "#f3d2a3", "o": "#7e756b", "p": "#eeede6", "q": "#d9d6cf", "r": "#aba59b", "s": "#494246", "t": "#72c3e3", "u": "#569ed1", "v": "#3c78c0", "w": "#e3e2da", "x": "#284c98", "y": "#1b1f48", "z": "#bea573", "A": "#6e4a32", "B": "#2d1a20", "C": "#401c17", "D": "#967550", "E": "#573123"}); ART.gnome._s=2;
+ART.sprink=mkSpriteP(["....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "................aaaa................", "..........b..c.aaaaaa.c..b..........", "........c.....aaddefgg.....c........", ".............aaeeffhhgg.............", "......b......iaghhhaggi......b......", "...........iiiijjjkkkliii...........", "..........iiimmmmjkjkkklii..........", ".........iikjjjjjjkkkknnill.........", ".........iikjjjjkkkkknnnill.........", ".........iikkkkkkkknnnniill.........", "..........ilnnnnnnnnniiill..........", "...........llllnnniiillll...........", "............llikjjknilll............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", ".............iikjjknill.............", "............aiikjjknilla............", "...........aaaikjjknilaaa...........", "..........aaeddkjjkniffhgg..........", ".........aaeeeeeefffffhhhgg.........", ".........aaffffffffhhhhhagg.........", "..........aghhhhhhhhhaaagg..........", "...........gggggggggggggg...........", "............gggggggggggg............", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "...................................."],{"a": "#2f3043", "b": "#81e3f2", "c": "#67c8ea", "d": "#a6b0c0", "e": "#80889a", "f": "#5d6273", "g": "#252334", "h": "#45485b", "i": "#4b516a", "j": "#a9b8ca", "k": "#93a0b6", "l": "#323246", "m": "#bfd0de", "n": "#6d7790"}); ART.sprink._s=2;
+ART.zap=mkSpriteP(["....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "...............aaaaaa...............", ".............aaaaaaaaaa.............", "............aaabbccddeaa............", "...........aacbcccdddffee...........", "...........aaddddddffffee...........", "...........ggeffffffaaegg...........", "..........gghhhhhhhhhiijkk..........", "..........gghhhhhhhhhiijkk..........", ".........gghhhhhllllhijjjkk.........", ".........gghhhhllllllijjjkk.........", "........gghhhhllllllmmjjnnkk........", "........ggihhhllllllmhjjnnkk........", ".........gkhhhlllllmmhjnnkk.........", ".........ggiiiilmmmmhjnnnkk.........", ".........ggjiiimmmhhhnnnnkk.........", "..........gkjjjjjjjjnnnnkk..........", "...........kkjjjjjnnnnnkk...........", "............kkbbcccddfee............", "...........aaddddddfffaee...........", "............aeeffffaaeee............", ".............eeeccdfeee.............", "..............aaccdfee..............", "..............aaccdfee..............", "..............aaccdfee..............", "..............aaccdfee..............", "............aaaaccdfeeaa............", "...........aaaabccdfdeaaa...........", "..........aacbbcccdfddffee..........", "..........aaddddddddfffaee..........", "...........aeffffffffaaee...........", "............eeeeeeeeeeee............", ".............eeeeeeeeee.............", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "...................................."],{"a": "#2f3043", "b": "#a6b0c0", "c": "#80889a", "d": "#5d6273", "e": "#252334", "f": "#45485b", "g": "#3c638c", "h": "#a6fcfa", "i": "#92ecf7", "j": "#7fd6f2", "k": "#2b3a55", "l": "#fff8ec", "m": "#c8f6ff", "n": "#5b99bf"}); ART.zap._s=2;
+ART.hive=mkSpriteP(["....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", ".................aa.................", "................aaaa................", "..............aaabcdda..............", ".............aaabbcedaa.............", "............aabbeeffefdd............", "...........aacbbcceeeffdd...........", "...........aaeeeeeeeffadd...........", "..........aaabeeeffffaedaa.g........", ".........aacbbbbaaaaeeeffdd.........", ".........aacccccceeeeefffdd.........", ".........aaeeeeeeeefffffadd.........", "........aaabfffffffffaaafdaa........", ".......aaccbbbccaaaaeeeefffdd.......", ".......aaeccccceeeeeeeffffadd.......", "........adeeeeeeeeeffffffadd........", "........aabfffffffffffaaafdd........", ".......aaccbbccaaaaaaeeefffdd.......", "......aaecccccceeeeeeefffffadd......", ".......adeeeeeeeeeefffffffadd.......", "........ddffffffhhhhfffaaadd........", ".......aacccccffhhhhaaeefffdd.......", ".......aaeecceeehhhheeffffadd.......", ".......aafeeeeeeeefffffffaadd.......", "........addffffffffffaaaaddd........", ".........ddddddddijkddddddd.........", "...........dddddlijkkdddd...........", ".............llllijklll.............", "............llliijjjmkll............", "...........lljjjjjjmmmlkk...........", "............lkmmmmmmllkk............", ".............kkkkkkkkkk.............", "..............kkkkkkkk..............", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "....................................", "...................................."],{"a": "#873d0c", "b": "#f5e966", "c": "#efcd48", "d": "#4d291b", "e": "#e9a92c", "f": "#b86d1a", "g": "#f9ee72", "h": "#42200a", "i": "#b6935f", "j": "#9a6c45", "k": "#382024", "l": "#592a1f", "m": "#7a4830"}); ART.hive._s=2;
+
+const COIN2=glint(scale2x(COIN)), COIN2_DIM=scale2x(COIN_DIM);
+const FLIP={}; ['gnome','gnomeA','gnomeB','grub','beetle','snail','moth','slug'].forEach(k=>FLIP[k]=flipped(ART[k]));
+function whiten(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  c._s=src._s; const x=c.getContext('2d'); x.drawImage(src,0,0);
+  x.globalCompositeOperation='source-atop'; x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height);
+  return c;
+}
+const WHITE={}, WHITEF={};
+Object.keys(ART).forEach(k=>{ WHITE[k]=whiten(ART[k]); if(FLIP[k]) WHITEF[k]=whiten(FLIP[k]); });
+
+// 3x5 pixel font: digits, A to Z and a little punctuation. Upper case only;
+// drawText upper-cases what it is given. Punctuation is narrower than 3px so
+// "2.9" does not read as "2 . 9"; every glyph advances its own width plus 1.
+const GLYPH={
+ '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+ '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+ '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+ '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
+ '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+ 'A':['111','101','111','101','101'],'B':['110','101','110','101','110'],
+ 'C':['111','100','100','100','111'],'D':['110','101','101','101','110'],
+ 'E':['111','100','110','100','111'],'F':['111','100','110','100','100'],
+ 'G':['111','100','101','101','111'],'H':['101','101','111','101','101'],
+ 'I':['111','010','010','010','111'],'J':['001','001','001','101','111'],
+ 'K':['101','101','110','101','101'],'L':['100','100','100','100','111'],
+ 'M':['101','111','111','101','101'],'N':['110','101','101','101','101'],
+ 'O':['111','101','101','101','111'],'P':['111','101','111','100','100'],
+ 'Q':['111','101','101','111','001'],'R':['110','101','110','101','101'],
+ 'S':['111','100','111','001','111'],'T':['111','010','010','010','010'],
+ 'U':['101','101','101','101','111'],'V':['101','101','101','101','010'],
+ 'W':['101','101','111','111','101'],'X':['101','101','010','101','101'],
+ 'Y':['101','101','010','010','010'],'Z':['111','001','010','100','111'],
+ '+':['000','010','111','010','000'],'-':['000','000','111','000','000'],
+ '/':['001','001','010','100','100'],'%':['101','001','010','100','101'],
+ '?':['111','001','011','000','010'],
+ ':':['0','1','0','1','0'],'.':['0','0','0','0','1'],
+ ',':['00','00','00','01','10'],'!':['1','1','1','0','1']
+};
+const SPACE_W=3;
+// sc scales every font pixel to an sc x sc block, for headings
+function drawText(x,y,txt,color,shadow,sc){
+  txt=String(txt).toUpperCase(); sc=sc||1;
+  const pass=(ox,oy)=>{
+    let cx=x;
+    for(const ch of txt){
+      const g=GLYPH[ch];
+      if(!g){ cx+=(SPACE_W+1)*sc; continue; }
+      for(let j=0;j<5;j++) for(let i=0;i<g[j].length;i++)
+        if(g[j][i]==='1') ctx.fillRect(cx+i*sc+ox,y+j*sc+oy,sc,sc);
+      cx+=(g[0].length+1)*sc;
+    }
+  };
+  if(shadow){ ctx.fillStyle=shadow; pass(sc,sc); }  // offset copy first, so light text reads on any ground
+  ctx.fillStyle=color; pass(0,0);
+}
+function textW(t,sc){
+  let w=0;
+  for(const ch of String(t).toUpperCase()){ const g=GLYPH[ch]; w+=(g?g[0].length:SPACE_W)+1; }
+  return Math.max(0,w-1)*(sc||1);
+}
+
+/* ======================================================================
+   2. TOWER & ENEMY DATA
+   ====================================================================== */
+const TOWERS={
+  gnome:{
+    name:'Gnome Post', cost:45, art:'gnome', flip:true,
+    blurb:'Steady single-target pebbles.',
+    lv:[ {dmg:12,rng:46,rate:0.90}, {dmg:19,rng:50,rate:1.00,cost:40}, {dmg:28,rng:54,rate:1.10,cost:70} ],
+    forks:{
+      deadeye:{name:'Deadeye Gnome', art:'gnomeA', flip:true, desc:'long shot',
+        lv:[{dmg:85,rng:110,rate:0.55,cost:130},{dmg:150,rng:124,rate:0.60,cost:220}]},
+      rascal:{name:'Rascal Gnome', art:'gnomeB', flip:true, desc:'fast, short',
+        lv:[{dmg:16,rng:54,rate:3.4,cost:130},{dmg:24,rng:58,rate:4.2,cost:220}]}
+    }
+  },
+  sprink:{
+    name:'Sprinkler', cost:70, art:'sprink',
+    blurb:'Splash damage, soaks and slows.',
+    lv:[ {dmg:9,rng:52,rate:0.70,splash:14,slow:.25,slowT:1.2},
+         {dmg:14,rng:56,rate:0.80,splash:16,slow:.25,slowT:1.2,cost:55},
+         {dmg:20,rng:60,rate:0.90,splash:18,slow:.3,slowT:1.4,cost:95} ],
+    forks:{
+      geyser:{name:'Geyser', art:'sprinkA', desc:'big splash',
+        lv:[{dmg:45,rng:66,rate:0.90,splash:26,slow:.2,slowT:1,cost:150},
+            {dmg:75,rng:70,rate:1.00,splash:30,slow:.2,slowT:1,cost:250}]},
+      frost:{name:'Frostmist', art:'sprinkB', desc:'deep slow',
+        lv:[{dmg:12,rng:66,rate:1.20,splash:24,slow:.55,slowT:2.0,cost:150},
+            {dmg:18,rng:72,rate:1.30,splash:28,slow:.68,slowT:2.6,cost:250}]}
+    }
+  },
+  zap:{
+    name:'Zap Lamp', cost:95, art:'zap',
+    blurb:'Arcs between bugs standing too close together.',
+    lv:[ {dmg:14,rng:50,rate:0.80,chain:2,fall:.65},
+         {dmg:20,rng:54,rate:0.90,chain:3,fall:.68,cost:55},
+         {dmg:28,rng:58,rate:1.00,chain:3,fall:.72,cost:95} ],
+    forks:{
+      storm:{name:'Storm Lamp', art:'zapA', desc:'more chains',
+        lv:[{dmg:44,rng:72,rate:1.10,chain:6,fall:.80,cost:155},
+            {dmg:68,rng:78,rate:1.20,chain:8,fall:.85,cost:255}]},
+      jolt:{name:'Jolt Post', art:'zapB', desc:'big hit, stun',
+        lv:[{dmg:120,rng:62,rate:0.80,chain:0,stun:.35,cost:155},
+            {dmg:200,rng:66,rate:0.90,chain:0,stun:.55,cost:255}]}
+    }
+  },
+  hive:{
+    name:'Beehive', cost:85, art:'hive',
+    blurb:'Homing bees that never miss.',
+    lv:[ {dmg:10,rng:58,rate:1.10}, {dmg:15,rng:62,rate:1.30,cost:60}, {dmg:21,rng:66,rate:1.50,cost:100} ],
+    forks:{
+      wasp:{name:'Wasp Nest', art:'hiveA', desc:'fast homing',
+        lv:[{dmg:34,rng:74,rate:2.2,cost:160},{dmg:52,rng:82,rate:2.6,cost:260}]},
+      pollen:{name:'Pollen Bloom', art:'hiveB', desc:'damage aura',
+        lv:[{dmg:26,rng:52,rate:0,aura:true,cost:160},
+            {dmg:45,rng:58,rate:0,aura:true,slow:.2,cost:260}]}
+    }
+  }
+};
+const FAMS=['gnome','sprink','zap','hive'];
+
+const ENEMIES={
+  grub  :{hp:24,  spd:34, bounty:4,  art:'grub',   flip:true, r:4, name:'Grub'},
+  beetle:{hp:58,  spd:26, bounty:7,  art:'beetle', flip:true, r:5, name:'Beetle'},
+  snail :{hp:140, spd:17, bounty:13, art:'snail',  flip:true, r:5, armor:2, name:'Snail'},
+  moth  :{hp:46,  spd:52, bounty:8,  art:'moth',   flip:true, r:5, noSlow:true, name:'Moth'},
+  slug  :{hp:1500,spd:13, bounty:90, art:'slug',   flip:true, r:7, armor:4, slowRes:.7, boss:true, lives:5, name:'Grand Slug'}
+};
+
+// [type, count, gap, delay]: five waves per map, boss on the fifth
+const WAVES_PER_MAP=5;
+const MAPS=[
+ {
+  name:'The Carrot Patch',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
+  wp:[[-2.37,4],[1.38,4],[3.25,2],[8.88,1.63],[15.88,2],[18,4],[17.63,6.5],[14.5,7.38],[8.88,7.38],[6.88,5.75],[7.5,4.13],[10.25,4]],
+  bed:{x:150,y:59,o:'h'},
+  pal:{g1:'#6cc16b',g2:'#66bb66',speck:'#5cb25d',bright:'#7fd07c',dark:'#3d8a4d',
+       dirt:'#c9a06a',edge:'#8f6a44',inner:'#d8b482',hedgeA:'#3d8a4d',hedgeB:'#2f6f3c',
+       flowers:['#ffd452','#f58fbf','#ffeedd','#a8ecff']},
+  waves:[
+   {m:1.00,g:[['grub',8,0.85]]},
+   {m:1.10,g:[['grub',12,0.60]]},
+   {m:1.20,g:[['beetle',7,0.90],['grub',8,0.50,4]]},
+   {m:1.30,g:[['moth',8,0.70],['grub',6,0.60,5]]},
+   {m:1.20,g:[['slug',1,1,0],['grub',10,0.50,2]]}
+  ]
+ },
+ {
+  name:'The Long Hedge',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[238,84,1],[100,79,1],[137,61,0],[35,33,0],[184,100,1],[12,43,0],[234,51,0],[246,116,0],[188,66,0],[145,94,0],[97,40,0],[60,45,0],[143,124,0],[194,27,0],[119,20,0],[267,22,0]],
+  wp:[[21.38,7.25],[17,7.25],[8.25,7.25],[7.38,5.75],[8.88,4.5],[17,4.5],[18.25,3.13],[17,1.75],[8.88,2],[5.13,2.13],[2,3]],
+  bed:{x:6,y:43,o:'h'},
+  pal:{g1:'#5fb864',g2:'#59b05f',speck:'#4fa557',bright:'#74c877',dark:'#357f45',
+       dirt:'#bd9461',edge:'#845f3c',inner:'#cfa877',hedgeA:'#357f45',hedgeB:'#2a6335',
+       flowers:['#a8ecff','#ffeedd','#c9a0ff','#ffd452']},
+  waves:[
+   {m:1.15,g:[['beetle',9,0.70]]},
+   {m:1.25,g:[['grub',16,0.35],['moth',4,0.70,6]]},
+   {m:1.40,g:[['snail',4,1.20],['beetle',10,0.60,3]]},
+   {m:1.50,g:[['moth',12,0.45],['beetle',9,0.70,4]]},
+   {m:1.35,g:[['slug',1,1,0],['moth',10,0.50,3],['grub',12,0.35,7]]}
+  ]
+ },
+ {
+  name:'The Bramble',
+  // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
+  plots:[[120,61,1],[202,56,1],[16,68,0],[149,103,0],[259,92,0],[59,90,1],[105,32,0],[65,58,0],[163,80,0],[211,89,0],[110,89,0],[161,50,0],[65,25,0],[157,20,0],[110,123,0],[220,121,0]],
+  wp:[[-2.37,5.25],[3.25,5.25],[6.38,5.5],[9.5,4],[13.25,2],[17.31,2.63],[18.13,5.25],[15.13,6.88],[12,6],[9.5,4],[6.38,2.5],[3.88,2.38],[1.69,2.38]],
+  bed:{x:6,y:33,o:'h'},
+  pal:{g1:'#7ec267',g2:'#77bb62',speck:'#6aa957',bright:'#93d178',dark:'#4a8a3c',
+       dirt:'#cfa065',edge:'#94693f',inner:'#e0bb85',hedgeA:'#4a8a3c',hedgeB:'#3a6d30',
+       flowers:['#ffd452','#ff9a3c','#ffeedd','#f58fbf']},
+  waves:[
+   {m:1.30,g:[['beetle',10,0.50],['grub',10,0.35,4]]},
+   {m:1.45,g:[['moth',14,0.40],['grub',8,0.40,6]]},
+   {m:1.65,g:[['snail',5,1.00],['beetle',11,0.50,3]]},
+   {m:1.80,g:[['grub',26,0.24],['moth',10,0.45,6]]},
+   {m:1.55,g:[['slug',2,2.5,0],['moth',10,0.40,4],['beetle',10,0.50,8]]}
+  ]
+ }
+];
+function waveDef(n){
+  const M=MAPS[G.map-1];
+  if(n<=M.waves.length) return M.waves[n-1];
+  const k=n-M.waves.length;   // endless, once the last plot has been held
+  return {m:2.6+k*0.45, g:[
+    ['slug',1+Math.floor(k/2),2.5,0],
+    ['moth',10+k*2,0.35,3],
+    ['snail',4+k,0.9,6],
+    ['beetle',12+k*2,0.4,9]
+  ]};
+}
+
+/* ======================================================================
+   3. MAP GEOMETRY: rebuilt at runtime, one map at a time
+   ====================================================================== */
+let WP=[], PTS=[], SEG=[], PATH_LEN=0;
+
+// Centripetal Catmull-Rom through the waypoints: rounds the corners like a trail
+// worn in by feet rather than drawn with a ruler.
+function spline(P,step){
+  const first={x:2*P[0].x-P[1].x, y:2*P[0].y-P[1].y};
+  const last={x:2*P[P.length-1].x-P[P.length-2].x, y:2*P[P.length-1].y-P[P.length-2].y};
+  const cp=[first].concat(P,[last]);
+  const knot=(t,a,b)=>t+Math.pow(Math.hypot(b.x-a.x,b.y-a.y),0.5);
+  const out=[];
+  for(let i=0;i+3<cp.length;i++){
+    const p0=cp[i],p1=cp[i+1],p2=cp[i+2],p3=cp[i+3];
+    const t0=0,t1=knot(t0,p0,p1),t2=knot(t1,p1,p2),t3=knot(t2,p2,p3);
+    const n=Math.max(6,Math.ceil(Math.hypot(p2.x-p1.x,p2.y-p1.y)/step));
+    for(let k=0;k<n;k++){
+      const t=t1+(t2-t1)*(k/n);
+      const L=(a,b,ta,tb)=>({x:((tb-t)*a.x+(t-ta)*b.x)/(tb-ta), y:((tb-t)*a.y+(t-ta)*b.y)/(tb-ta)});
+      const A1=L(p0,p1,t0,t1),A2=L(p1,p2,t1,t2),A3=L(p2,p3,t2,t3);
+      const B1=L(A1,A2,t0,t2),B2=L(A2,A3,t1,t3);
+      out.push(L(B1,B2,t1,t2));
+    }
+  }
+  out.push({x:P[P.length-1].x,y:P[P.length-1].y});
+  return out;
+}
+
+// Gentle meander on top of the curve, faded out at both ends so the entry and
+// the garden gate still line up.
+function meander(pts){
+  const src=pts.map(q=>({x:q.x,y:q.y}));
+  let run=0; const off=[];
+  for(let i=0;i<src.length;i++){
+    if(i) run+=Math.hypot(src[i].x-src[i-1].x, src[i].y-src[i-1].y);
+    off.push(Math.sin(run*0.085)*2.2 + Math.sin(run*0.031+2.1)*1.6 + Math.sin(run*0.19+0.7)*0.45);
+  }
+  for(let i=0;i<pts.length;i++){
+    const a=src[Math.max(0,i-1)], b=src[Math.min(src.length-1,i+1)];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+    const fade=Math.min(1, Math.min(i,pts.length-1-i)/12);
+    pts[i].x=src[i].x + (-dy/L)*off[i]*fade;
+    pts[i].y=src[i].y + ( dx/L)*off[i]*fade;
+  }
+}
+
+function buildGeometry(wpTiles){
+  WP=wpTiles.map(p=>({x:(p[0]+0.5)*TILE, y:(p[1]+0.5)*TILE}));
+  PTS=spline(WP,3);
+  meander(PTS);
+  SEG=[]; PATH_LEN=0;
+  for(let i=0;i<PTS.length-1;i++){
+    const a=PTS[i], b=PTS[i+1];
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1e-6;
+    SEG.push({a,b,dx:dx/len,dy:dy/len,len,s:PATH_LEN});
+    PATH_LEN+=len;
+  }
+}
+
+function posAt(d){
+  if(d<=0){ const s=SEG[0]; return {x:s.a.x,y:s.a.y,dx:s.dx,dy:s.dy}; }
+  if(d>=PATH_LEN){ const s=SEG[SEG.length-1]; return {x:s.b.x,y:s.b.y,dx:s.dx,dy:s.dy}; }
+  let lo=0,hi=SEG.length-1;
+  while(lo<hi){ const mid=(lo+hi)>>1; if(SEG[mid].s+SEG[mid].len<d) lo=mid+1; else hi=mid; }
+  const s=SEG[lo], t=d-s.s;
+  return {x:s.a.x+s.dx*t, y:s.a.y+s.dy*t, dx:s.dx, dy:s.dy};
+}
+function distToPath(px,py){
+  let best=1e9;
+  for(const s of SEG){
+    let t=((px-s.a.x)*s.dx+(py-s.a.y)*s.dy);
+    t=t<0?0:(t>s.len?s.len:t);
+    const ex=px-(s.a.x+s.dx*t), ey=py-(s.a.y+s.dy*t);
+    const d=ex*ex+ey*ey;
+    if(d<best) best=d;
+  }
+  return Math.sqrt(best);
+}
+
+/* ======================================================================
+   4. BACKGROUND: the 320x144 playfield sits inside a larger decorated
+   canvas, so the garden runs to the edges of the screen instead of
+   floating in a letterbox. OX/OY are the margin; world coords are unchanged.
+   ====================================================================== */
+let ARTW=W, ARTH=H, OX=0, OY=0;
+// Wider than the game (Safari's toolbars eat height): plain bars at the sides,
+// so the trail and carrot patch sit exactly where the home-screen app puts
+// them. Taller than the game still grows garden above and below.
+const MAX_PAD_X=0, MAX_PAD_Y=52;
+
+let seed=1337;
+function rnd(){ seed=(seed*1664525+1013904223)&0x7fffffff; return seed/0x7fffffff; }
+
+const bg=document.createElement('canvas'); bg.width=W; bg.height=H;
+let BGX=null;
+
+// crisp pixel disc, filled by scanline so the edges stay hard
+function disc(q,cx,cy,r,col){
+  q.fillStyle=col;
+  for(let py=Math.floor(cy-r);py<=Math.ceil(cy+r);py++){
+    const dy=py+0.5-cy, k=r*r-dy*dy; if(k<0) continue;
+    const hw=Math.sqrt(k), x0=Math.round(cx-hw), x1=Math.round(cx+hw);
+    if(x1>x0) q.fillRect(x0,py,x1-x0,1);
+  }
+}
+
+// ---- small bits of garden clutter, drawn in canvas space
+function stone(q,x,y,pal){
+  disc(q,x,y,1.8,'#87907f'); disc(q,x,y-0.5,1.1,'#a3ab98');
+}
+function mushroom(q,x,y){
+  q.fillStyle='#e0524f'; q.fillRect(x-2,y-3,5,2); q.fillRect(x-1,y-4,3,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x-1,y-3,1,1); q.fillRect(x+1,y-2,1,1);
+  q.fillStyle='#ffeedd'; q.fillRect(x,y-1,1,2);
+}
+function tuft(q,x,y,col,col2){
+  q.fillStyle=col;  q.fillRect(x,y-3,1,3); q.fillRect(x-2,y-2,1,2); q.fillRect(x+2,y-2,1,2);
+  q.fillStyle=col2; q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-2,1,2);
+}
+function clover(q,x,y,col){
+  q.fillStyle=col; q.fillRect(x,y,1,1); q.fillRect(x-1,y-1,1,1); q.fillRect(x+1,y-1,1,1); q.fillRect(x,y-2,1,1);
+}
+// a plus, not a block; a solid 3x3 at this scale reads as a floating blob
+function bloom(q,x,y,pet,mid){
+  q.fillStyle=pet;
+  q.fillRect(x,y-1,1,1); q.fillRect(x-1,y,1,1); q.fillRect(x+1,y,1,1); q.fillRect(x,y+1,1,1);
+  q.fillStyle=mid; q.fillRect(x,y,1,1);
+}
+
+/* ---------------------------------------------------------------------------
+   v34 LOOK PASS (B direction): same 320x144 grid, refined.
+   Rules every painted thing follows, so the game reads as one hand:
+   1. One light, from the top left (LIGHT). Round things are shaded as if lit
+      by it; banks and edges facing it are lit, the far ones are in shadow.
+   2. Ramps, not single colours. A base colour becomes five shades, dark to
+      light. Shadows lean blue-violet and highlights lean warm, so shading
+      reads as light rather than as grey.
+   3. Outlines are coloured, never black: the darkest shade of what they
+      outline, pulled toward INK, and lighter on the lit side.
+   4. No dither, no alpha, no blur: every pixel is one solid ramp colour.
+   --------------------------------------------------------------------------- */
+function shadeIdx(I,n){ const th=RAMP_TH[n]; let k=0; while(k<th.length && I>=th[k]) k++; return k; }
+function mixc(a,b,t){ return [0,1,2].map(i=>Math.round(a[i]*(1-t)+b[i]*t)); }
+function hexc(c){ return '#'+c.map(v=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join(''); }
+function rgbToHsv(c){
+  const r=c[0]/255,g=c[1]/255,b=c[2]/255, mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  let h=0;
+  if(d){ if(mx===r) h=((g-b)/d)%6; else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0) h+=360; }
+  return [h, mx?d/mx:0, mx];
+}
+function hsvToRgb(h,s,v){
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  const [r,g,b]= h<60?[c,x,0]:h<120?[x,c,0]:h<180?[0,c,x]:h<240?[0,x,c]:h<300?[x,0,c]:[c,0,x];
+  return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
+}
+function toward(h,target,amt){ const d=((target-h+540)%360)-180; return (h+Math.sign(d)*Math.min(Math.abs(d),amt)+360)%360; }
+// dark to light; o: {h: hue shift, vd: shadow depth, vl: highlight lift}
+function ramp(hex,o){
+  o=o||{}; const hs=o.h||16, vd=o.vd||0.42, vl=o.vl||0.55, sd=0.10, sl=0.28;
+  const [h,s,v]=rgbToHsv(rgb3(hex)), out=[];
+  for(let k=0;k<5;k++){
+    const t=(k-2)/2;
+    if(t<0) out.push(hsvToRgb(toward(h,250,hs*-t), Math.min(1,s+sd*-t), v*(1+vd*t)));
+    else    out.push(hsvToRgb(toward(h,55,hs*t),  s*(1-sl*t),          v+(1-v)*vl*t));
+  }
+  return out;
+}
+function inkOf(c,lit){ return lit ? mixc(c,INK,0.2) : mixc(c,INK,0.55); }
+
+// cheap hashed value noise in world space, so margins never shift the pattern
+function hash2(ix,iy,s){ let n=(ix*374761393+iy*668265263+s*1442695041)|0; n=(n^(n>>>13))*1274126177|0; return ((n^(n>>>16))>>>0)/4294967296; }
+function vnoise(x,y,cell,s){
+  const fx=x/cell, fy=y/cell, ix=Math.floor(fx), iy=Math.floor(fy), tx=fx-ix, ty=fy-iy;
+  const sx=tx*tx*(3-2*tx), sy=ty*ty*(3-2*ty);
+  const a=hash2(ix,iy,s), b=hash2(ix+1,iy,s), c=hash2(ix,iy+1,s), d=hash2(ix+1,iy+1,s);
+  return (a*(1-sx)+b*sx)*(1-sy)+(c*(1-sx)+d*sx)*sy;
+}
+
+/* ---------------------------------------------------------------------------
+   v34 P5: THE A LOOK, painted natively at 2x (one art pixel = half a game unit)
+   Target: a cozy top-down garden. Calm mint ground in big soft patches,
+   packed-dirt trail with grass hanging over its edges, chunky rounded props
+   with coloured outlines, flat soft shadows at their feet, trees and flowers
+   framing the map while the middle stays open for play.
+   Rules carried over from P1: one light from the top left, ramps whose
+   shadows lean cool and highlights warm, outlines never black, no dither.
+   Props only go where no tower can: off the trail, clear of every authored
+   plot, the carrot bed and the HUD.
+   --------------------------------------------------------------------------- */
+// P6: one season per map. Fields beyond the colours: leaves scatters fallen
+// leaves on the grass, snow turns grass tufts off and frosts the ground.
+const P5_PAL=[
+  {name:'spring', g1:'#93dcaa', dirt:'#e2bd86', edge:'#a8794b', inner:'#efd2a2', hedgeA:'#3f9c86', hedgeB:'#2f7a69',
+   blossom:'#f2a7c3', soil:'#8a5a3a', fence:'#b98a5c', flowers:['#f6a9c8','#ffd866','#fff4e6','#b39ae6'],
+   canopy:['#5fb873','#46a58a','#8acb62'], species:{round:0.34,blossom:0.16,birch:0.16,pine:0.12,bush:0.22}},
+  {name:'summer', g1:'#7fcf8c', dirt:'#e8be82', edge:'#a5733f', inner:'#f3d29d', hedgeA:'#2f8f5a', hedgeB:'#24704a',
+   blossom:'#5cbf6e', soil:'#835333', fence:'#c0905a', flowers:['#ffd23f','#ff7a59','#fff4e6','#5ab0f0'],
+   canopy:['#3a9a5c','#5cb84e','#86c84a'], species:{round:0.36,fruit:0.18,pine:0.16,bush:0.30}},
+  {name:'autumn', g1:'#a9b878', dirt:'#d39a63', edge:'#8a5733', inner:'#e2b583', hedgeA:'#d9772f', hedgeB:'#3f6b4a',
+   blossom:'#c8452f', soil:'#7a4a2e', fence:'#b0804e', flowers:['#e8a23a','#c8452f','#f5e6c8','#9a5bb8'],
+   leaves:['#d9772f','#c8452f','#e8a23a','#9c5a2c'],
+   canopy:['#de7a2e','#c9472f','#e3a838'], species:{round:0.40,birch:0.14,pine:0.24,bush:0.22}},
+];
+const WINTER_PAL={name:'winter', g1:'#e3ecf0', dirt:'#bfae95', edge:'#7d6a55', inner:'#d3c5ae', hedgeA:'#4f8a86', hedgeB:'#2f5f62',
+   blossom:'#f4f8fb', soil:'#6e4e3a', fence:'#9a8068', flowers:['#d6403a','#fff','#c9dff0','#d6403a'], snow:true,
+   canopy:['#4f8a86'], species:{pine:0.5,blossom:0.2,bush:0.3}};
+
+MAPS.forEach((m,i)=>{
+  const p=P5_PAL[i%P5_PAL.length];
+  Object.assign(m.pal,p,{g2:p.g1,speck:shade(p.g1,.9),bright:shade(p.g1,1.08),dark:p.hedgeA});
+});
+
+const GROUND_STYLE='both';
+const SCALE_EDGE=1, SCALE_INNER=1;   // P9: back to P7's world size (P8 tried 1.6 and 1.15)
+function paintBG(pal){
+  const R=ART_RES, CW=ARTW*R, CH=ARTH*R, N=CW*CH;
+  const out=document.createElement('canvas'); out.width=CW; out.height=CH; out._s=R;
+  const q=out.getContext('2d'), im=q.createImageData(CW,CH), d=im.data;
+  const put=(x,y,c)=>{ if(x<0||y<0||x>=CW||y>=CH) return; const i=(y*CW+x)*4; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255; };
+  const get=(x,y)=>{ x=Math.max(0,Math.min(CW-1,x)); y=Math.max(0,Math.min(CH-1,y)); const i=(y*CW+x)*4; return [d[i],d[i+1],d[i+2]]; };
+  const toW=(x,y)=>[(x+0.5)/R-OX,(y+0.5)/R-OY];
+  const toA=(wx,wy)=>[Math.round((wx+OX)*R),Math.round((wy+OY)*R)];
+  const M=MAPS[G.map-1];
+
+  const G5=ramp(pal.g1,{h:10,vd:0.20,vl:0.32});
+  const D5=ramp(pal.dirt,{h:12,vd:0.30,vl:0.45});
+  const T5=ramp(pal.hedgeA,{h:18,vd:0.42,vl:0.55});      // tree teal
+  const P5=ramp(pal.hedgeB,{h:18,vd:0.45,vl:0.5});       // pine, darker
+  const PK=ramp(pal.blossom||'#f2a7c3',{h:14,vd:0.30,vl:0.55});   // blossom
+  const WD=ramp('#9a6a43',{h:12,vd:0.42,vl:0.5});        // wood
+  const ST=ramp('#b9b8ad',{h:12,vd:0.40,vl:0.55});       // stone
+  const MT=ramp('#6aa6c4',{h:12,vd:0.40,vl:0.55});       // painted tin
+  const RD=ramp('#d9574a',{h:14,vd:0.40,vl:0.5});        // red paint
+  const FL=pal.flowers.map(rgb3);
+  const SHADOW=mixc(G5[1],INK,0.16);
+
+  // ---- 1. grass: two close tones in big soft patches, a rare lighter one.
+  // P7: calmer. 'subtle' keeps coverage and halves the contrast, 'sparse'
+  // keeps the contrast and makes patches fewer and bigger, 'both' does both.
+  const GS=GROUND_STYLE;
+  const GCELL=GS==='subtle'?26:40, GLO=GS==='subtle'?0.40:0.30, GHI=GS==='subtle'?0.74:0.82;
+  const GDK=GS==='sparse'?G5[1]:mixc(G5[1],G5[2],0.5), GLT=GS==='sparse'?G5[3]:mixc(G5[3],G5[2],0.5);
+  for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){
+    const [wx,wy]=toW(x,y);
+    const n=vnoise(wx,wy,GCELL,7+G.map)*0.72+vnoise(wx,wy,GCELL/3,9+G.map)*0.28;
+    put(x,y, n<GLO?GDK:(n>GHI?GLT:G5[2]));
+  }
+
+  // ---- 2. the trail, extended to the canvas edge as before
+  const T=PTS.map(p=>({x:p.x,y:p.y}));
+  {
+    const k=Math.min(6,PTS.length-1), ux=PTS[k].x-PTS[0].x, uy=PTS[k].y-PTS[0].y, ul=Math.hypot(ux,uy)||1;
+    for(let n=1; n<80 && PTS[0].x-ux/ul*3*n > -OX-10; n++) T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
+  }
+  const ext=T.length-PTS.length, widths=[], runAt=[];
+  let run=-3*ext;
+  for(let i=0;i<T.length;i++){
+    if(i) run+=Math.hypot(T[i].x-T[i-1].x, T[i].y-T[i-1].y);
+    runAt.push(run);
+    widths.push(6.0 + Math.sin(run*0.105)*0.7 + Math.sin(run*0.047+1.7)*0.6);
+  }
+  const D=new Float32Array(N).fill(1e9), SI=new Int32Array(N), STt=new Float32Array(N);
+  for(let i=0;i<T.length-1;i++){
+    const a=T[i], b=T[i+1], dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1e-9, reach=12;
+    const [ax0,ay0]=toA(Math.min(a.x,b.x)-reach, Math.min(a.y,b.y)-reach), [ax1,ay1]=toA(Math.max(a.x,b.x)+reach, Math.max(a.y,b.y)+reach);
+    for(let y=Math.max(0,ay0);y<=Math.min(CH-1,ay1);y++) for(let x=Math.max(0,ax0);x<=Math.min(CW-1,ax1);x++){
+      const [px,py]=toW(x,y);
+      let t=((px-a.x)*dx+(py-a.y)*dy)/L2; t=t<0?0:(t>1?1:t);
+      const ex=px-(a.x+dx*t), ey=py-(a.y+dy*t), dd=ex*ex+ey*ey, j=y*CW+x;
+      if(dd<D[j]){ D[j]=dd; SI[j]=i; STt[j]=t; }
+    }
+  }
+  for(let j=0;j<N;j++) D[j]=Math.sqrt(D[j]);
+  const wAt=j=>widths[SI[j]];
+  // grass hangs over the dirt in soft scallops, period ~5 units
+  const edgeAt=j=>{
+    const i=SI[j], s=runAt[i]+STt[j]*Math.hypot(T[i+1].x-T[i].x,T[i+1].y-T[i].y);
+    const ph=(s/5)%1, sc=Math.sqrt(Math.max(0,1-(2*ph-1)*(2*ph-1)));
+    return wAt(j)-0.1-sc*1.3;
+  };
+  const LIP=G5[4], UNDER=mixc(D5[1],INK,0.12);
+  for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){
+    const j=y*CW+x; if(D[j]>wAt(j)+1) continue;
+    const e=edgeAt(j);
+    if(D[j]>e){ if(D[j]<=e+0.5) put(x,y,LIP); continue; }         // lit lip of the overhang
+    const [wx,wy]=toW(x,y);
+    const n=vnoise(wx,wy,5,40+G.map);
+    let c=n<0.20?mixc(D5[2],D5[1],0.5):D5[2];
+    if(D[j]>e-0.5) c=UNDER;                                          // shade under the grass lip
+    put(x,y,c);
+  }
+  const onTrail=(wx,wy,pad)=>{ const [x,y]=toA(wx,wy); if(x<0||y<0||x>=CW||y>=CH) return false; const j=y*CW+x; return D[j]<wAt(j)+(pad||0); };
+
+  // trail detail: grains, lit pebbles, hairline cracks, weeds at the edge
+  for(let n=0;n<Math.round(T.length*1.2);n++){
+    const i=Math.floor(rnd()*(T.length-1)), a=T[i], b=T[i+1];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, side=rnd()*2-1, w=widths[i];
+    const wx=a.x+(-dy/L)*side*w*0.75, wy=a.y+(dx/L)*side*w*0.75;
+    const [x,y]=toA(wx,wy), k=rnd();
+    if(k<0.55) put(x,y,D5[0]);
+    else if(k<0.70){ put(x,y,ST[3]); put(x+1,y,ST[2]); put(x,y+1,ST[1]); put(x+1,y+1,ST[1]); put(x,y+2,UNDER); put(x+1,y+2,UNDER); }
+    else if(k<0.80){ const s=rnd()<0.5?1:-1; put(x,y,D5[0]); put(x+1,y+s,D5[0]); put(x+2,y+s,D5[0]); put(x+3,y+2*s,D5[1]); }
+    else if(k<0.86){ put(x,y,D5[4]); }
+  }
+
+  // ---- 3. shape layers for props: shaded shapes, coloured outline, composited
+  const LH=[-0.25,0.30,0.72,0.93];
+  function layer(){ return {px:new Map()}; }
+  function lp(L,x,y,c,o){ if(x<0||y<0||x>=CW||y>=CH) return; L.px.set(y*CW+x,[c,o]); }   // off canvas: drop, never wrap
+  function lell(L,cx,cy,rx,ry,Rm,bias){     // centre and radii in art px
+    for(let y=Math.floor(cy-ry);y<=Math.ceil(cy+ry);y++) for(let x=Math.floor(cx-rx);x<=Math.ceil(cx+rx);x++){
+      if(x<0||y<0||x>=CW||y>=CH) continue;
+      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry, r2=dx*dx+dy*dy; if(r2>1) continue;
+      const I=dx*LIGHT[0]+dy*LIGHT[1]+Math.sqrt(1-r2)*LIGHT[2]+(bias||0);
+      lp(L,x,y,Rm[shadeIdx(I,5)],Rm[0]);
+    }
+  }
+  function lbox(L,x0,y0,x1,y1,Rm,flat){
+    for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+      if(x<0||y<0||x>=CW||y>=CH) continue;
+      let k=flat;
+      if(k===undefined){ const u=((x+0.5)-(x0+x1)/2)/((x1-x0)/2); k=shadeIdx(u*LIGHT[0]+Math.sqrt(Math.max(0,1-u*u))*LIGHT[2]+0.1,5); }
+      lp(L,x,y,Rm[k],Rm[0]);
+    }
+  }
+  function lscallop(L,cx,cy,rx,ry,Rm,step){   // leafy rows: darker arcs, lit tops
+    for(let row=-ry+step; row<ry; row+=step){
+      const off=(Math.round(row/step)%2)*step/2;
+      for(let col=-rx; col<rx; col+=step){
+        const ax=Math.round(cx+col+off), ay=Math.round(cy+row);
+        for(let k=-2;k<=2;k++){
+          const x=ax+k, y=ay+(Math.abs(k)===2?-1:0), key=y*CW+x, cur=L.px.get(key);
+          if(!cur) continue;
+          const lit=(x-cx)/rx+(y-cy)/ry < -0.4;
+          L.px.set(key,[Math.abs(k)<=1? Rm[lit?2:1] : Rm[lit?3:1], Rm[0]]);
+        }
+        const tk=(ay-2)*CW+ax, tc=L.px.get(tk);
+        if(tc && (ax-cx)/rx+(ay-cy)/ry < 0.2) L.px.set(tk,[Rm[4],Rm[0]]);
+      }
+    }
+  }
+  function lcomp(L){
+    const has=k=>L.px.has(k);
+    const outl=new Map();
+    for(const [k,[c,o]] of L.px){
+      const x=k%CW, y=(k-x)/CW;
+      for(const [dx,dy,lit] of [[0,-1,1],[-1,0,1],[0,1,0],[1,0,0]]){
+        const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=CW||ny>=CH) continue;
+        const nk=ny*CW+nx; if(has(nk)) continue;
+        const col=lit? mixc(o,INK,0.22) : mixc(o,INK,0.55);
+        if(!outl.has(nk) || !lit) outl.set(nk,col);
+      }
+    }
+    for(const [k,c] of outl){ const x=k%CW; put(x,(k-x)/CW,c); }
+    for(const [k,[c]] of L.px){ const x=k%CW; put(x,(k-x)/CW,c); }
+  }
+  function shadowAt(cx,cy,rx,ry){            // flat, soft, at the feet
+    for(let y=Math.floor(cy-ry);y<=Math.ceil(cy+ry);y++) for(let x=Math.floor(cx-rx);x<=Math.ceil(cx+rx);x++){
+      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry; if(dx*dx+dy*dy>1) continue;
+      const c=get(x,y); put(x,y,mixc(c,INK,0.16));
+    }
+  }
+
+  // ---- 4. the props
+  const S=R;                                      // art px per unit
+  const tree=(wx,wy,s,Rm)=>{                       // round canopy, scalloped leaves
+    const [x,y]=toA(wx,wy), r=6.5*s*S;
+    shadowAt(x+1*S,y+0.5*S,r*0.85,r*0.32);
+    const L=layer();
+    lbox(L,x-1.2*S,y-4*S,x+1.3*S,y+0.6*S,WD);
+    lell(L,x,y-4*S-r*0.85,r,r*0.9,Rm);
+    lscallop(L,x,y-4*S-r*0.85,r,r*0.9,Rm,Math.round(2.2*S));
+    lcomp(L);
+  };
+  const birch=(wx,wy,s,Rm)=>{                      // white trunk, light narrow crown
+    const [x,y]=toA(wx,wy), r=4.4*s*S;
+    shadowAt(x+1*S,y+0.5*S,r*0.8,r*0.3);
+    const L=layer(), BK=ramp('#ece6da',{h:8,vd:0.30,vl:0.4});
+    lbox(L,x-1*S,y-7*S,x+1*S,y+0.6*S,BK);
+    lell(L,x,y-7*S-r*0.9,r*0.85,r*1.05,Rm,0.05);
+    lscallop(L,x,y-7*S-r*0.9,r*0.85,r*1.05,Rm,Math.round(2*S));
+    lcomp(L);
+    for(let k=y-6*S;k<y;k+=3){ put(x-1,k,[70,64,60]); if(k%2) put(x,k+1,[110,100,92]); }   // bark marks
+  };
+  const fruit=(wx,wy,s,Rm)=>{
+    tree(wx,wy,s,Rm);
+    const [x,y]=toA(wx,wy), r=6.5*s*S, cy=y-4*S-r*0.85, FR=ramp('#e0483a',{h:12});
+    for(let k=0;k<6;k++){
+      const a=rnd()*Math.PI*2, d=rnd()*r*0.7, fx=Math.round(x+Math.cos(a)*d), fy=Math.round(cy+Math.sin(a)*d*0.85);
+      put(fx,fy,FR[3]); put(fx+1,fy,FR[2]); put(fx,fy+1,FR[2]); put(fx+1,fy+1,FR[1]); put(fx,fy,FR[4]);
+    }
+  };
+  const tall=(wx,wy)=>{                               // a tuft of tall grass, lit tips
+    const [x,y]=toA(wx,wy), base=get(x,y), dk=mixc(base,INK,0.28), md=mixc(base,G5[0],0.6);
+    for(let b=0;b<6;b++){
+      const bx=x+Math.round((b-2.5)*1.4+rnd()), h=3+Math.floor(rnd()*4), lean=rnd()<0.5?-1:1;
+      for(let k=0;k<h;k++){ const xx=bx+(k>h-2?lean:0); put(xx,y-k,k<h-1?(b%2?dk:md):G5[4]); }
+    }
+    if(rnd()<0.35){ const c=FL[Math.floor(rnd()*FL.length)]; put(x,y-6,c); put(x+1,y-6,c); put(x,y-5,c); put(x+1,y-5,[255,196,90]); }
+  };
+  const pine=(wx,wy,s)=>{
+    const [x,y]=toA(wx,wy), h=15*s*S, w=6*s*S;
+    shadowAt(x+1*S,y+0.5*S,w*0.9,w*0.3);
+    const L=layer();
+    lbox(L,x-1*S,y-2.5*S,x+1.2*S,y+0.6*S,WD);
+    for(let t=0;t<3;t++){
+      const top=y-2*S-h+t*h*0.28, base=top+h*0.45, half=w*(0.62+t*0.2);
+      for(let yy=Math.floor(top);yy<base;yy++){
+        const f=(yy-top)/(base-top), hw=half*f;
+        for(let xx=Math.floor(x-hw);xx<=Math.ceil(x+hw);xx++){
+          const u=(xx+0.5-x)/(hw||1);
+          const I=u*LIGHT[0]*0.9-0.3*LIGHT[1]+Math.sqrt(Math.max(0,1-u*u))*LIGHT[2]*0.9 - (f>0.85?0.5:0);
+          lp(L,xx,yy,P5[shadeIdx(I,5)],P5[0]);
+        }
+      }
+    }
+    lcomp(L);
+  };
+  const bush=(wx,wy,s,Rm)=>{
+    const [x,y]=toA(wx,wy), r=3.2*s*S;
+    shadowAt(x+0.5*S,y+0.3*S,r*1.6,r*0.4);
+    const L=layer();
+    lell(L,x-r*0.8,y-r*0.7,r,r*0.85,Rm); lell(L,x+r*0.8,y-r*0.7,r,r*0.85,Rm); lell(L,x,y-r*1.2,r*1.05,r*0.9,Rm);
+    lscallop(L,x,y-r,r*1.8,r*1.1,Rm,Math.round(2*S));
+    lcomp(L);
+  };
+  const rock=(wx,wy,s)=>{
+    const [x,y]=toA(wx,wy), r=2.4*s*S;
+    shadowAt(x+0.5*S,y+0.2*S,r*1.1,r*0.35);
+    const L=layer(); lell(L,x,y-r*0.5,r,r*0.7,ST,0.1); lell(L,x+r*0.9,y-r*0.2,r*0.55,r*0.45,ST); lcomp(L);
+  };
+  const flowers=(wx,wy)=>{
+    const [x,y]=toA(wx,wy), L=layer(), lf=ramp(shade(pal.hedgeA,1.15),{h:16});
+    for(const [dx,dy] of [[-2,0],[2,0],[0,-1],[-1,-2],[2,-3]]) lell(L,x+dx*S*0.8,y+dy*S*0.8,1.4*S*0.6,1.0*S*0.6,lf);
+    lcomp(L);
+    const c=FL[Math.floor(rnd()*FL.length)];
+    for(const [dx,dy] of [[-2,-3],[1,-4],[3,-2]]){
+      const fx=Math.round(x+dx*S*0.7), fy=Math.round(y+dy*S*0.7), dk=mixc(c,INK,0.35);
+      put(fx,fy-1,c); put(fx-1,fy,c); put(fx+1,fy,c); put(fx,fy+1,c);
+      put(fx-1,fy+1,dk); put(fx+1,fy+1,dk); put(fx,fy,[255,196,90]);
+    }
+  };
+  const mushroom=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+1,y+1,4,1.5);
+    const L=layer(); lbox(L,x-1,y-3,x+2,y+1,ramp('#f1e6cf')); lell(L,x+0.5,y-3.5,3.6,2.2,RD,0.1); lcomp(L);
+    put(x-1,y-4,[255,248,236]); put(x+2,y-5,[255,248,236]);
+  };
+  const wateringCan=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,8,2);
+    const L=layer();
+    lbox(L,x-4,y-7,x+4,y+1,MT);
+    for(let k=0;k<6;k++){ lp(L,x+4+k,y-3-k,MT[k<3?2:3],MT[0]); lp(L,x+4+k,y-2-k,MT[1],MT[0]); }
+    lp(L,x+10,y-9,MT[4],MT[0]); lp(L,x+11,y-9,MT[3],MT[0]);
+    for(let k=-3;k<=3;k++) lp(L,x+k,y-9-Math.round(Math.sqrt(9-k*k)*0.8),MT[3],MT[0]);
+    lcomp(L);
+  };
+  const signpost=(wx,wy,flip)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,6,1.8);
+    const L=layer();
+    lbox(L,x-1,y-12,x+2,y+1,WD);
+    const bx0=flip?x-8:x-3, bx1=flip?x+3:x+9;
+    lbox(L,bx0,y-15,bx1,y-9,WD,3);
+    lcomp(L);
+    for(let k=bx0+2;k<bx1-2;k++){ if(k%3) put(k,y-13,WD[0]); if(k%4) put(k,y-11,WD[1]); }
+  };
+  const birdhouse=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,5,1.6);
+    const L=layer();
+    lbox(L,x-1,y-12,x+2,y+1,WD);
+    lbox(L,x-4,y-19,x+5,y-12,ramp('#e8d6b0'));
+    for(let r=0;r<5;r++) for(let k=-5+r;k<=5-r;k++) lp(L,x+k,y-19-r,RD[r<2?1:(k<0?3:2)],RD[0]);
+    lcomp(L);
+    put(x,y-16,[60,40,30]); put(x+1,y-16,[60,40,30]); put(x,y-15,[60,40,30]); put(x+1,y-15,[60,40,30]);
+  };
+
+  // where a prop may stand: off the trail, clear of plots, bed and HUD
+  const B0={l:BED.x-8,r:BED.x+BED.w+8,t:BED.y-8,b:BED.y+BED.h+6};
+  const plotsW=(M.plots||[]).map(p=>({x:p[0],y:p[1]}));
+  const taken=[];
+  function free(wx,wy,rad){
+    if(onTrail(wx,wy,rad+2.5) || onTrail(wx,wy-rad,rad+1)) return false;
+    for(const p of plotsW) if(Math.hypot(p.x-wx,(p.y-wy)*1.3)<rad*0.7+13) return false;
+    if(wx+rad>B0.l && wx-rad<B0.r && wy>B0.t && wy-rad*2<B0.b) return false;
+    if(wy-rad*2<16 && wx<132) return false;                         // top bar
+    if(wy-rad*2<17 && wx>258) return false;                         // buttons
+    if(wy>110 && wx-rad<-OX+100) return false;                      // dock
+    for(const t of taken) if(Math.hypot(t.x-wx,t.y-wy)<(t.r+rad)*OVERLAP) return false;
+    return true;
+  }
+  const items=[]; let OVERLAP=0.75;
+  function tryPut(kind,wx,wy,rad,extra){ if(!free(wx,wy,rad)) return false; taken.push({x:wx,y:wy,r:rad}); items.push([wy,kind,wx,extra]); return true; }
+
+  // framing (P7): groves of mixed size and species with open meadow between
+  // them, big trees cut off by the corners, smaller ones toward the field,
+  // a fringe of tall grass and flowers on each grove's open side, and a few
+  // small groves inside the map where no plot or trail goes
+  const left=-OX-6, right=W+OX+6, top=-OY, bot=H+OY;
+  const CAN=(pal.canopy||[pal.hedgeA]).map(c=>ramp(c,{h:18,vd:0.40,vl:0.55}));
+  const SP=pal.species||{round:0.4,pine:0.2,bush:0.3,blossom:0.1};
+  const species=()=>{ let r=rnd(), acc=0; for(const k in SP){ acc+=SP[k]; if(r<acc) return k; } return 'bush'; };
+  const RAD={round:6.5,blossom:6.5,fruit:6.5,birch:4.4,pine:5,bush:3.5};
+  let WS=SCALE_EDGE;
+  const plant=(kind,wx,wy,s)=>{ s*=WS; return tryPut(kind,wx,wy,RAD[kind]*s,{s,R:CAN[Math.floor(rnd()*CAN.length)]}); };
+  function grove(cx,cy,n,spread,sMin,sMax,inx,iny){
+    let placed=0;
+    for(let k=0;k<n*8 && placed<n;k++){
+      const a=rnd()*Math.PI*2, r=Math.sqrt(rnd())*spread, wx=cx+Math.cos(a)*r, wy=cy+Math.sin(a)*r*0.7;
+      const inward=((wx-cx)*inx+(wy-cy)*iny)/spread;              // -1 outer edge .. 1 field side
+      const s=sMin+(sMax-sMin)*Math.max(0,Math.min(1,0.5-inward*0.5))*(0.75+rnd()*0.25);
+      let kind=species(); if(s<0.75 && kind!=='pine') kind='bush';
+      if(plant(kind,wx,wy,s)) placed++;
+    }
+    for(let k=0;k<6;k++){
+      const a=rnd()*Math.PI*2, r=spread*(0.5+rnd()*0.6);
+      tryPut(rnd()<0.65?'tall':'flowers', cx+Math.cos(a)*r+inx*spread*0.9, cy+Math.sin(a)*r*0.6+iny*spread*0.9, 2);
+    }
+  }
+  OVERLAP=0.55;                                                    // canopies may overlap: lush, not lined up
+  // back row: big trees standing just past the top and bottom edges, so the
+  // screen edge shows hanging foliage in mixed colours, never a straight wall
+  for(let wx=left; wx<right; wx+=8+rnd()*9){
+    const k=rnd(), kind=k<0.6?(SP.round?'round':'pine'):(k<0.8?'pine':'bush');
+    plant(kind,wx,top-1+rnd()*4,1.15+rnd()*0.35);
+    if(rnd()<0.8) plant(rnd()<0.7?'bush':'round',wx+rnd()*6,bot+5+rnd()*5,1.1+rnd()*0.4);
+  }
+  // corners: one big tree each, mostly off screen
+  for(const [cx,cy] of [[left+4,top+9],[right-4,top+9],[left+4,bot+4],[right-4,bot+4]]){
+    const kind=SP.round?'round':'pine'; plant(kind,cx+(rnd()-0.5)*4,cy,1.35+rnd()*0.2);
+  }
+  // edges: groves with gaps
+  const edges=[
+    {a:left+12,b:right-12,at:t=>[t,top+5+rnd()*5],inx:0,iny:1},
+    {a:left+12,b:right-12,at:t=>[t,bot+1+rnd()*5],inx:0,iny:-1},
+    {a:top+18,b:bot-10,at:t=>[left+2+rnd()*5,t],inx:1,iny:0},
+    {a:top+18,b:bot-10,at:t=>[right-2-rnd()*5,t],inx:-1,iny:0},
+  ];
+  for(const e of edges){
+    for(let t=e.a+rnd()*8; t<e.b; t+=18+rnd()*16){
+      const [cx,cy]=e.at(t);
+      if(rnd()<0.85) grove(cx,cy,4+Math.floor(rnd()*4),12+rnd()*6,0.8,1.25,e.inx,e.iny);
+      else for(let k=0;k<2;k++) tryPut(rnd()<0.6?'tall':'flowers',cx+(rnd()-0.5)*10+e.inx*8,cy+(rnd()-0.5)*6+e.iny*8,2);
+    }
+  }
+  // spare margins on tall or wide screens fill with more groves
+  for(let n=0;n<Math.round((OX*H+OY*W)/500);n++){
+    const wx=left+rnd()*(right-left), wy=top+rnd()*(bot-top);
+    if(wx>4&&wx<W-4&&wy>4&&wy<H-4) continue;
+    grove(wx,wy,3,9,0.9,1.3,(W/2-wx)/Math.hypot(W/2-wx,H/2-wy),(H/2-wy)/Math.hypot(W/2-wx,H/2-wy));
+  }
+  // inward groves: the roomiest free spots inside the field
+  {
+    const cand=[];
+    for(let wy=22; wy<H-18; wy+=8) for(let wx=20; wx<W-20; wx+=8){
+      if(!free(wx,wy,8)) continue;
+      let clr=1e9;
+      for(const p of plotsW) clr=Math.min(clr,Math.hypot(p.x-wx,p.y-wy));
+      cand.push([clr+rnd()*6,wx,wy]);
+    }
+    cand.sort((a,b)=>b[0]-a[0]);
+    let made=0;
+    OVERLAP=0.75; WS=SCALE_INNER;
+    for(const [,wx,wy] of cand){ if(made>=3) break; if(!free(wx,wy,8)) continue; grove(wx,wy,2+Math.floor(rnd()*2),6,0.75,1.0,0,1); made++; }
+  }
+  // character: things a gardener left lying around
+  {
+    const bx=BED.x, by=BED.y, bw=BED.w, bh=BED.h;
+    const spots=[['can',bx+bw+14,by+bh+5,3],['can',bx-13,by+bh+5,3],['can',bx+bw/2,by+bh+14,3],['bird',bx+bw+13,by+6,3],['bird',bx-12,by+4,3],['bird',bx+bw-6,by-12,3]];
+    let can=false, bird=false;
+    for(const [k,x,y,r] of spots){
+      if(k==='can'&&!can&&tryPut('can',x,y,r)) can=true;
+      if(k==='bird'&&!bird&&tryPut('bird',x,y,r)) bird=true;
+    }
+    // a signpost where the trail comes on screen
+    for(let i=0;i<PTS.length-1;i++){
+      if(PTS[i].x<4 || PTS[i].x>W-4 || PTS[i].y<4 || PTS[i].y>H-4) continue;
+      const a=PTS[i], b=PTS[Math.min(PTS.length-1,i+2)], dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+      let ok=false;
+      for(const side of [-1,1]){ if(tryPut('sign',a.x+(-dy/L)*side*11,a.y+(dx/L)*side*11+3,4,a.x>W/2)){ ok=true; break; } }
+      if(ok) break;
+    }
+  }
+  for(let n=0;n<45;n++){ const wx=rnd()*W, wy=8+rnd()*(H-16), k=rnd();
+    if(k<0.55) tryPut('flowers',wx,wy,2.5); else if(k<0.7) tryPut('rock',wx,wy,2.2,0.7); else if(k<0.85) tryPut('mush',wx,wy,1.8); }
+
+  items.sort((a,b)=>a[0]-b[0]);
+  for(const [wy,k,wx,ex] of items){
+    if(k==='round') tree(wx,wy,ex.s,ex.R);
+    else if(k==='blossom') tree(wx,wy,ex.s,PK);
+    else if(k==='fruit') fruit(wx,wy,ex.s,ex.R);
+    else if(k==='birch') birch(wx,wy,ex.s,ex.R);
+    else if(k==='pine') pine(wx,wy,ex.s);
+    else if(k==='bush') bush(wx,wy,ex.s,ex.R);
+    else if(k==='tall') tall(wx,wy);
+    else if(k==='rock') rock(wx,wy,ex||1);
+    else if(k==='flowers') flowers(wx,wy);
+    else if(k==='mush') mushroom(wx,wy);
+    else if(k==='can') wateringCan(wx,wy);
+    else if(k==='bird') birdhouse(wx,wy);
+    else if(k==='sign') signpost(wx,wy,ex);
+  }
+
+  // ---- 5. sparse grass tufts, little V marks, on open grass only
+  for(let n=0;n<(pal.snow?0:Math.round(CW*CH/700));n++){
+    const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), [wx,wy]=toW(x,y);
+    if(onTrail(wx,wy,2)) continue;
+    const c=get(x,y); if(Math.abs(c[1]-G5[1][1])>18 && Math.abs(c[1]-G5[2][1])>18) continue;  // grass only
+    const dk=mixc(c,G5[0],0.6);
+    put(x,y,dk); put(x+1,y+1,dk); put(x+2,y,dk); if(rnd()<0.5){ put(x+3,y+1,dk); put(x+4,y,dk); }
+  }
+
+  // fallen leaves: two-pixel flecks, a few lying across the trail edge
+  if(pal.leaves){
+    const LV=pal.leaves.map(rgb3);
+    for(let n=0;n<Math.round(CW*CH/260);n++){
+      const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), [wx,wy]=toW(x,y);
+      if(onTrail(wx,wy,-1.5)) continue;
+      const c=LV[Math.floor(rnd()*LV.length)], k=rnd();
+      put(x,y,c); if(k<0.5) put(x+1,y,c); else put(x,y+1,c); if(k<0.25) put(x+1,y+1,mixc(c,INK,0.3));
+    }
+  }
+
+  // ---- 6. the carrot bed: a raised planter with a front face, tilled rows,
+  // and a round-topped picket fence, open at the gate
+  const S5=ramp(pal.soil||'#8a5a3a',{h:12,vd:0.42,vl:0.42}), F5=ramp(pal.fence||'#b98a5c',{h:12,vd:0.40,vl:0.55});
+  const [bx0,by0]=toA(BED.x,BED.y), bw=BED.w*R, bh=BED.h*R;
+  const rowsY=[];
+  for(const c of CARROT_SLOTS){ if(!rowsY.some(r=>Math.abs(r-c.y)<4)) rowsY.push(c.y); }
+  for(let y=by0;y<by0+bh+4;y++) for(let x=bx0;x<bx0+bw;x++){
+    if(y>=by0+bh){ put(x,y, y===by0+bh?S5[1]:S5[0]); continue; }        // front face
+    const [wx,wy]=toW(x,y), n=vnoise(wx,wy,1.6,90+G.map);
+    let k=n<0.4?0:1;
+    for(const ry of rowsY){
+      const my=ry+2, wob=Math.sin(wx*0.8+ry)*0.35;
+      const top=my-3+wob, bot=my+2+wob;
+      if(wy>=top && wy<bot){ k = wy<top+0.5?3:(wy>=bot-0.5?1:(n>0.7?3:2)); break; }
+      if(wy>=bot && wy<bot+0.5){ k=0; break; }
+    }
+    put(x,y,S5[k]);
+  }
+  for(let x=bx0;x<bx0+bw;x++) put(x,by0,S5[3]);                         // lit rim
+  const SOL=mixc(S5[0],INK,0.5);
+  for(let x=bx0-1;x<=bx0+bw;x++){ put(x,by0-1,SOL); put(x,by0+bh+4,SOL); }
+  for(let y=by0;y<by0+bh+4;y++){ put(bx0-1,y,SOL); put(bx0+bw,y,SOL); }
+  // fence
+  const gate=bedGate(), gt=(gate.side==='l'||gate.side==='r')?gate.t:gate.t;
+  const fl=BED.x-3, fr=BED.x+BED.w+3, ft=BED.y-3, fb=BED.y+BED.h+4;
+  const open=(side,t)=>gate.side===side && Math.abs(t-gt)<9;
+  const FL5=layer();
+  const railH=(wy,x0,x1,side)=>{ const [, y]=toA(0,wy); for(let wx=x0; wx<=x1; wx+=0.5){ if(open(side,wx)) continue; const [x]=toA(wx,0); lp(FL5,x,y-2,F5[3],F5[0]); lp(FL5,x,y-1,F5[2],F5[0]); lp(FL5,x,y,F5[1],F5[0]); } };
+  const railV=(wx,y0,y1,side)=>{ const [x]=toA(wx,0); for(let wy=y0; wy<=y1; wy+=0.5){ if(open(side,wy)) continue; const [,y]=toA(0,wy); lp(FL5,x-1,y,F5[3],F5[0]); lp(FL5,x,y,F5[2],F5[0]); lp(FL5,x+1,y,F5[1],F5[0]); } };
+  railH(ft,fl,fr,'t'); railH(fb,fl,fr,'b'); railV(fl,ft,fb,'l'); railV(fr,ft,fb,'r');
+  const post=(wx,wy)=>{ const [x,y]=toA(wx,wy);
+    for(let yy=y-7;yy<=y+3;yy++) for(let xx=x-2;xx<=x+2;xx++){
+      if(yy===y-7 && Math.abs(xx-x)===2) continue;                     // round top
+      const k=yy<=y-6?4:(xx===x-2?3:(xx===x+2?1:2));
+      lp(FL5,xx,yy,F5[k],F5[0]);
+    }
+    lp(FL5,x,y-3,F5[1],F5[0]);                                          // a knot
+  };
+  const posts=[];
+  for(let x=fl; x<=fr+0.1; x+=(fr-fl)/Math.max(1,Math.round((fr-fl)/12))){ if(!open('t',x)) posts.push([x,ft]); if(!open('b',x)) posts.push([x,fb]); }
+  for(let y=ft; y<=fb+0.1; y+=(fb-ft)/Math.max(1,Math.round((fb-ft)/12))){ if(!open('l',y)) posts.push([fl,y]); if(!open('r',y)) posts.push([fr,y]); }
+  if(gate.side==='l'||gate.side==='r'){ const xx=gate.side==='l'?fl:fr; posts.push([xx,gt-9],[xx,gt+9]); }
+  else { const yy=gate.side==='t'?ft:fb; posts.push([gt-9,yy],[gt+9,yy]); }
+  for(const [x,y] of posts) post(x,y);
+  lcomp(FL5);
+
+  q.putImageData(im,0,0);
+  BGX=out;
+  const qb=bg.getContext('2d'); qb.clearRect(0,0,ARTW,ARTH); qb.drawImage(out,0,0,ARTW,ARTH);
+}
+
+/* ======================================================================
+   4b. THE CARROTS: one per life, eaten from the gate inward
+   ====================================================================== */
+// 20 lives, drawn as 10 carrots: each carrot takes two bites, whole, half
+// eaten, gone. Every number the player reads (top bar, screens) counts lives;
+// only the bed shows them in halves, which keeps it small.
+const MAX_LIVES=20, BITES=2, MAX_CARROTS=MAX_LIVES/BITES;
+let CARROT_SLOTS=[];
+function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitter
+  let sd=7777;
+  const r=()=>{ sd=(sd*1664525+1013904223)&0x7fffffff; return sd/0x7fffffff; };
+  const cols=BED.o==='h'?5:2, rows=BED.o==='h'?2:5;
+  // centred in the bed: a carrot covers x-2..x+3 and y-2..y+3 of its slot
+  const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
+  const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
+  CARROT_SLOTS=[];
+  for(let row=0;row<rows;row++) for(let col=0;col<cols;col++)
+    CARROT_SLOTS.push({x:x0+col*10+Math.round(r()*2-1), y:y0+row*11+Math.round(r()*2-1)});
+}
+function sortCarrots(){          // nearest the gate is eaten first, so the damage
+  const g=bedGate();             // visibly advances inward from where bugs break in
+  CARROT_SLOTS.sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y));
+}
+function drawCarrot(x,y,s){
+  ctx.fillStyle='#3f2a1c'; ctx.fillRect(x-1,y+3,4,1);      // the hole it sits in
+  if(s<=0) return;
+  if(s<0.55){                                              // half eaten: a stub
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y+1,2,1);
+    ctx.fillStyle='#e07a22'; ctx.fillRect(x,y+2,1,1);
+    return;
+  }
+  ctx.fillStyle='#ff9a3c'; ctx.fillRect(x,y+1,2,2);
+  ctx.fillStyle='#e07a22'; ctx.fillRect(x+1,y+1,1,2); ctx.fillRect(x,y+3,1,1);
+  ctx.fillStyle='#ffc27a'; ctx.fillRect(x,y+1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-1,y,4,1);
+  ctx.fillStyle='#2f6b36'; ctx.fillRect(x,y-1,2,1);
+  ctx.fillStyle='#7fd07c'; ctx.fillRect(x-2,y-1,1,1); ctx.fillRect(x+2,y-1,1,1);
+  ctx.fillStyle='#4f9d4a'; ctx.fillRect(x,y-2,1,1);
+}
+/* ---------------------------------------------------------------------------
+   PLOT GEOMETRY. One source of truth, and now purely logical: these numbers
+   drive spacing, the tap target and the button keep-out box, but nothing is
+   drawn as a rectangle any more.
+
+   The bed went through three shapes. Square was wrong because tower art is
+   13px tall and only 9-11px wide. A wide tilled strip seated the tower
+   properly but still read as an object dropped on the lawn, sixteen identical
+   rectangles to a map. What is drawn now is a scuff of turned earth: an
+   irregular patch with a ragged edge, seeded from its own position so no two
+   are alike. Ground, not furniture.
+--------------------------------------------------------------------------- */
+const BED_W=20, BED_H=14;        // logical footprint, for spacing and hit-tests
+const BED_L=-10, BED_T=-4;       // relative to the anchor
+const BED_R=BED_L+BED_W-1;       // +9
+const BED_B=BED_T+BED_H-1;       // +9, four rows of soil in front of the feet
+const TOWER_DY=-2;               // sprite centre, so the feet land on the soil
+const PIP_Y=7;                   // level pips sit on the apron, clear of the feet
+
+/* PLACEMENT MODE.
+   'open'  - build anywhere off the trail. No bed exists until a tower stands
+             in it, so the lawn stays clean and every bed on screen is there
+             because the player put it there.
+   'plots' - the authored sixteen beds per map, visible from the start. Keeps
+             position as a real decision (coverage varies about 2.5x across
+             the set) at the cost of sixteen identical rectangles sitting on
+             the grass before anything is built.
+   The authored arrays stay in MAPS either way, so this is a one-word switch
+   while the mechanics and the art direction are still moving. */
+const PLACEMENT='open';
+const SNAP=2;                    // placements land on even pixels, so beds align
+const TRAIL_CLEAR=10;            // the drawn trail runs ~9.5px either side
+const BED_GAP=3;                 // breathing room between two beds
+
+/* ---- the soil ------------------------------------------------------------
+   A patch is the union of eleven small overlapping discs along a shallow
+   line, with a bite out of the top and the bottom so the silhouette never
+   closes into a neat oval. Everything is seeded from the patch's own
+   position, so a patch is identical every frame (nothing shimmers) and
+   different at every spot (nothing looks stamped from the same die).
+
+   It is rendered into a small cached canvas rather than drawn disc by disc,
+   because the outline has to be grown around the finished union. Drawing a
+   rim per disc puts rim pixels through the interior wherever a later disc
+   overlaps an earlier one, which is what made the first attempt read as a
+   handful of dark rocks instead of turned earth. */
+function soilRnd(x,y){
+  let s=((((x|0)*73856093) ^ ((y|0)*19349663) ^ 0x9e3779b9)>>>0);
+  return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+}
+const SOIL_CACHE=new Map();
+function soilLobes(x,y){
+  const key=x+','+y;
+  let L=SOIL_CACHE.get(key);
+  if(L) return L;
+  if(SOIL_CACHE.size>512) SOIL_CACHE.clear();   // the hover walks the whole map
+  const r=soilRnd(x,y);
+  L=[];
+  for(let i=0;i<9;i++){
+    const t=i/8*2-1;                            // -1 .. 1 across the patch
+    L.push({dx:t*7.4+(r()*1.3-0.65),
+            dy:4.0+(r()*1.3-0.65)+Math.abs(t)*0.4,
+            r :4.1-Math.abs(t)*0.9+r()*0.7});
+  }
+  L.push({dx:r()*9-4.5, dy:1.0+r()*1.1, r:2.3+r()*1.1});
+  L.push({dx:r()*11-5.5, dy:7.2+r()*0.9, r:2.0+r()*1.1});
+  // crumbs, the light ones biased high so the patch reads as lit from above
+  L.crumbs=[];
+  for(let i=0;i<16;i++){
+    const lit=r()<.5;
+    L.crumbs.push([Math.round(r()*19-9.5),
+                   Math.round(lit ? 1+r()*4 : 4+r()*5), lit]);
+  }
+  SOIL_CACHE.set(key,L);
+  return L;
+}
+
+/* [edge, fill, light crumb, dark crumb].
+   Derived from the map's own trail palette rather than fixed. A patch in
+   colours of its own reads as an object dropped on the lawn, which is what
+   the bed kept doing; in the path's colours it reads as the same earth, just
+   turned over. It also means a theme swap carries the soil with it. */
+let SOIL_TILLED=[], SOIL_ROUGH=[], SOIL_BAD=[];
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16), c=i=>
+    Math.max(0,Math.min(255,Math.round(((n>>i)&255)*f)));
+  return '#'+((1<<24)|(c(16)<<16)|(c(8)<<8)|c(0)).toString(16).slice(1);
+}
+function buildSoilPals(P){
+  SOIL_TILLED=[shade(P.edge,.72), shade(P.dirt,.92), P.inner,        shade(P.edge,.86)];
+  SOIL_ROUGH =[shade(P.edge,.50), shade(P.dirt,.60), shade(P.dirt,.80), shade(P.edge,.42)];
+  SOIL_BAD   =['#7e3330','#a85450','#c97d78','#8f3f3b'];
+  PATCH_CACHE.clear();
+}
+
+const PATCH_W=30, PATCH_H=22, PATCH_AX=15, PATCH_AY=7;
+const PATCH_CACHE=new Map();
+function rgb3(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function soilPatch(x,y,step,pal,halo,palKey){
+  const key=x+','+y+','+step+','+palKey+','+(halo||'-');
+  let c=PATCH_CACHE.get(key);
+  if(c) return c;
+  if(PATCH_CACHE.size>320) PATCH_CACHE.clear();
+  const g=step/8, L=soilLobes(x,y);
+  c=document.createElement('canvas'); c.width=PATCH_W; c.height=PATCH_H;
+  const q=c.getContext('2d');
+  for(const b of L) disc(q, PATCH_AX+b.dx, PATCH_AY+b.dy, b.r*g, pal[1]);
+  if(g>=0.8){
+    for(const cr of L.crumbs){
+      const px=PATCH_AX+cr[0], py=PATCH_AY+cr[1];
+      if(px<1||py<1||px>=PATCH_W-1||py>=PATCH_H-1) continue;
+      let inside=false;
+      for(const b of L){
+        const ex=px+0.5-(PATCH_AX+b.dx), ey=py+0.5-(PATCH_AY+b.dy);
+        if(ex*ex+ey*ey <= (b.r*g-1.2)*(b.r*g-1.2)){ inside=true; break; }
+      }
+      if(!inside) continue;
+      q.fillStyle = cr[2]?pal[2]:pal[3];
+      q.fillRect(px,py,1,1);
+    }
+  }
+  // one outline grown around the finished union, then the halo ring outside it
+  const im=q.getImageData(0,0,PATCH_W,PATCH_H), d=im.data;
+  let on=new Uint8Array(PATCH_W*PATCH_H);
+  for(let i=0;i<on.length;i++) on[i]= d[i*4+3] ? 1 : 0;
+  // v34: a mound lit from above: top row catches light, bottom row is in shade
+  const lit=rgb3(pal[2]), foot=mixc(rgb3(pal[1]),INK,0.25);
+  for(let py=0;py<PATCH_H;py++) for(let px=0;px<PATCH_W;px++){
+    const i=py*PATCH_W+px; if(!on[i]) continue;
+    const c=(py===0||!on[i-PATCH_W]) ? lit : ((py===PATCH_H-1||!on[i+PATCH_W]) ? foot : null);
+    if(c){ d[i*4]=c[0]; d[i*4+1]=c[1]; d[i*4+2]=c[2]; }
+  }
+  const ring=(src,col)=>{
+    const add=[];
+    for(let py=0;py<PATCH_H;py++) for(let px=0;px<PATCH_W;px++){
+      const i=py*PATCH_W+px;
+      if(src[i]) continue;
+      if((px>0&&src[i-1]) || (px<PATCH_W-1&&src[i+1]) ||
+         (py>0&&src[i-PATCH_W]) || (py<PATCH_H-1&&src[i+PATCH_W])) add.push(i);
+    }
+    const nx=Uint8Array.from(src);
+    for(const i of add){
+      d[i*4]=col[0]; d[i*4+1]=col[1]; d[i*4+2]=col[2]; d[i*4+3]=255; nx[i]=1;
+    }
+    return nx;
+  };
+  on=ring(on, rgb3(pal[0]));
+  if(halo) ring(on, rgb3(halo));
+  q.putImageData(im,0,0);
+  c=scale2x(c);
+  PATCH_CACHE.set(key,c);
+  return c;
+}
+// halo is a 1px rim in the patch's own shape: a selection marker shaped like
+// the thing it marks, which a rectangle around an irregular patch never was
+function drawSoil(x,y,grow,halo,pal,palKey){
+  const g=(grow===undefined)?1:grow;
+  if(g<=0.1) return;
+  const step=Math.max(1,Math.min(8,Math.round(g*8)));
+  ctx.drawImage(soilPatch(x,y,step,pal||SOIL_TILLED,halo,palKey||('t'+G.map)),
+                x-PATCH_AX, y-PATCH_AY);
+}
+
+function drawPlot(p){
+  const x=Math.round(p.x), y=Math.round(p.y);
+  if(p.blocked){                                  // a stump: pay to clear it
+    drawSoil(x,y,1,null,SOIL_ROUGH,'r'+G.map);
+    ctx.fillStyle='#3a2617'; ctx.fillRect(x-5,y-3,10,8);      // the cut trunk
+    ctx.fillStyle='#6b4630'; ctx.fillRect(x-4,y-2,8,6);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-4,y-3,8,3);       // sawn face
+    ctx.fillStyle='#b08454'; ctx.fillRect(x-3,y-3,6,2);
+    ctx.fillStyle='#8a6242'; ctx.fillRect(x-1,y-3,2,1);       // growth rings
+    ctx.fillStyle='#5c4433'; ctx.fillRect(x-3,y,1,3); ctx.fillRect(x+2,y+1,1,2);
+    ctx.fillStyle='#2f6b36';                                  // weeds beside it
+    ctx.fillRect(x-7,y+1,1,3); ctx.fillRect(x+6,y+2,1,2);
+    ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-8,y+1,1,1); ctx.fillRect(x+7,y+2,1,1);
+    return;
+  }
+  drawSoil(x,y,1,null,SOIL_TILLED);
+}
+function drawPlots(){
+  for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
+}
+
+/* Open placement: is this a legal spot for a bed?
+   Five tests, cheapest first. The trail test samples the bed on a 2px lattice
+   rather than measuring rectangle-to-polyline properly; the bed is 18x10, so
+   45 samples is exact enough and only ever runs for the one spot under the
+   pointer. */
+function clearOfTrail(x,y){
+  if(distToPath(x,y) >= TRAIL_CLEAR+10.3) return true;   // whole bed is far
+  for(let ix=x+BED_L; ix<=x+BED_R; ix+=2)
+    for(let iy=y+BED_T; iy<=y+BED_B; iy+=2)
+      if(distToPath(ix,iy) < TRAIL_CLEAR) return false;
+  return true;
+}
+// The carrot bed: where the map puts it, upright (2 x 5 carrots) or wide (5 x 2).
+// Its fence and a margin are no-build ground.
+let BED={x:278,y:66,w:28,h:60,o:'v'}, CARROT_BOX={l:272,t:58,r:312,b:132};
+function setBed(b){
+  const w=b.o==='h'?58:28, h=b.o==='h'?27:60;
+  BED={x:b.x,y:b.y,w,h,o:b.o};
+  CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
+}
+// where the trail crosses into the bed: which side, and how far along it
+function bedGate(){
+  const inside=p=>p.x>=BED.x&&p.x<=BED.x+BED.w&&p.y>=BED.y&&p.y<=BED.y+BED.h;
+  let i=PTS.length-1;
+  while(i>0 && inside(PTS[i])) i--;
+  const p=PTS[Math.min(PTS.length-1,i+1)];
+  const d={l:p.x-BED.x, r:BED.x+BED.w-p.x, t:p.y-BED.y, b:BED.y+BED.h-p.y};
+  const side=Object.keys(d).reduce((a,k)=>d[k]<d[a]?k:a,'l');
+  return {side, t:(side==='l'||side==='r')?p.y:p.x, x:p.x, y:p.y};
+}
+function overUI(x,y){
+  const L=x+BED_L, R=x+BED_R, T=y+BED_T, B=y+BED_B;
+  if(T < -OY+15 && (L < -OX+124 || R > W+OX-72)) return true;   // the top ribbon
+  if(T < plqTop()+PLQ_H+1 && R > PLQ_L && L < PLQ_R) return true; // the info plaque
+  const dockTop=H+OY-3-(DOCK_W+9);
+  if(B > dockTop-2 && L < -OX+dockWidthArt()+2) return true;    // the dock
+  return false;
+}
+function placeOK(x,y){
+  if(x+BED_L < -OX+2 || x+BED_R > W+OX-3) return false;
+  if(y+BED_T < -OY+2 || y+BED_B > H+OY-3) return false;
+  if(x+BED_R > CARROT_BOX.l && x+BED_L < CARROT_BOX.r &&
+     y+BED_B > CARROT_BOX.t && y+BED_T < CARROT_BOX.b) return false;
+  for(const p of G.plots)
+    if(Math.abs(p.x-x) < BED_W+BED_GAP && Math.abs(p.y-y) < BED_H+BED_GAP) return false;
+  if(overUI(x,y)) return false;
+  return clearOfTrail(x,y);
+}
+function snapTo(v){ return Math.round(v/SNAP)*SNAP; }
+function drawCarrots(){
+  const lost=MAX_LIVES-G.lives;       // bites taken, nearest the gate first
+  for(let i=0;i<MAX_CARROTS;i++){
+    const left=1-Math.min(BITES,Math.max(0,lost-i*BITES))/BITES;
+    if(left<=0) continue;
+    const sl=CARROT_SLOTS[i];
+    drawCarrot(sl.x, sl.y+Math.round(Math.sin(G.ui*1.1+i)*0.4), left);
+  }
+}
+
+/* ======================================================================
+   5. STATE
+   ====================================================================== */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+cv.width=W*ART_RES; cv.height=H*ART_RES; ctx.imageSmoothingEnabled=false;
+{
+  const _di=ctx.drawImage.bind(ctx);
+  ctx.drawImage=function(img,a,b){
+    if(arguments.length===3 && img._s>1) return _di(img,a,b,img.width/img._s,img.height/img._s);
+    return _di.apply(null,arguments);
+  };
+}
+const gw=img=>img.width/(img._s||1), gh=img=>img.height/(img._s||1);
+
+const G={
+  gold:150, lives:MAX_LIVES, map:1, pack:0, wave:0, phase:'idle', // idle | wave | rift | dead | won
+  speed:1, paused:true, started:false,
+  towers:[], foes:[], shots:[], fx:[], flies:[],
+  queue:[], qt:0, shake:0, flash:0, time:0,
+  plots:[], placing:null, ghost:null, hover:-1, hoverAge:0, selected:null, selPlot:-1,
+  hoverPos:null, selAge:0,
+  btns:[], btnHover:null, ui:0, toast:null, screen:'title'
+};
+
+// Lives carry across maps. Towers do not: the grid is a different shape on the
+// other side. Gold resets so each map stays its own clean puzzle, plus a bounty
+// on the carrots you kept, which is what makes protecting them matter.
+// Two compounding levers, both tunable here.
+// Carrots are worth more the deeper you go, and you pack a slice of your kit
+// through the rift, so a strong earlier map actually pays for the next one.
+const CARROT_BONUS=[0,0,6,8];     // by map number: map2 = 6/carrot, map3 = 8/carrot
+const PACK_REFUND=0.20;           // share of standing tower value carried over
+const MAP_BASE_GOLD=130;
+function carrotRate(n){ return CARROT_BONUS[n] || CARROT_BONUS[CARROT_BONUS.length-1]; }
+let curPal=MAPS[0].pal;
+function loadMap(n){
+  G.map=n;
+  const M=MAPS[n-1];
+  curPal=M.pal;
+  buildSoilPals(curPal);
+  seed=1337+n*7919;
+  buildGeometry(M.wp);
+  setBed(M.bed); layoutCarrots(); sortCarrots();
+  paintBG(M.pal);
+  // in open mode a plot comes into existence when a tower is planted in it
+  G.plots = (PLACEMENT==='plots')
+    ? M.plots.map(q=>({x:q[0],y:q[1],blocked:!!q[2],tower:null}))
+    : [];
+  G.towers=[]; G.foes=[]; G.shots=[]; G.fx=[]; G.queue=[]; G.qt=0;
+  G.selected=null; G.selPlot=-1; G.placing=null; G.ghost=null; G.hoverPos=null;
+  G.wave=0; G.phase='idle'; G.shake=0; G.flash=0;
+  G.gold = (n===1) ? 150 : MAP_BASE_GOLD + carrotRate(n)*G.lives + (G.pack||0);
+  G.pack=0;
+}
+loadMap(1);
+
+const BUTTERFLIES=[];
+for(let i=0;i<7;i++) BUTTERFLIES.push({x:rnd()*W,y:10+rnd()*(H-20),a:rnd()*6.28,sp:6+rnd()*8,c:['#ffd452','#f58fbf','#ffffff'][i%3]});
+
+/* ======================================================================
+   6. AUDIO
+   ====================================================================== */
+let AC=null, sndOn=true, lastTick=0;
+function actx(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function tone(f,dur,type,vol,f2){
+  if(!sndOn) return; const a=actx(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,a.currentTime);
+  if(f2) o.frequency.exponentialRampToValueAtTime(f2,a.currentTime+dur);
+  g.gain.setValueAtTime(vol||.06,a.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);
+  o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur+.02);
+}
+const SFX={
+  place(){ tone(320,.07,'square',.07); setTimeout(()=>tone(520,.09,'square',.07),60); },
+  up(){ tone(440,.06,'square',.07); setTimeout(()=>tone(660,.06,'square',.07),55); setTimeout(()=>tone(880,.1,'square',.07),110); },
+  shoot(){ const t=performance.now(); if(t-lastTick<90) return; lastTick=t; tone(700,.03,'square',.02,420); },
+  pop(){ tone(220,.06,'triangle',.045,90); },
+  coin(){ tone(980,.05,'square',.03); },
+  hurt(){ tone(200,.22,'sawtooth',.08,60); },
+  boom(){ tone(120,.18,'sawtooth',.06,50); },
+  wave(){ tone(392,.09,'square',.07); setTimeout(()=>tone(523,.09,'square',.07),90); setTimeout(()=>tone(659,.14,'square',.07),180); },
+  bad(){ tone(160,.3,'sawtooth',.09,70); },
+  tick(){ tone(620,.02,'square',.025); },
+  zap(){ tone(1500,.07,'square',.045,240); }
+};
+
+/* ======================================================================
+   7. HELPERS
+   ====================================================================== */
+function statsOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].lv[t.level-4] : F.lv[t.level-1];
+}
+function artOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].art : F.art;
+}
+function nameOf(t){
+  const F=TOWERS[t.fam];
+  return t.branch ? F.forks[t.branch].name : F.name;
+}
+function nextCost(t){
+  const F=TOWERS[t.fam];
+  if(t.branch) return t.level>=5 ? null : F.forks[t.branch].lv[t.level-3].cost;
+  if(t.level<3) return F.lv[t.level].cost;
+  return null; // fork point
+}
+// ---- plots ----------------------------------------------------------------
+// The tap target is the bed itself, grown by PLOT_PAD so a thumb still lands
+// on it. A radius no longer works now that the bed is wide and shallow: it
+// would either miss the ends or swallow the ground above and below.
+const PLOT_PAD=4;
+const CLEAR_COST=60;
+function plotAt(ax,ay){
+  let best=-1, bd=1e9;
+  const hw=BED_W/2+PLOT_PAD, hh=BED_H/2+PLOT_PAD;
+  for(let i=0;i<G.plots.length;i++){
+    const p=G.plots[i], dx=ax-p.x, dy=ay-(p.y+0.5);
+    if(Math.abs(dx)>hw || Math.abs(dy)>hh) continue;
+    // normalise so the nearest plot wins consistently across the two axes
+    const d=(dx/hw)*(dx/hw)+(dy/hh)*(dy/hh);
+    if(d<bd){ bd=d; best=i; }
+  }
+  return best;
+}
+function freePlot(i){ const p=G.plots[i]; return !!p && !p.blocked && !p.tower; }
+function towerAt(i){ const p=G.plots[i]; return p ? p.tower : null; }
+function addFx(o){ G.fx.push(Object.assign({life:0,ttl:.6},o)); }
+// painted by drawPlaque, in the plaque's spot, for TOAST_T seconds of real time
+const TOAST_T=1.1;
+function toast(msg){ G.toast={msg, t:G.ui}; }
+
+/* ======================================================================
+   8. WAVES
+   ====================================================================== */
+function startWave(){
+  if(G.phase!=='idle') return;
+  G.wave++;
+  const def=waveDef(G.wave);
+  G.queue=[]; G.qt=0;
+  def.g.forEach(grp=>{
+    const [type,count,gap,delay]=grp;
+    for(let i=0;i<count;i++) G.queue.push({type,t:(delay||0)+i*gap,m:def.m});
+  });
+  G.queue.sort((a,b)=>a.t-b.t);
+  G.phase='wave';
+  SFX.wave();
+}
+function spawn(type,m){
+  const E=ENEMIES[type];
+  G.foes.push({
+    type,E, hp:E.hp*m, max:E.hp*m, d:0, x:PTS[0].x, y:PTS[0].y,
+    slow:0, slowT:0, stunT:0, bob:Math.random()*6.28, hit:0, dead:false
+  });
+}
+function waveDone(){
+  const bonus=30+G.wave*7+(G.map-1)*25;
+  G.gold+=bonus;
+  addFx({type:'txt',x:W/2,y:40,txt:'+'+bonus,color:'#ffd452',ttl:1.2,vy:-14});
+  SFX.coin();
+  if(G.wave>=WAVES_PER_MAP && !G.endless){
+    if(G.map<MAPS.length){
+      // a slice of the standing kit comes through the rift; loadMap spends it
+      G.pack=Math.floor(G.towers.reduce((a,t)=>a+t.spent,0)*PACK_REFUND);
+      G.phase='rift'; showOver('rift');
+    }
+    else { G.phase='won'; showOver('won'); }
+  } else G.phase='idle';
+}
+
+/* ======================================================================
+   9. UPDATE
+   ====================================================================== */
+function damage(f,amt,src){
+  const armor=f.E.armor||0;
+  const real=Math.max(1,amt-armor);
+  f.hp-=real; f.hit=.12;
+  if(f.hp<=0 && !f.dead){
+    f.dead=true; G.gold+=f.E.bounty;
+    addFx({type:'txt',x:f.x,y:f.y-6,txt:'+'+f.E.bounty,color:'#ffd452',ttl:.8,vy:-16});
+    for(let i=0;i<(f.E.boss?14:6);i++) addFx({type:'bit',x:f.x,y:f.y,vx:(Math.random()-.5)*40,vy:-10-Math.random()*30,ttl:.5,color:f.E.boss?'#a057b8':'#8fdc8b'});
+    SFX.pop(); if(f.E.boss){ SFX.boom(); G.shake=4; }
+  }
+}
+function applyStun(f,dur){
+  const d=dur*(1-(f.E.slowRes||0));
+  if(d>f.stunT) f.stunT=d;
+}
+function jag(pts){
+  const out=[pts[0]];
+  for(let i=1;i<pts.length;i++){
+    const a=out[out.length-1], b=pts[i];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, n=Math.max(2,Math.round(L/6));
+    for(let k=1;k<n;k++){
+      const t=k/n, off=(Math.random()-.5)*3.4;
+      out.push({x:a.x+dx*t+(-dy/L)*off, y:a.y+dy*t+(dx/L)*off});
+    }
+    out.push({x:b.x,y:b.y});
+  }
+  return out;
+}
+function applySlow(f,amt,dur){
+  if(f.E.noSlow) return;
+  const eff=amt*(1-(f.E.slowRes||0));
+  if(eff>=f.slow){ f.slow=eff; f.slowT=Math.max(f.slowT,dur); }
+}
+function pickTarget(t,st){
+  let best=null,bd=-1;
+  const r2=st.rng*st.rng;
+  for(const f of G.foes){
+    if(f.dead) continue;
+    const dx=f.x-t.x, dy=f.y-t.y;
+    if(dx*dx+dy*dy<=r2 && f.d>bd){ bd=f.d; best=f; }
+  }
+  return best;
+}
+
+function step(dt){
+  G.time+=dt;
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt*14);
+  if(G.flash>0) G.flash=Math.max(0,G.flash-dt*3);
+
+  // butterflies
+  for(const b of BUTTERFLIES){
+    b.a+=(Math.random()-.5)*dt*4; b.x+=Math.cos(b.a)*b.sp*dt; b.y+=Math.sin(b.a)*b.sp*dt*.6;
+    if(b.x<-OX+3||b.x>W+OX-3) b.a=Math.PI-b.a; if(b.y<-OY+3||b.y>H+OY-3) b.a=-b.a;
+  }
+
+  // spawning
+  if(G.phase==='wave'){
+    G.qt+=dt;
+    while(G.queue.length && G.queue[0].t<=G.qt){ const q=G.queue.shift(); spawn(q.type,q.m); }
+  }
+
+  // enemies
+  for(const f of G.foes){
+    if(f.dead) continue;
+    if(f.slowT>0){ f.slowT-=dt; if(f.slowT<=0) f.slow=0; }
+    let sp=f.E.spd*(1-f.slow);
+    if(f.stunT>0){ f.stunT-=dt; sp=0; }
+    f.d+=sp*dt;
+    f.bob+=dt*(f.type==='moth'?18:7);
+    if(f.hit>0) f.hit-=dt;
+    const p=posAt(f.d); f.x=p.x; f.y=p.y; f.face=p.dx<0?-1:1;
+    if(f.d>=PATH_LEN){
+      f.dead=true; f.leaked=true;
+      const loss=(f.E.lives||1);
+      const from=MAX_LIVES-G.lives;
+      G.lives=Math.max(0,G.lives-loss);
+      const to=MAX_LIVES-G.lives;
+      const bitten=new Set();
+      for(let b=from; b<to; b++) bitten.add(Math.floor(b/BITES));
+      for(const ci of bitten){                               // show each bite land
+        const sl=CARROT_SLOTS[ci]; if(!sl) continue;
+        addFx({type:'eaten',x:sl.x,y:sl.y,ttl:.45});
+        for(let k=0;k<5;k++) addFx({type:'bit',x:sl.x+1,y:sl.y,
+          vx:(Math.random()-.5)*34, vy:-16-Math.random()*16, ttl:.5,
+          color:k<3?'#ff9a3c':'#4f9d4a'});
+      }
+      G.shake=5; G.flash=1; SFX.hurt();
+      addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
+      if(G.lives<=0){ G.lives=0; G.phase='dead'; showOver('dead'); }
+    }
+  }
+
+  // towers
+  for(const t of G.towers){
+    const st=statsOf(t);
+    t.bob=(t.bob||0)+dt;
+    if(st.aura){
+      t.cd-=dt;
+      if(t.cd<=0){
+        t.cd=.25;
+        const r2=st.rng*st.rng; let any=false;
+        for(const f of G.foes){
+          if(f.dead) continue;
+          const dx=f.x-t.x, dy=f.y-t.y;
+          if(dx*dx+dy*dy<=r2){ damage(f,st.dmg*.25); if(st.slow) applySlow(f,st.slow,.4); any=true; }
+        }
+        if(any){ addFx({type:'bit',x:t.x+(Math.random()-.5)*st.rng,y:t.y+(Math.random()-.5)*st.rng,vx:0,vy:-6,ttl:.6,color:'#ffd452'}); }
+      }
+      continue;
+    }
+    t.cd-=dt;
+    if(t.cd<=0){
+      const tg=pickTarget(t,st);
+      if(tg && t.fam==='zap'){
+        t.cd=1/st.rate; t.face=tg.x<t.x?-1:1; t.kick=.12;
+        const chain=[tg]; let cur=tg, dmg=st.dmg;
+        damage(tg,dmg);
+        if(st.stun) applyStun(tg,st.stun);
+        for(let n=0;n<(st.chain||0);n++){
+          let best=null, bd=34*34;
+          for(const f of G.foes){
+            if(f.dead||chain.indexOf(f)>=0) continue;
+            const dx=f.x-cur.x, dy=f.y-cur.y, d=dx*dx+dy*dy;
+            if(d<bd){ bd=d; best=f; }
+          }
+          if(!best) break;
+          dmg*=st.fall; damage(best,dmg); chain.push(best); cur=best;
+        }
+        addFx({type:'bolt', pts:jag([{x:t.x,y:t.y-3}].concat(chain.map(f=>({x:f.x,y:f.y})))), ttl:.22});
+        SFX.zap();
+      } else if(tg){
+        t.cd=1/st.rate; t.face=tg.x<t.x?-1:1; t.kick=.12;
+        const kind = t.fam==='hive'?'bee' : (t.fam==='sprink'?'drop':'pebble');
+        let ax=tg.x, ay=tg.y;
+        if(kind==='drop'){ // lead the shot so fast bugs still get soaked
+          const flight=Math.hypot(tg.x-t.x,tg.y-t.y)/95;
+          const lp=posAt(tg.d+tg.E.spd*(1-tg.slow)*flight); ax=lp.x; ay=lp.y;
+        }
+        G.shots.push({
+          kind, x:t.x, y:t.y-4, tx:ax, ty:ay, tgt:tg,
+          sp: kind==='drop'?95:(kind==='bee'?70:130),
+          dmg:st.dmg, splash:st.splash||0, slow:st.slow||0, slowT:st.slowT||0,
+          life:0, wob:Math.random()*6.28,
+          col: t.fam==='hive' ? (t.branch==='wasp'?'#cfd3e0':'#ffd452') : (t.branch==='frost'?'#a8ecff':(t.branch==='geyser'?'#59b0e6':'#c9a06a'))
+        });
+        SFX.shoot();
+      } else t.cd=0;
+    }
+    if(t.kick>0) t.kick-=dt;
+  }
+
+  // projectiles
+  for(const s of G.shots){
+    s.life+=dt; s.wob+=dt*14;
+    if(s.kind!=='drop' && s.tgt && !s.tgt.dead){ s.tx=s.tgt.x; s.ty=s.tgt.y; }
+    const dx=s.tx-s.x, dy=s.ty-s.y, d=Math.hypot(dx,dy);
+    const mv=s.sp*dt;
+    if(d<=mv+1 || s.life>3){
+      s.done=true;
+      if(s.splash){
+        addFx({type:'ring',x:s.tx,y:s.ty,r:2,rmax:s.splash,ttl:.32,color:s.col});
+        const r2=s.splash*s.splash;
+        for(const f of G.foes){ if(f.dead) continue;
+          const ex=f.x-s.tx, ey=f.y-s.ty;
+          if(ex*ex+ey*ey<=r2){ damage(f,s.dmg); if(s.slow) applySlow(f,s.slow,s.slowT); }
+        }
+        SFX.boom();
+      } else if(s.tgt && !s.tgt.dead){
+        damage(s.tgt,s.dmg);
+        addFx({type:'bit',x:s.tx,y:s.ty,vx:(Math.random()-.5)*30,vy:-14,ttl:.25,color:s.col});
+      }
+    } else { s.x+=dx/d*mv; s.y+=dy/d*mv; }
+  }
+
+  // effects
+  for(const e of G.fx){
+    e.life+=dt;
+    if(e.vx!==undefined) e.x+=e.vx*dt;
+    if(e.vy!==undefined){ e.y+=e.vy*dt; if(e.type==='bit') e.vy+=90*dt; }
+  }
+
+  G.shots=G.shots.filter(s=>!s.done);
+  G.fx=G.fx.filter(e=>e.life<e.ttl);
+  G.foes=G.foes.filter(f=>!f.dead);
+
+  if(G.phase==='wave' && !G.queue.length && !G.foes.length) waveDone();
+}
+
+/* ======================================================================
+   10. DRAW
+   ====================================================================== */
+function ring(cx,cy,rad,color,alpha){
+  ctx.fillStyle=color; ctx.globalAlpha=alpha===undefined?1:alpha;
+  const steps=Math.max(16,Math.floor(rad*2.2));
+  for(let i=0;i<steps;i++){
+    const a=i/steps*Math.PI*2;
+    ctx.fillRect(Math.round(cx+Math.cos(a)*rad),Math.round(cy+Math.sin(a)*rad),1,1);
+  }
+  ctx.globalAlpha=1;
+}
+/* ---------- in-world pixel UI: glyph icons, plates and buttons ---------- */
+const GL={
+  check:[".....x","....xx","x..xx.","xxxx..",".xx..."],
+  cross:["x...x",".x.x.","..x..",".x.x.","x...x"],
+  up:["..x..",".xxx.","xxxxx","..x..","..x.."],      // upgrade: an arrow, not a diamond
+  coin:[".xxx.","x...x","x.x.x","x...x",".xxx."],
+  note:["...xx","..xxx","..x..","xxx..","xxx.."],
+  pause:["x.x","x.x","x.x","x.x","x.x"],
+  play:["x..","xx.","xxx","xx.","x.."],
+  back:["..x",".xx","xxx",".xx","..x"],
+  flag:["x...","xxx.","xxxx","x...","x..."],    // map; a 3px M reads as H
+  wave:[".....",".x...","x.x.x","...x.","....."] // wave; so does a 3px W
+};
+function glyph(rows,x,y,col,shadow){
+  if(shadow){
+    ctx.fillStyle=shadow;
+    for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+      if(rows[j][i]==='x') ctx.fillRect(x+i+1,y+j+1,1,1);
+  }
+  ctx.fillStyle=col;
+  for(let j=0;j<rows.length;j++)for(let i=0;i<rows[j].length;i++)
+    if(rows[j][i]==='x') ctx.fillRect(x+i,y+j,1,1);
+}
+// No drop shadow: translucent black on grass read as a murky green band under
+// every plate (removed in v33.2). The light rim is enough to lift it.
+// v34: a plate is a small lit object: coloured dark rim, a lit top row in its
+// edge colour, a shadowed foot. Still no drop shadow (v33.2).
+function plate(x,y,w,h,fill,edge){
+  const f=rgb3(fill);
+  ctx.fillStyle=hexc(inkOf(f.map(v=>v*0.8))); ctx.fillRect(x+1,y,w-2,h); ctx.fillRect(x,y+1,w,h-2);
+  ctx.fillStyle=fill; ctx.fillRect(x+1,y+1,w-2,h-2);
+  ctx.fillStyle=edge; ctx.fillRect(x+2,y+1,w-4,1);
+  ctx.fillStyle=hexc(mixc(f,INK,0.3)); ctx.fillRect(x+2,y+h-2,w-4,1);
+}
+const BTN_SKIN={
+  ok   :['#4f9d4a','#82d17c'], no   :['#3a3f3a','#6a706a'],
+  up   :['#3d5f8f','#7aa6dd'], sell :['#8a5a3d','#c99a76'],
+  close:['#3a3f3a','#6a706a'], fork :['#2f4a3a','#6fb98a']
+};
+// Place each action around the plot: try its preferred side, then the others,
+// rejecting anything off-frame, overlapping the plot, or overlapping a button
+// already placed. Falls back to sliding along the free axis.
+function rectsHit(a,b){
+  return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+}
+// The keep-out box is the bed plus its selection frame plus the tower
+// silhouette standing in it, not a 16px tile. Buttons that cleared a tile
+// still landed on the gnome's hat.
+const KEEP_L=BED_L-1, KEEP_R=BED_R+1, KEEP_T=TOWER_DY-9, KEEP_B=BED_B+1;
+function layoutBtns(cx,cy,specs){
+  const gap=2, minX=-OX+1, maxX=W+OX-1, minY=-OY+1, maxY=H+OY-1;
+  const tile={x:cx+KEEP_L, y:cy+KEEP_T, w:KEEP_R-KEEP_L+1, h:KEEP_B-KEEP_T+1};
+  const midY=cy+(BED_T+BED_B)/2;      // vertical centre of the bed, not the box
+  const placed=[], out=[];
+  const posFor=(side,w,h)=>{
+    if(side==='right') return {x:cx+KEEP_R+1+gap, y:midY-h/2};
+    if(side==='left')  return {x:cx+KEEP_L-gap-w, y:midY-h/2};
+    if(side==='up')    return {x:cx-w/2, y:cy+KEEP_T-gap-h};
+    return {x:cx-w/2, y:cy+KEEP_B+1+gap};
+  };
+  const okAt=(x,y,w,h)=>{
+    if(x<minX||x+w>maxX||y<minY||y+h>maxY) return false;
+    const r={x,y,w,h};
+    if(rectsHit(r,tile)) return false;
+    return !placed.some(q=>rectsHit(r,q));
+  };
+  const ORDER=['right','left','up','down'];
+  specs.forEach(sp=>{
+    const w=sp.w||11, h=sp.h||11;
+    const sides=[sp.side].concat(ORDER.filter(x=>x!==sp.side));
+    let found=null;
+    for(const side of sides){
+      const p=posFor(side,w,h);
+      const x=Math.round(p.x), y=Math.round(p.y);
+      if(okAt(x,y,w,h)){ found={x,y}; break; }
+      // slide along the axis this side leaves free
+      const vertical = (side==='right'||side==='left');
+      for(let k=1;k<=3&&!found;k++){
+        for(const dir of [-1,1]){
+          const nx=vertical? x : x+dir*k*(w+gap);
+          const ny=vertical? y+dir*k*(h+gap) : y;
+          if(okAt(nx,ny,w,h)){ found={x:nx,y:ny}; break; }
+        }
+      }
+      if(found) break;
+    }
+    if(!found){   // last resort: clamp the preferred side into frame
+      const p=posFor(sp.side,w,h);
+      found={x:Math.max(minX,Math.min(maxX-w,Math.round(p.x))),
+             y:Math.max(minY,Math.min(maxY-h,Math.round(p.y)))};
+    }
+    placed.push({x:found.x,y:found.y,w,h});
+    out.push(Object.assign({},sp,{x:found.x,y:found.y,w,h}));
+  });
+  return out;
+}
+function drawBtn(b){
+  const press=(G.btnHover===b.act)?1:0;
+  const y=b.y+press;
+  if(b.sprite){
+    plate(b.x,y,b.w,b.h,BTN_SKIN.fork[0],BTN_SKIN.fork[1]);
+    ctx.globalAlpha=b.dis?.45:1;
+    ctx.drawImage(ART[b.sprite], b.x+1, y+1);
+    ctx.globalAlpha=1;
+  } else {
+    const sk=BTN_SKIN[b.act]||BTN_SKIN.no;
+    plate(b.x,y,b.w,b.h,sk[0],sk[1]);
+    glyph(GL[b.glyph],b.x+3,y+3,b.dis?'#8d92a8':(b.act==='sell'?'#ffd452':'#ffffff'));
+  }
+  if(b.num!==undefined){
+    // A price tag, not loose text. It used to be a translucent smear that the
+    // trail showed straight through; now it is an opaque chip with a rim, and
+    // it flips to whichever side of the button has room inside the frame.
+    const t=String(b.num), tw=textW(t);
+    let bx=Math.round(b.x+b.w/2-tw/2);
+    let by=(b.side==='up'||b.side==='left'||b.side==='right') ? y-8 : y+b.h+1;
+    if(by<-OY+1) by=y+b.h+1;
+    if(by+7>H+OY-1) by=y-8;
+    bx=Math.max(-OX+3, Math.min(W+OX-4-tw, bx));
+    plate(bx-2, by-1, tw+4, 9, '#2a2f28', '#4b5248');
+    // money back reads green, money out reads yellow
+    drawText(bx, by+1, t, b.dis?'#8d92a8':(b.act==='sell'?'#8ee88a':'#ffd452'));
+  }
+}
+// The dock used to be <button> elements. Native button rendering, focus rings
+// and canvas filters all put a faint box around each card that no amount of
+// background:none removed, so it is drawn here instead: sprite, price, nothing.
+const DOCK_W=18, DOCK_GAP=6, DOCK_PAD=4;
+function dockWidthArt(){ return DOCK_PAD + FAMS.length*(DOCK_W+DOCK_GAP); }
+function dockSlots(){
+  const cellH=DOCK_W+9;
+  const top=H+OY-3-cellH;
+  return FAMS.map((fam,i)=>({
+    act:'card', fam,
+    x:Math.round(-OX+DOCK_PAD+i*(DOCK_W+DOCK_GAP)),
+    y:Math.round(top), w:DOCK_W, h:cellH
+  }));
+}
+function drawDock(){
+  const slots=dockSlots();
+  slots.forEach(sl=>{
+    const F=TOWERS[sl.fam], img=ART[F.art];
+    const sel=G.placing===sl.fam, poor=G.gold<F.cost;
+    const lift=sel?2:0;
+    if(sel){                                  // a small gold shelf marks the armed one
+      ctx.fillStyle='#ffd452';
+      ctx.fillRect(sl.x+1, sl.y+DOCK_W, DOCK_W-2, 1);
+      ctx.fillStyle='rgba(255,212,82,.35)';
+      ctx.fillRect(sl.x+3, sl.y+DOCK_W+1, DOCK_W-6, 1);
+    }
+    ctx.globalAlpha=(poor&&!sel)?0.42:1;
+    ctx.drawImage(img, Math.round(sl.x+(DOCK_W-gw(img))/2), Math.round(sl.y-lift-(gh(img)-18)/2));
+    ctx.globalAlpha=1;
+    const t=String(F.cost), wTot=6+textW(t);
+    const px=Math.round(sl.x+(DOCK_W-wTot)/2), py=sl.y+DOCK_W+3;
+    plate(px-3,py-2,wTot+6,9,'#2f3329','#5d6455');
+    ctx.drawImage(poor?COIN2_DIM:COIN2,px,py);
+    drawText(px+6,py,t, sel?'#ffeedd':(poor?'#8d92a8':'#ffd452'));
+  });
+  return slots;
+}
+
+// The HUD used to be HTML chips. Painted here instead, it shares the dock's
+// language exactly: sprites and pixel digits sitting on the grass for the
+// read-outs, plates only for the things you can actually tap.
+function drawHUD(){
+  const SH='#17200f';                         // the shadow every read-out carries
+  const x0=Math.round(-OX+3), y0=Math.round(-OY+3);
+  const car=ART.carrot;
+  ctx.drawImage(car, x0, y0+1);
+  let x=x0+gw(car)+1;
+  drawText(x, y0+3, String(G.lives), '#ffffff', SH);
+  x+=textW(String(G.lives))+7;
+  ctx.drawImage(COIN2, x, y0+3);
+  x+=7;
+  drawText(x, y0+3, String(G.gold), '#ffd452', SH);
+  x+=textW(String(G.gold))+8;
+  glyph(GL.flag, x, y0+3, '#e8dcc4', SH);
+  x+=6;
+  drawText(x, y0+3, String(G.map), '#e8dcc4', SH);
+  x+=textW(String(G.map))+6;
+  glyph(GL.wave, x, y0+3, '#ffffff', SH);
+  x+=7;
+  const shown=Math.max(1, G.phase==='idle' ? G.wave+1 : G.wave);
+  const wv=String(shown)+(shown>WAVES_PER_MAP?'':'/'+WAVES_PER_MAP);
+  drawText(x, y0+3, wv, '#ffffff', SH);
+
+  // controls, right to left. Taller than the read-outs so they stay thumb-sized.
+  const bh=13, by=y0-2;
+  const st=actionState();
+  const out=[];
+  let rx=Math.round(W+OX-3);
+  const aw=(st==='send') ? textW('GO')+8 : 13;
+  rx-=aw; out.push({act:'hud_action', x:rx, y:by, w:aw, h:bh, state:st});
+  const sl=String(G.speed)+'X', sw=textW(sl)+8;
+  rx-=sw+3; out.push({act:'hud_speed', x:rx, y:by, w:sw, h:bh, label:sl});
+  rx-=13+3; out.push({act:'hud_sound', x:rx, y:by, w:13, h:bh});
+
+  out.forEach(b=>{
+    const hot=(G.btnHover===b.act)?1:0;
+    const y=b.y+hot;
+    if(b.act==='hud_action' && b.state==='send'){
+      plate(b.x,y,b.w,b.h,'#4f9d4a','#82d17c');
+      drawText(b.x+4, y+4, 'GO', '#ffffff', '#2c5c2a');
+    } else {
+      plate(b.x,y,b.w,b.h,'#2f3329','#5d6455');
+      if(b.act==='hud_action'){
+        const g = b.state==='resume' ? GL.play : GL.pause;
+        glyph(g, b.x+5, y+4, b.state==='resume' ? '#e2c06a' : '#c2cfbe');
+      } else if(b.act==='hud_speed'){
+        drawText(b.x+4, y+4, b.label, '#dfe8db', '#181c14');
+      } else {
+        glyph(GL.note, b.x+4, y+4, sndOn ? '#c2cfbe' : '#5d6455');
+      }
+    }
+  });
+  return out;
+}
+
+function hitBtn(ax,ay){
+  for(const b of G.btns) if(ax>=b.x-3&&ax<=b.x+b.w+3&&ay>=b.y-3&&ay<=b.y+b.h+3) return b;
+  return null;
+}
+
+/* ---------------- the placement mark ----------------
+   Third attempt, and the first one that is not an object laid over the world.
+   Vines lost because they sprouted from exactly where the tower stands. The
+   frame lost because it drew a rectangle around something that is not
+   rectangular. What marks a spot now is the ground itself being turned over:
+   the soil patch grows out of nothing with easeOutBack, a few clods of dirt
+   kick up and fall back, and a 1px rim in the patch's own shape says whose
+   spot it is. One animation, at the moment of choosing, which is the only
+   moment that needed marking. Deliberately small, so it can be built on. */
+const SEL_GROW=0.22;
+function easeOutBack(t,k){ k=k||1.9; t=t<0?0:(t>1?1:t);
+  return 1+(k+1)*Math.pow(t-1,3)+k*Math.pow(t-1,2); }
+
+// six clods thrown up by the dig, on fixed parabolas so they never shimmer
+function digSpecks(x,y,age){
+  if(age<=0 || age>0.5) return;
+  const r=soilRnd(x+7,y+13);
+  for(let i=0;i<6;i++){
+    const dir = r()<.5 ? -1 : 1;
+    const reach = 7+r()*7, up = 4+r()*4, lag = r()*0.06;
+    const t=(age-lag)/0.40;
+    if(t<=0||t>=1) continue;
+    const sx = x + dir*reach*t;
+    const sy = y + 3 - (up*4*t*(1-t));            // up, then back down
+    ctx.fillStyle = (i%3) ? '#7a5636' : '#9c7048';
+    ctx.fillRect(Math.round(sx), Math.round(sy), 1, 1);
+  }
+}
+
+// mode: 'hover' | 'armed' | 'bad' | 'selected'
+function plotMark(cx,cy,age,mode){
+  if(age<=0) return;
+  const x=Math.round(cx), y=Math.round(cy);
+  const g=Math.min(1, easeOutBack(age/SEL_GROW));
+  if(mode==='bad'){
+    ctx.globalAlpha=.72; drawSoil(x,y,g,'#c0423c',SOIL_BAD,'bad'); ctx.globalAlpha=1;
+    return;
+  }
+  if(mode==='hover'){
+    ctx.globalAlpha=.5; drawSoil(x,y,g,'#c9a36a',SOIL_TILLED); ctx.globalAlpha=1;
+    return;
+  }
+  // armed or selected: full soil with a gold rim. Only a fresh dig throws dirt.
+  drawSoil(x,y,g,'#ffd452',SOIL_TILLED);
+  if(mode==='armed') digSpecks(x,y,age);
+}
+
+// grow a 1px outline around the art, so it holds up on any background
+// Coloured outline (v34): each outline pixel takes the colour of the sprite
+// pixel it wraps, darkened toward INK. Bottom and right edges, away from the
+// light, go darker; top and left edges stay lighter. Never black.
+function mkOutlined(rows,pal){
+  const w=rows[0].length, h=rows.length;
+  const c=document.createElement('canvas'); c.width=w+2; c.height=h+2;
+  const x=c.getContext('2d');
+  const col=(i,j)=> (i>=0&&j>=0&&i<w&&j<h) ? pal[rows[j][i]] : null;
+  for(let j=-1;j<=h;j++) for(let i=-1;i<=w;i++){
+    if(col(i,j)) continue;
+    const dark=col(i,j-1)||col(i-1,j), lit=col(i,j+1)||col(i+1,j);
+    if(!dark && !lit) continue;
+    const base=rgb3(dark||lit), dk=mixc(base.map(v=>v*0.55),INK,0.45);
+    x.fillStyle=hexc(dark ? dk.map(Math.round) : mixc(dk,base,0.3));
+    x.fillRect(i+1,j+1,1,1);
+  }
+  for(let j=0;j<h;j++) for(let i=0;i<w;i++){
+    const cc=pal[rows[j][i]];
+    if(cc){ x.fillStyle=cc; x.fillRect(i+1,j+1,1,1); }
+  }
+  return c;
+}
+function pxLine(x0,y0,x1,y1,col){
+  x0=Math.round(x0); y0=Math.round(y0); x1=Math.round(x1); y1=Math.round(y1);
+  const dx=Math.abs(x1-x0), sx=x0<x1?1:-1, dy=-Math.abs(y1-y0), sy=y0<y1?1:-1;
+  let err=dx+dy;
+  ctx.fillStyle=col;
+  for(let i=0;i<200;i++){
+    ctx.fillRect(x0,y0,1,1);
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>=dy){ err+=dy; x0+=sx; }
+    if(e2<=dx){ err+=dx; y0+=sy; }
+  }
+}
+// P5: a flat soft shadow at the feet, a cool dark tint rather than black,
+// drawn on the 2x grid so its ends round off
+function shadow(x,y,w){
+  ctx.fillStyle='rgba(28,60,52,.22)';
+  const X=Math.round(x*2)/2, Y=Math.round(y*2)/2, hw=w/2;
+  ctx.fillRect(X-hw+1,Y-0.5,w-2,0.5);
+  ctx.fillRect(X-hw,Y,w,1);
+  ctx.fillRect(X-hw+1,Y+1,w-2,0.5);
+}
+// P5: petals drifting across the garden, one art pixel each, tumbling
+const PETALS=[];
+function drawPetals(){
+  if(!PETALS.length) for(let i=0;i<14;i++) PETALS.push({x:Math.random()*400, y:Math.random()*200, s:0.25+Math.random()*0.35, ph:Math.random()*6, w:i%3===2});
+  const t=performance.now()/1000, SW=W+2*OX+20, SH=H+2*OY+20;
+  for(const p of PETALS){
+    const a=t*p.s;
+    const x=((p.x+a*18+Math.sin(t*0.9+p.ph)*4)%SW+SW)%SW-OX-10;
+    const y=((p.y+a*9)%SH+SH)%SH-OY-10;
+    ctx.fillStyle=p.w?'#fff4e6':'#f6a9c8';
+    const flip=Math.sin(t*3+p.ph)>0;
+    ctx.fillRect(Math.round(x*2)/2, Math.round(y*2)/2, flip?1:0.5, 0.5);
+  }
+}
+function drawSprite(key,flip,x,y,w,h){
+  const img=(flip===-1?FLIP[key]:ART[key])||ART[key];
+  ctx.drawImage(img, Math.round(x-gw(img)/2), Math.round(y-gh(img)/2));
+}
+
+function draw(){
+  let pending=[];      // in-world buttons, drawn last so nothing covers them
+  ctx.setTransform(ART_RES,0,0,ART_RES,0,0);
+  ctx.save();
+  if(G.shake>0) ctx.translate(Math.round((Math.random()-.5)*G.shake), Math.round((Math.random()-.5)*G.shake));
+  ctx.drawImage(BGX||bg,0,0);
+  ctx.translate(OX,OY);
+
+  // butterflies (behind everything)
+  for(const b of BUTTERFLIES){
+    const f=Math.sin(G.time*18+b.x)>0?1:0;
+    ctx.fillStyle=b.c;
+    ctx.fillRect(Math.round(b.x),Math.round(b.y),1,1);
+    ctx.fillRect(Math.round(b.x)-1,Math.round(b.y)-f,1,1);
+    ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)-f,1,1);
+  }
+
+  drawPlots();
+  drawCarrots();
+
+  G.btns=[];
+
+  // placement: the spot under the pointer, then the armed spot with its buttons
+  if(G.placing){
+    const F=TOWERS[G.placing];
+    // what the pointer is over, if it is not already the armed spot
+    let hx=null, hy=null, hok=true;
+    if(PLACEMENT==='open'){
+      const hp=G.hoverPos;
+      if(hp && !(G.ghost && G.ghost.x===hp.x && G.ghost.y===hp.y)){
+        hx=hp.x; hy=hp.y; hok=hp.ok;
+      }
+    } else if(G.hover>=0 && !(G.ghost && G.ghost.i===G.hover)){
+      hx=G.plots[G.hover].x; hy=G.plots[G.hover].y;
+    }
+    if(hx!==null){
+      if(hok){
+        plotMark(hx,hy,G.hoverAge,'hover');
+        // with a free position the range matters more before you commit
+        ring(hx,hy,F.lv[0].rng,'#ffffff',PLACEMENT==='open'?.45:.28);
+      } else {
+        plotMark(hx,hy,G.hoverAge,'bad');
+      }
+    }
+    if(G.ghost){
+      const cx=G.ghost.x, cy=G.ghost.y;
+      ring(cx,cy,F.lv[0].rng,'#ffd452',.85);
+      plotMark(cx,cy,G.ghost.age||0,'armed');
+      const drop=1-Math.pow(1-Math.min(1,(G.ghost.age||0)/0.18),3);
+      ctx.globalAlpha=.55+drop*.3;
+      drawSprite(F.art,1,cx,cy+TOWER_DY+Math.round((1-drop)*-4),16,16);
+      ctx.globalAlpha=1;
+      const bs=layoutBtns(cx,cy,[
+        {act:'ok', glyph:'check', side:'right', num:F.cost, dis:G.gold<F.cost},
+        {act:'no', glyph:'cross', side:'left'}
+      ]);
+      G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+    }
+  }
+
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    const pl=G.plots[G.selPlot];
+    // the stump is already drawn; this adds the gold rim around it
+    plotMark(pl.x,pl.y,G.selAge||0,'selected');
+    const bs=layoutBtns(pl.x,pl.y,[
+      {act:'clear', glyph:'coin', side:'right', num:CLEAR_COST, dis:G.gold<CLEAR_COST, plot:G.selPlot}
+    ]);
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+  }
+
+  // selected tower: range ring plus its actions, arranged around the plot
+  if(G.selected && G.towers.includes(G.selected)){
+    const t=G.selected, F=TOWERS[t.fam], st=statsOf(t);
+    ring(t.x,t.y,st.rng,'#ffd452',.7);
+    // same gold rim as an armed spot, so selection reads the same everywhere
+    plotMark(t.x,t.y,G.selAge||0,'selected');
+    const sell=Math.floor(t.spent*.6);
+    const atFork=!t.branch && t.level===3;
+    if(atFork){
+      const keys=Object.keys(F.forks);
+      const A=F.forks[keys[0]], B=F.forks[keys[1]];
+      // tapping anywhere else already deselects, so no close button is needed
+      var bs=layoutBtns(t.x,t.y,[
+        {act:'forkA', side:'left',  w:20,h:20, sprite:A.art, branch:keys[0], num:A.lv[0].cost, dis:G.gold<A.lv[0].cost},
+        {act:'forkB', side:'right', w:20,h:20, sprite:B.art, branch:keys[1], num:B.lv[0].cost, dis:G.gold<B.lv[0].cost},
+        {act:'sell',  side:'up',    glyph:'coin', num:sell}
+      ]);
+    } else {
+      const cost=nextCost(t);
+      const specs=[{act:'sell', glyph:'coin', side:'left', num:sell}];
+      if(cost!==null) specs.unshift({act:'up', glyph:'up', side:'right', num:cost, dis:G.gold<cost});
+      var bs=layoutBtns(t.x,t.y,specs);
+    }
+    G.btns=G.btns.concat(bs); pending=pending.concat(bs);
+  }
+
+  // towers
+  const sorted=G.towers.slice().sort((a,b)=>a.y-b.y);
+  for(const t of sorted){
+    const st=statsOf(t);
+    // no ground shadow: it stands on a bed now, and the shadow read as extra
+    // bed edge underneath, which is what made towers look like they sat high
+    const kick=t.kick>0?1:0;
+    const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
+    drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+TOWER_DY+bob+kick, 16,16);
+    // level pips ride the bed's bottom frame row, under the tower's feet
+    const lv=t.level;
+    for(let i=0;i<lv;i++){
+      ctx.fillStyle = i>=3 ? '#a8ecff' : '#ffd452';
+      ctx.fillRect(Math.round(t.x-lv*1.5+i*3), Math.round(t.y+PIP_Y), 2,1);
+    }
+    if(st.aura){
+      const a=(Math.sin(G.time*3)+1)*.5;
+      ring(t.x,t.y,st.rng-1,'#ffd452',.10+a*.10);
+    }
+  }
+
+  // enemies
+  for(const f of G.foes){
+    const E=f.E, w=E.boss?16:12;
+    const fa=Math.max(0,Math.min(1, f.d/16, (PATH_LEN-f.d)/16));   // trail ends
+    ctx.globalAlpha=fa;
+    const bob=E.boss?0:Math.round(Math.sin(f.bob)* (f.type==='moth'?1.5:0.6));
+    shadow(f.x, f.y+ (E.boss?7:5), E.boss?14:9);
+    const fl=(E.flip&&f.face===-1)?-1:1;
+    drawSprite(E.art, fl, f.x, f.y-1+bob, w,w);
+    if(f.hit>0){
+      const img=fl===-1?WHITEF[E.art]:WHITE[E.art];
+      ctx.globalAlpha=fa*Math.min(.85,f.hit*6);
+      ctx.drawImage(img, Math.round(f.x-w/2), Math.round(f.y-1+bob-w/2));
+      ctx.globalAlpha=fa;
+    }
+    if(f.stunT>0){
+      ctx.fillStyle='#ffd452';
+      const a=G.time*9;
+      ctx.fillRect(Math.round(f.x+Math.cos(a)*4),Math.round(f.y-w/2-3+Math.sin(a)*1.5),1,1);
+      ctx.fillRect(Math.round(f.x+Math.cos(a+2.1)*4),Math.round(f.y-w/2-3+Math.sin(a+2.1)*1.5),1,1);
+      ctx.fillRect(Math.round(f.x+Math.cos(a+4.2)*4),Math.round(f.y-w/2-3+Math.sin(a+4.2)*1.5),1,1);
+    }
+    if(f.slow>0){ ctx.fillStyle='rgba(168,236,255,.5)'; ctx.fillRect(Math.round(f.x-3),Math.round(f.y-w/2-3),1,1); ctx.fillRect(Math.round(f.x+2),Math.round(f.y-w/2-4),1,1); }
+    // health bar
+    if(f.hp<f.max){
+      const bw=E.boss?18:11, hp=Math.max(0,f.hp/f.max);
+      const bx=Math.round(f.x-bw/2), by=Math.round(f.y-w/2-4);
+      ctx.fillStyle='#1c1b24'; ctx.fillRect(bx-1,by-1,bw+2,3);
+      ctx.fillStyle=hp>.5?'#6cc16b':(hp>.25?'#ffd452':'#e0524f');
+      ctx.fillRect(bx,by,Math.ceil(bw*hp),1);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // projectiles
+  for(const s of G.shots){
+    ctx.fillStyle=s.col;
+    if(s.kind==='bee'){
+      const o=Math.round(Math.sin(s.wob)*1.2);
+      ctx.fillRect(Math.round(s.x),Math.round(s.y+o),2,2);
+      ctx.fillStyle='rgba(255,255,255,.7)';
+      ctx.fillRect(Math.round(s.x)-1,Math.round(s.y+o)-1,1,1);
+      ctx.fillRect(Math.round(s.x)+2,Math.round(s.y+o)-1,1,1);
+    } else if(s.kind==='drop'){
+      ctx.fillRect(Math.round(s.x)-1,Math.round(s.y),3,2);
+      ctx.fillRect(Math.round(s.x),Math.round(s.y)-1,1,4);
+    } else {
+      ctx.fillRect(Math.round(s.x),Math.round(s.y),2,2);
+    }
+  }
+
+  // effects
+  for(const e of G.fx){
+    const k=e.life/e.ttl;
+    if(e.type==='bit'){ ctx.globalAlpha=1-k; ctx.fillStyle=e.color; ctx.fillRect(Math.round(e.x),Math.round(e.y),1,1); ctx.globalAlpha=1; }
+    else if(e.type==='ring'){ ring(e.x,e.y,e.r+(e.rmax-e.r)*k,e.color,1-k); }
+    else if(e.type==='eaten'){ drawCarrot(e.x,e.y,1-e.life/e.ttl); }
+    else if(e.type==='bolt'){
+      ctx.globalAlpha=Math.min(1,(1-k)*2.2);
+      for(let i=1;i<e.pts.length;i++) pxLine(e.pts[i-1].x,e.pts[i-1].y+1,e.pts[i].x,e.pts[i].y+1,'#3b8fd4');
+      for(let i=1;i<e.pts.length;i++) pxLine(e.pts[i-1].x,e.pts[i-1].y,e.pts[i].x,e.pts[i].y,'#a8ecff');
+      if(k<.5) for(let i=1;i<e.pts.length;i+=2) pxLine(e.pts[i-1].x,e.pts[i-1].y,e.pts[i].x,e.pts[i].y,'#ffffff');
+      ctx.globalAlpha=1;
+    }
+    else if(e.type==='txt'){ ctx.globalAlpha=Math.min(1,(1-k)*2); drawText(Math.round(e.x-textW(e.txt)/2),Math.round(e.y),e.txt,e.color); ctx.globalAlpha=1; }
+  }
+
+  drawPlaque();
+  pending.forEach(drawBtn);
+
+  // dock last so it paints over the field, but appended last so in-world
+  // buttons keep hit priority where they overlap
+  drawPetals();
+  G.btns=G.btns.concat(drawDock());
+  G.btns=G.btns.concat(drawHUD());
+
+  if(G.flash>0){ ctx.fillStyle='rgba(224,82,79,'+(G.flash*.28)+')'; ctx.fillRect(-OX,-OY,ARTW,ARTH); }
+  if(G.screen) G.btns=drawScreen(G.screen);   // on top of everything, and takes every tap
+  ctx.restore();
+}
+
+/* ======================================================================
+   11. LOOP
+   ====================================================================== */
+const SHAKE_SETTLE=2;   // shake units per second while paused: 4 settles in 2s
+let last=performance.now();
+function frame(now){
+  const raw=Math.min(.05,(now-last)/1000); last=now;
+  G.ui+=raw; G.hoverAge+=raw;
+  G.selAge = (G.selPlot>=0 || G.selected) ? (G.selAge||0)+raw : 0;
+  if(G.ghost) G.ghost.age=(G.ghost.age||0)+raw;
+  if(!G.paused && G.phase!=='dead' && G.phase!=='won'){
+    let t=raw*G.speed;
+    while(t>0){ const d=Math.min(1/60,t); step(d); t-=d; }
+  } else if(!G.paused){ G.time+=raw; }
+  // A paused game (a screen is up, or the pause button) runs no step(), so the
+  // shake would freeze at whatever the last hit left. Let it settle in real
+  // time instead, slowly, so a boss kill still rumbles under the map-cleared
+  // screen for a moment and then goes still.
+  if(G.paused && G.shake>0) G.shake=Math.max(0,G.shake-raw*SHAKE_SETTLE);
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ======================================================================
+   12. LAYOUT
+   ====================================================================== */
+const stage=document.getElementById('stage');
+const MAX_SCALE=8;   // sanity ceiling for very large displays only; normally never reached
+
+function applyPad(vw,vh){
+  const want=vw/vh, px0=OX, py0=OY;
+  let px=0, py=0;
+  if(want > W/H) px=Math.min(MAX_PAD_X, Math.round((H*want-W)/2));
+  else           py=Math.min(MAX_PAD_Y, Math.round((W/want-H)/2));
+  if(px===px0 && py===py0 && cv.width===ARTW*ART_RES) return false;
+  OX=px; OY=py; ARTW=W+2*px; ARTH=H+2*py;
+  cv.width=ARTW*ART_RES; cv.height=ARTH*ART_RES;   // resizing clears context state
+  ctx.imageSmoothingEnabled=false;
+  bg.width=ARTW; bg.height=ARTH;
+  seed=1337+G.map*7919;
+  paintBG(curPal);
+  return true;
+}
+
+function layout(){
+  const cs=getComputedStyle(document.body);
+  const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  const padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const vv=window.visualViewport;
+  const vw=(vv?vv.width:window.innerWidth)-padX;
+  const vh=(vv?vv.height:window.innerHeight)-padY;
+  const dpr=window.devicePixelRatio||1;
+  applyPad(Math.max(1,vw), Math.max(1,vh));
+
+  // Fit, then cap.
+  let raw=Math.min(vw/ARTW, vh/ARTH, MAX_SCALE);
+
+  // Snap so one art pixel covers a whole number of DEVICE pixels; that is what
+  // keeps the edges hard. Size beats crispness though, so only take the snap when
+  // it is nearly free (within 5%). On a 2x display the snap costs ~2% and is taken;
+  // on a 3x phone it would cost 12%, so we fill and let the unevenness go unnoticed
+  // at that density.
+  const snapped=Math.floor(raw*dpr)/dpr;
+  const s=(snapped>=0.5 && snapped>=raw*0.95) ? snapped : raw;
+
+  const cw=ARTW*s, ch=ARTH*s;
+  cv.style.width=cw+'px'; cv.style.height=ch+'px';
+  stage.style.width=cw+'px'; stage.style.height=ch+'px';
+  document.body.classList.toggle('framed', vw-cw>90 && vh-ch>60);
+}
+window.addEventListener('resize',layout);
+window.addEventListener('orientationchange',()=>setTimeout(layout,250));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',layout);
+layout();
+
+/* ======================================================================
+   13. INPUT
+   ====================================================================== */
+function toArt(ev){
+  const r=cv.getBoundingClientRect();
+  return { x:(ev.clientX-r.left)/r.width*ARTW-OX, y:(ev.clientY-r.top)/r.height*ARTH-OY };
+}
+
+function doAction(b){
+  if(b.act==='hud_sound'){ sndOn=!sndOn; SFX.tick(); return; }
+  if(b.act==='hud_speed'){ G.speed = G.speed===1?2:(G.speed===2?3:1); SFX.tick(); return; }
+  if(b.act==='hud_action'){
+    const st=actionState();
+    if(st==='send') startWave(); else G.paused=(st==='pause');
+    return;
+  }
+  if(b.act==='card'){
+    const F=TOWERS[b.fam];
+    if(G.placing===b.fam){ cancelPlacing(); return; }
+    if(G.gold<F.cost){ toast('Not enough coins'); SFX.bad(); return; }
+    G.placing=b.fam; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.selected=null;
+    toast(PLACEMENT==='open' ? 'Tap the ground to preview' : 'Tap a plot to preview');
+    SFX.tick(); return;
+  }
+  if(b.act==='ok'){ placeGhost(); return; }
+  if(b.act==='no'){ cancelPlacing(); return; }   // cross leaves build mode entirely
+  if(b.act==='clear'){
+    if(G.gold<CLEAR_COST){ toast('Not enough coins'); SFX.bad(); return; }
+    const pl=G.plots[b.plot];
+    G.gold-=CLEAR_COST; pl.blocked=false; G.selPlot=-1;
+    G.shake=3; SFX.up();
+    addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:18,ttl:.45,color:'#a97a4f'});
+    for(let k=0;k<8;k++) addFx({type:'bit',x:pl.x,y:pl.y,
+      vx:(Math.random()-.5)*40, vy:-14-Math.random()*20, ttl:.5, color:k<5?'#8a6242':'#5c4433'});
+    return;
+  }
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return;
+  if(b.act==='sell'){
+    const val=Math.floor(t.spent*.6);
+    if(G.plots[t.plot]) G.plots[t.plot].tower=null;
+    if(PLACEMENT==='open'){      // the bed goes with it, and later plots shift down
+      const gi=t.plot;
+      G.plots.splice(gi,1);
+      for(const o of G.towers) if(o.plot>gi) o.plot--;
+    }
+    G.gold+=val; G.towers=G.towers.filter(x=>x!==t); G.selected=null;
+    addFx({type:'txt',x:t.x,y:t.y-6,txt:'+'+val,color:'#ffd452',ttl:.9,vy:-16});
+    SFX.coin(); return;
+  }
+  if(b.act==='up'){
+    const cost=nextCost(t);
+    if(cost===null) return;
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=cost; t.spent+=cost; t.level++; SFX.up();
+    if(t.level===3 && !t.branch) toast('Pick a path: permanent');
+    return;
+  }
+  if(b.act==='forkA'||b.act==='forkB'){
+    const F=TOWERS[t.fam], B=F.forks[b.branch], c0=B.lv[0].cost;
+    if(G.gold<c0){ toast('Not enough coins'); SFX.bad(); return; }
+    G.gold-=c0; t.spent+=c0; t.branch=b.branch; t.level=4;
+    SFX.up(); G.shake=2;
+    addFx({type:'ring',x:t.x,y:t.y,r:2,rmax:22,ttl:.5,color:'#ffd452'});
+    return;
+  }
+}
+cv.addEventListener('pointerdown',ev=>{
+  ev.preventDefault();
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  if(G.screen){ if(b) screenAction(b.act); return; }
+  if(b){ if(b.dis){ toast('Not enough coins'); SFX.bad(); } else doAction(b); return; }
+
+  const i=plotAt(p.x,p.y);
+
+  if(G.placing){
+    if(PLACEMENT==='open'){
+      // tapping a standing tower says so; anywhere else is a build attempt, so
+      // the only way out is the cross or re-tapping the dock card
+      if(i>=0 && G.plots[i].tower){ toast('Plot taken'); return; }
+      const gx=snapTo(p.x), gy=snapTo(p.y);
+      if(!placeOK(gx,gy)){
+        // leave the red frame standing where they tapped: on a touch screen
+        // there is no hover, so the refusal has to be visible somewhere
+        G.hoverPos={x:gx,y:gy,ok:false}; G.hoverAge=SEL_GROW;
+        toast('No room there'); SFX.bad(); return;
+      }
+      if(!G.ghost||G.ghost.x!==gx||G.ghost.y!==gy){
+        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick();
+      }
+      return;
+    }
+    if(i<0){ cancelPlacing(); return; }          // tapping open ground puts it away
+    if(freePlot(i)){
+      if(!G.ghost||G.ghost.i!==i){
+        const q=G.plots[i]; G.ghost={i,x:q.x,y:q.y,age:0}; SFX.tick();
+      }
+    } else toast(G.plots[i].tower ? 'Plot taken' : 'Cleared stumps only');
+    return;
+  }
+  if(i<0){ G.selected=null; G.selPlot=-1; return; }
+  const p2=G.plots[i];
+  if(p2.tower){
+    G.selPlot=-1;
+    G.selected=(p2.tower===G.selected)?null:p2.tower;
+  } else if(p2.blocked){
+    G.selected=null;
+    G.selPlot=(G.selPlot===i)?-1:i;
+  } else { G.selected=null; G.selPlot=-1; }
+},{passive:false});
+
+cv.addEventListener('pointermove',ev=>{
+  const p=toArt(ev);
+  const b=hitBtn(p.x,p.y);
+  G.btnHover=b?b.act:null;
+  if(b){ G.hover=-1; G.hoverPos=null; return; }
+  if(!G.placing){ G.hover=-1; G.hoverPos=null; return; }
+  if(PLACEMENT==='open'){
+    // the frame grows once, when the tower is armed, then tracks the pointer
+    const gx=snapTo(p.x), gy=snapTo(p.y);
+    G.hoverPos={x:gx, y:gy, ok:placeOK(gx,gy)};
+    return;
+  }
+  const i=plotAt(p.x,p.y);
+  const ok = i>=0 && freePlot(i);
+  if(G.hover!==(ok?i:-1)) G.hoverAge=0;
+  G.hover = ok ? i : -1;
+});
+cv.addEventListener('pointerleave',()=>{ G.hover=-1; G.hoverPos=null; G.btnHover=null; });
+
+function placeGhost(){
+  if(!G.placing||!G.ghost) return;
+  const fam=G.placing, cost=TOWERS[fam].cost;
+  let i=G.ghost.i, pl;
+  if(PLACEMENT==='open'){
+    if(!placeOK(G.ghost.x,G.ghost.y)){ toast('No room there'); SFX.bad(); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+    pl={x:G.ghost.x, y:G.ghost.y, blocked:false, tower:null};  // the bed is born here
+    G.plots.push(pl); i=G.plots.length-1;
+  } else {
+    pl=G.plots[i];
+    if(!freePlot(i)){ toast('No room there'); return; }
+    if(G.gold<cost){ toast('Not enough coins'); SFX.bad(); return; }
+  }
+  G.gold-=cost;
+  const t={fam,plot:i,x:pl.x,y:pl.y,level:1,branch:null,cd:0,face:1,bob:Math.random()*6,kick:0,spent:cost};
+  G.towers.push(t); pl.tower=t;
+  addFx({type:'ring',x:pl.x,y:pl.y,r:2,rmax:14,ttl:.35,color:'#ffd452'});
+  SFX.place();
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.hoverAge=0; G.btnHover=null;
+}
+function cancelPlacing(){
+  G.placing=null; G.ghost=null; G.hover=-1; G.hoverPos=null; G.btnHover=null;
+}
+
+/* ======================================================================
+   14. UI
+   ====================================================================== */
+// state of the single action control: paused is checked before idle, so a tab
+// that lost focus between waves offers resume before it offers the next wave
+function actionState(){
+  if(!G.started) return 'pause';
+  if(G.paused) return 'resume';
+  if(G.phase==='idle') return 'send';
+  return 'pause';
+}
+
+// what a tower does beyond plain damage, for the plaque's first line
+function effects(st){
+  const x=[];
+  if(st.chain) x.push('CHAIN '+(st.chain+1));
+  if(st.stun) x.push('STUN');
+  if(st.splash) x.push('SPLASH');
+  if(st.slow) x.push('SLOW '+Math.round(st.slow*100)+'%');
+  return x.length ? ' '+x.join(' ') : '';
+}
+function numbers(st){
+  return 'DMG '+st.dmg+' RNG '+(st.rng/TILE).toFixed(1)+' '+(st.aura?'AURA':'DPS '+Math.round(st.dmg*st.rate));
+}
+
+// The info plaque used to be a DOM panel over the field, and it hid part of
+// map 1's bottom loop. It is painted now, in the one spot that is clear of the
+// trail on all three maps at every screen shape: the top band between the
+// read-outs and the buttons. Measured in v31: two lines fit there, three do
+// not fit anywhere on map 3, so every plaque is two lines, and there is no
+// room for a tower picture beside them: the tower is lit up on the field.
+// Line one says what it is and does, line two gives the numbers.
+// A line is a list of segments: [text,colour] or {glyph,colour}.
+const PLQ_L=146, PLQ_R=266, PLQ_H=18;
+const PLQ_NAME='#ffeedd', PLQ_STAT='#cbb495', PLQ_GOLD='#ffd452', PLQ_SH='#241a10';
+function plqTop(){ return -OY+1; }
+function plaqueContent(){
+  if(G.placing){
+    const F=TOWERS[G.placing], st=F.lv[0];
+    return {lines:[[[F.name,PLQ_NAME],[effects(st),PLQ_STAT]],
+      [{glyph:'coin',col:PLQ_GOLD},[F.cost+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
+  }
+  if(G.selPlot>=0 && G.plots[G.selPlot] && G.plots[G.selPlot].blocked){
+    return {lines:[[['Overgrown plot',PLQ_NAME]],
+      [['Clear the stump: ',PLQ_STAT],{glyph:'coin',col:PLQ_GOLD},[String(CLEAR_COST),PLQ_GOLD]]]};
+  }
+  const t=G.selected;
+  if(!t||!G.towers.includes(t)) return null;
+  const F=TOWERS[t.fam];
+  if(!t.branch && t.level===3){
+    // one line per path, on the same side as its button
+    const k=Object.keys(F.forks), A=F.forks[k[0]], B=F.forks[k[1]];
+    return {lines:[
+      [{glyph:'back',col:PLQ_GOLD},[' '+A.name+': ',PLQ_NAME],[A.desc,PLQ_STAT]],
+      [[B.name+': ',PLQ_NAME],[B.desc+' ',PLQ_STAT],{glyph:'play',col:PLQ_GOLD}]
+    ]};
+  }
+  const st=statsOf(t);
+  return {lines:[[[nameOf(t),PLQ_NAME],[effects(st),PLQ_STAT]],
+    [['LV '+t.level+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
+}
+function segW(s){ return s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
+function lineW(l){ return l.reduce((w,s)=>w+segW(s),0); }
+function drawLine(l,x,y,sh){
+  sh=sh||PLQ_SH;
+  for(const s of l){
+    if(s.glyph) glyph(GL[s.glyph],x,y,s.col,sh);
+    else drawText(x,y,s[0],s[1],sh);
+    x+=segW(s);
+  }
+}
+function plaqueW(c){ return 7+Math.max.apply(null,c.lines.map(lineW)); }
+function drawPlaque(){
+  const y=plqTop();
+  if(G.toast && G.ui-G.toast.t < TOAST_T){         // a toast takes the plaque's spot
+    const age=G.ui-G.toast.t, w=textW(G.toast.msg)+9, h=11;
+    const x=Math.round((PLQ_L+PLQ_R-w)/2);
+    ctx.globalAlpha=Math.min(1,(TOAST_T-age)/0.18);
+    plate(x,y,w,h,'#1f251e','#4b5248');
+    drawText(x+4,y+3,G.toast.msg,'#fff6e5','#0e120e');
+    ctx.globalAlpha=1;
+    return;
+  }
+  const c=plaqueContent();
+  if(!c) return;
+  const w=plaqueW(c), x=Math.round((PLQ_L+PLQ_R-w)/2);
+  plate(x,y,w,PLQ_H,'#3b2a1b','#6b4a30');
+  const tx=x+3;
+  drawLine(c.lines[0],tx,y+3);
+  if(c.lines[1]) drawLine(c.lines[1],tx,y+10);
+}
+
+/* ======================================================================
+   15. SCREENS: title, map cleared, lost, won. They used to be DOM text in a
+   system font over the field; painted here they share the game's pixel font
+   and plates. A screen dims the field and takes every tap while it is up.
+   ====================================================================== */
+const SC_TITLE='#ffd452', SC_HEAD='#ffeedd', SC_BODY='#cbb495', SC_GOLD='#ffd452';
+const SC_SKIN={go:['#4f9d4a','#82d17c','#2c5c2a'], alt:['#3d5f8f','#7aa6dd','#23395a']};
+const SC_MAXW=236;                 // body text wraps here, in art px
+// words of [text,colour] runs, packed into lines no wider than w; a '\n'
+// word starts a new line
+function wrapRuns(runs,w){
+  const lines=[]; let line=[], lw=0;
+  for(const [txt,col] of runs) for(const word of String(txt).split(' ')){
+    if(!word) continue;
+    if(word==='\n'){ if(line.length) lines.push(line); line=[]; lw=0; continue; }
+    const ww=textW(word), sp=line.length?SPACE_W+1:0;
+    if(line.length && lw+sp+ww>w){ lines.push(line); line=[]; lw=0; }
+    const last=line[line.length-1], lead=line.length?' ':'';
+    if(last && last[1]===col) last[0]+=lead+word; else line.push([lead+word,col]);
+    lw+=(line.length>1||lead?sp:0)+ww;
+  }
+  if(line.length) lines.push(line);
+  return lines;
+}
+// same number of lines, but as even as they can be, so no word sits alone
+function wrapEven(runs,w){
+  const n=wrapRuns(runs,w).length;
+  let lo=40, hi=w;
+  while(lo<hi){ const m=(lo+hi)>>1; if(wrapRuns(runs,m).length<=n) hi=m; else lo=m+1; }
+  return wrapRuns(runs,lo);
+}
+function screenContent(kind){
+  const M=MAPS[G.map-1];
+  if(kind==='title') return {
+    title:'Sprout Siege', col:SC_TITLE, shade:'#7a4a12',
+    body:[['Bugs are marching on your carrot patch. \n Tap a card, then any open ground to plant. \n Level 3 picks a specialty. GO sends the next wave.',SC_BODY]],
+    btns:[{act:'sc_start',label:'Start',skin:'go'}], ver:true };
+  if(kind==='rift'){
+    const nx=MAPS[G.map], rate=carrotRate(G.map+1);
+    const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
+    return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
+      head:M.name+' cleared: '+G.lives+' lives carried',
+      body:[['You pack up the kit and step through: '+G.lives+' lives at '+rate+
+        ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
+        [arrive+'.',SC_GOLD]],
+      btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
+  }
+  if(kind==='dead') return { title:'Patch eaten', col:'#ff7b7b', shade:'#5c1f1f',
+      head:M.name+', wave '+Math.max(1,G.wave),
+      body:[['The bugs got through. Replant and try a different mix of specialties.',SC_BODY]],
+      btns:[{act:'sc_again',label:'Plant again',skin:'go'}] };
+  const hp=G.lives;
+  const line = hp>=20 ? 'Not one carrot lost.'
+             : hp>=13 ? 'Chewed at the edges, still standing.'
+             : hp>=6  ? 'More stem than carrot now, but it held.'
+             :          'Down to the last row. That was close.';
+  return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
+    head:'All '+MAPS.length+' plots held, '+hp+' lives left',
+    body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
+    btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
+}
+const SC_T=3, BTN_H=13;            // heading scale, button height
+function drawScreen(kind){
+  const c=screenContent(kind);
+  ctx.fillStyle='rgba(14,18,14,.82)'; ctx.fillRect(-OX,-OY,ARTW,ARTH);
+  const body=wrapEven(c.body,SC_MAXW);
+  const btnW=b=>textW(b.label)+12+(b.arrow?6:0);
+  const rowW=c.btns.reduce((w,b)=>w+btnW(b),0)+(c.btns.length-1)*6;
+  const tw=textW(c.title,SC_T);
+  const innerW=Math.max(tw, c.head?textW(c.head):0, ...body.map(lineW), rowW);
+  const h=5*SC_T+(c.head?12:0)+9+body.length*7+6+BTN_H;
+  const pw=innerW+20, ph=h+18;
+  const px=Math.round((W-pw)/2), py=Math.round((H-ph)/2);
+  plate(px,py,pw,ph,'#3b2a1b','#6b4a30');
+  let y=py+8;
+  drawText(Math.round((W-tw)/2),y,c.title,c.col,c.shade,SC_T);
+  y+=5*SC_T+6;
+  if(c.head){ drawText(Math.round((W-textW(c.head))/2),y,c.head,SC_HEAD,PLQ_SH); y+=12; } else y+=3;
+  for(const l of body){ drawLine(l,Math.round((W-lineW(l))/2),y); y+=7; }
+  y+=6;
+  const out=[]; let bx=Math.round((W-rowW)/2);
+  for(const b of c.btns){
+    const w=btnW(b), sk=SC_SKIN[b.skin], press=G.btnHover===b.act?1:0;
+    plate(bx,y+press,w,BTN_H,sk[0],sk[1]);
+    drawText(bx+6,y+4+press,b.label,'#ffffff',sk[2]);
+    if(b.arrow) glyph(GL.play,bx+w-9,y+4+press,'#ffffff',sk[2]);
+    out.push({act:b.act,x:bx,y,w,h:BTN_H});
+    bx+=w+6;
+  }
+  if(c.ver) drawText(W+OX-3-textW(VERSION),H+OY-8,VERSION,'#6f7a6c');
+  return out;
+}
+function screenAction(act){
+  if(act==='sc_start'){ actx(); G.started=true; G.paused=false; G.phase='idle'; }
+  else if(act==='sc_next'){ loadMap(G.map+1); G.paused=false; SFX.wave(); }
+  else if(act==='sc_again'){ reset(); }
+  else if(act==='sc_endless'){ G.endless=true; G.phase='idle'; G.paused=false; }
+  else return;
+  G.screen=null; G.btnHover=null;
+}
+function showOver(kind){
+  G.paused=true; G.screen=kind; G.selected=null; G.placing=null; G.ghost=null;
+  if(kind==='rift'||kind==='won') SFX.up(); else SFX.bad();
+}
+function reset(){
+  G.lives=MAX_LIVES; G.endless=false; G.pack=0;
+  loadMap(1);
+  G.paused=false;
+}
+
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ G.paused=true; } });
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('dblclick',e=>e.preventDefault());
+
+})();
+</script>
+</body>
+</html>
