@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P9';
+const VERSION='V34 P10';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1189,12 +1189,14 @@ function drawCarrot(x,y,s){
    irregular patch with a ragged edge, seeded from its own position so no two
    are alike. Ground, not furniture.
 --------------------------------------------------------------------------- */
-const BED_W=20, BED_H=14;        // logical footprint, for spacing and hit-tests
-const BED_L=-10, BED_T=-4;       // relative to the anchor
-const BED_R=BED_L+BED_W-1;       // +9
-const BED_B=BED_T+BED_H-1;       // +9, four rows of soil in front of the feet
+// P10: the patch and its footprint shrink 10% with the towers (SOIL_SCALE)
+const SOIL_SCALE=0.9;            // drawn soil, about the tower's feet
+const BED_W=18, BED_H=13;        // logical footprint, for spacing and hit-tests (was 20x14)
+const BED_L=-9, BED_T=-4;        // relative to the anchor
+const BED_R=BED_L+BED_W-1;       // +8
+const BED_B=BED_T+BED_H-1;       // +8, rows of soil in front of the feet
 const TOWER_DY=-2;               // sprite centre, so the feet land on the soil
-const PIP_Y=7;                   // level pips sit on the apron, clear of the feet
+const PIP_Y=6;                   // level pips sit on the apron, clear of the feet (was 7)
 
 /* PLACEMENT MODE.
    'open'  - build anywhere off the trail. No bed exists until a tower stands
@@ -1243,12 +1245,13 @@ function soilLobes(x,y){
   }
   L.push({dx:r()*9-4.5, dy:1.0+r()*1.1, r:2.3+r()*1.1});
   L.push({dx:r()*11-5.5, dy:7.2+r()*0.9, r:2.0+r()*1.1});
+  for(const b of L){ b.dx*=SOIL_SCALE; b.dy*=SOIL_SCALE; b.r*=SOIL_SCALE; }
   // crumbs, the light ones biased high so the patch reads as lit from above
   L.crumbs=[];
   for(let i=0;i<16;i++){
     const lit=r()<.5;
-    L.crumbs.push([Math.round(r()*19-9.5),
-                   Math.round(lit ? 1+r()*4 : 4+r()*5), lit]);
+    L.crumbs.push([Math.round((r()*19-9.5)*SOIL_SCALE),
+                   Math.round((lit ? 1+r()*4 : 4+r()*5)*SOIL_SCALE), lit]);
   }
   SOIL_CACHE.set(key,L);
   return L;
