@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P12';
+const VERSION='V34 P13';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -260,6 +260,9 @@ const COIN_ROWS=[".ddd.","dlyyd","dyyYd","dyYYd",".ddd."];
 const COIN=mkSpriteP(COIN_ROWS,{d:'#94611b',l:'#fff0b0',y:'#f2c23c',Y:'#cf8f24'});
 const COIN_DIM=mkSpriteP(COIN_ROWS,{d:'#5a5e6e',l:'#c9cdd8',y:'#9aa0b0',Y:'#7a7f90'});
 
+// P13: the top bar counts the Great Sprout's life: a sprout icon
+ART.carrot=mkSpriteP([".oo...oo.","oLgo.oLgo","oggGoGggo",".oGGsGGo.","..oosoo..","....s....","...oso...","..obbbo..","...ooo..."],
+  {o:'#1f3a26',L:'#a6e886',g:'#5fbf55',G:'#3f8f45',s:'#4f8a3a',b:'#7a5034'});
 Object.keys(ART).forEach(k=>{ ART[k]=glint(scale2x(ART[k])); });
 // P12: refined level 1 towers (style reference, not final art): drawn on the
 // 36x48 tower canvas at 2x, feet on row 39, 2px coloured outline
@@ -1087,6 +1090,7 @@ function paintBG(pal){
     }
   }
 
+  if(!heartOn()){
   // ---- 6. the carrot bed: a raised planter with a front face, tilled rows,
   // and a round-topped picket fence, open at the gate
   const S5=ramp(pal.soil||'#8a5a3a',{h:12,vd:0.42,vl:0.42}), F5=ramp(pal.fence||'#b98a5c',{h:12,vd:0.40,vl:0.55});
@@ -1133,6 +1137,83 @@ function paintBG(pal){
   for(const [x,y] of posts) post(x,y);
   lcomp(FL5);
 
+  } else {
+  // ---- 6b. THE GREAT SPROUT (P13): the heart of the map, replacing the
+  // carrot bed in wide beds. A ring of mossy stones open at the gate, dark
+  // soil, and a giant seedling: two big leaves and a glowing bud. Its ten
+  // fruits are the lives (drawn live by drawCarrot); this paints the rest.
+  {
+    const HP=heartPal(pal), LF=ramp(HP.leaf,{h:16,vd:0.42,vl:0.5}), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42});
+    const STN=ramp(HP.stone,{h:10,vd:0.42,vl:0.55}), MOSS=ramp(HP.moss,{h:14});
+    const cxW=BED.x+BED.w/2, cyW=BED.y+BED.h/2+1, rxW=BED.w/2-1, ryW=BED.h/2-1;
+    const [cx,cy]=toA(cxW,cyW), rx=rxW*R, ry=ryW*R;
+    const g=bedGate(), [gx,gy]=toA(g.x,g.y);
+    // soft glow on the ground round the bud
+    const [bx,by]=toA(cxW,cyW-14);
+    for(let y=by-34;y<=by+34;y++) for(let x=bx-46;x<=bx+46;x++){
+      const d=Math.hypot((x-bx)/46,(y-by)/34); if(d>1) continue;
+      put(x,y,mixc(get(x,y),HP.glow,0.10*(1-d)));
+    }
+    // soil inside the ring, a little moss
+    for(let y=cy-ry;y<=cy+ry;y++) for(let x=cx-rx;x<=cx+rx;x++){
+      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry, r2=dx*dx+dy*dy; if(r2>1) continue;
+      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,2.2,70+G.map);
+      let c=SOIL[n<0.35?1:(n>0.75?3:2)];
+      if(dy<-0.75+0.1*Math.sin(dx*9)) c=SOIL[3];                       // lit far rim
+      if(vnoise(wx,wy,6,71+G.map)>0.80) c=mixc(c,MOSS[1],0.35);
+      put(x,y,c);
+    }
+    // the stone ring, a gap where the trail comes in
+    const SL=layer();
+    const per=2*Math.PI*Math.sqrt((rx*rx+ry*ry)/2), n=Math.round(per/7);
+    for(let k=0;k<n;k++){
+      const a=k/n*Math.PI*2, sx=cx+Math.cos(a)*rx, sy=cy+Math.sin(a)*ry;
+      if(Math.hypot(sx-gx,sy-gy)<19) continue;
+      const s=3.4+hash2(k,G.map,5)*1.4;
+      lell(SL,sx,sy-1,s*1.15,s*0.85,STN,0.05);
+    }
+    lcomp(SL);
+    for(let k=0;k<n;k++){                                               // moss tufts on some stones
+      if(hash2(k,G.map,9)>0.35) continue;
+      const a=k/n*Math.PI*2, sx=Math.round(cx+Math.cos(a)*rx), sy=Math.round(cy+Math.sin(a)*ry)-3;
+      if(Math.hypot(sx-gx,sy-gy)<19) continue;
+      put(sx,sy,MOSS[3]); put(sx+1,sy,MOSS[2]); put(sx-1,sy+1,MOSS[2]);
+    }
+    // the sprout: a curved stem, two big leaves with a midrib, and the bud
+    const SP=layer(), STEM=ramp(HP.stem,{h:14});
+    for(let y=cy+6;y>=cy-24;y--){
+      const t=(cy+6-y)/30, x0=Math.round(cx+Math.sin(t*2.4)*2);
+      for(let k=-2;k<=2;k++){ const u=k/2.5; lp(SP,x0+k,y,STEM[shadeIdx(u*LIGHT[0]+Math.sqrt(1-u*u)*LIGHT[2]+0.1,5)],STEM[0]); }
+    }
+    const leaf=(lx,ly,len,wid,ang)=>{                                  // a pointed leaf, tilted
+      const ca=Math.cos(ang), sa=Math.sin(ang);
+      for(let y=Math.floor(ly-len);y<=ly+len;y++) for(let x=Math.floor(lx-len);x<=lx+len;x++){
+        const dx=x+0.5-lx, dy=y+0.5-ly, u=(dx*ca+dy*sa)/len, v=(-dx*sa+dy*ca)/wid;
+        if(u<-1||u>1) continue;
+        const half=Math.sqrt(Math.max(0,1-u*u))*(u>0?1-u*0.35:1);     // tapers to a point at the tip
+        if(Math.abs(v)>half) continue;
+        const nv=v/(half||1), nz=Math.sqrt(Math.max(0,1-nv*nv));
+        const nx=-sa*nv, ny=ca*nv;
+        let I=nx*LIGHT[0]+ny*LIGHT[1]+nz*LIGHT[2]*0.85+0.1;
+        let c=LF[shadeIdx(I,5)];
+        if(Math.abs(v)<0.12 && u>-0.85 && u<0.9) c=LF[1];             // midrib
+        else if(Math.abs((v*3+u*2)%1)<0.08 && Math.abs(v)<half*0.8) c=LF[Math.max(1,shadeIdx(I,5)-1)];  // veins
+        lp(SP,x,y,c,LF[0]);
+      }
+    };
+    leaf(cx-26,cy-31,32,13,Math.PI+0.3);
+    leaf(cx+26,cy-31,32,13,-0.3);
+    lell(SP,cx+1,cy-27,7,7.5,ramp(HP.bud,{h:14,vl:0.7}),0.2);         // bud
+    lcomp(SP);
+    put(cx-2,cy-31,[255,255,250]); put(cx-1,cy-31,[255,255,250]); put(cx-2,cy-30,[255,255,250]);
+    if(HP.snow){                                                       // snow resting on the leaves
+      for(let x=cx-44;x<=cx+44;x++){
+        let top=-1; for(let y=cy-44;y<cy;y++){ const c=get(x,y); if(c[0]===LF[3][0]&&c[1]===LF[3][1]||c[0]===LF[4][0]&&c[1]===LF[4][1]){ top=y; break; } }
+        if(top>0){ put(x,top,[248,252,255]); if(hash2(x,1,3)<0.5) put(x,top+1,[232,242,250]); }
+      }
+    }
+  }
+  }
   q.putImageData(im,0,0);
   BGX=out;
   const qb=bg.getContext('2d'); qb.clearRect(0,0,ARTW,ARTH); qb.drawImage(out,0,0,ARTW,ARTH);
@@ -1145,6 +1226,48 @@ function paintBG(pal){
 // eaten, gone. Every number the player reads (top bar, screens) counts lives;
 // only the bed shows them in halves, which keeps it small.
 const MAX_LIVES=20, BITES=2, MAX_CARROTS=MAX_LIVES/BITES;
+
+/* ---------------------------------------------------------------------------
+   THE GREAT SPROUT (P13). Replaces the carrot bed as the thing the bugs are
+   after, in wide beds (every current map). Lives are unchanged: 20, shown as
+   10 fruits on the sprout, 2 bites each, eaten nearest the gate first.
+   Style reference for the art pass, not final art.
+   --------------------------------------------------------------------------- */
+const HEART=true;
+function heartOn(){ return HEART && BED.o==='h'; }
+function heartPal(pal){
+  const H={
+   spring:{leaf:'#6cc05a',stem:'#5aa04a',bud:'#f6b3cf',fruit:'#f2789f',flesh:'#ffe3ec',glow:[255,236,246],soil:'#6e4a33',stone:'#b8b6aa',moss:'#6fae5a'},
+   summer:{leaf:'#3f9c4a',stem:'#3d8a42',bud:'#ffe08a',fruit:'#ffbf33',flesh:'#fff1c2',glow:[255,246,210],soil:'#6b4630',stone:'#c2b9a5',moss:'#5aa04a'},
+   autumn:{leaf:'#e0902e',stem:'#8a6a3a',bud:'#ffcf7a',fruit:'#d9452f',flesh:'#ffe6c8',glow:[255,226,190],soil:'#5f3d27',stone:'#a99d88',moss:'#8a9a4a'},
+   winter:{leaf:'#8cc6c0',stem:'#5f8f8a',bud:'#e8f8ff',fruit:'#8fd8ff',flesh:'#eefaff',glow:[226,244,255],soil:'#5e4a3e',stone:'#c9d0d6',moss:'#9ab8b0',snow:true},
+  };
+  return H[pal.name]||H.spring;
+}
+const FRUIT_ROWS={
+  whole:["...s.gg.","..oso...",".oolhmo.","olhhmmdo","olmmmmdo","ommmmddo",".odddoo.","..ooo..."],
+  half: ["...s....","..oso...",".oolbo..","olhmbbo.","olmmbo..","ommmbbo.",".oddoo..","..ooo..."],
+  gone: ["........","........","........","...s....","..oso...","...o....","........","........"],
+};
+const FRUIT_CACHE={};
+function fruitSprite(st){
+  const key=G.map+':'+st; if(FRUIT_CACHE[key]) return FRUIT_CACHE[key];
+  const HP=heartPal(MAPS[G.map-1].pal), F=ramp(HP.fruit,{h:14,vl:0.6}), L=ramp(HP.leaf);
+  const pal={o:hexc(mixc(F[0],INK,0.5)), d:hexc(F[1]), m:hexc(F[2]), l:hexc(F[3]), h:'#fffaf0',
+             s:'#6b4a32', g:hexc(L[3]), b:HP.flesh};
+  const c=mkSpriteP(FRUIT_ROWS[st],pal); c._s=2;
+  return FRUIT_CACHE[key]=c;
+}
+// ten fruits: four along each leaf, hanging just under it, and two by the bud
+function heartSlots(){
+  const cx=BED.x+BED.w/2, cy=BED.y+BED.h/2+1, out=[];
+  for(const side of [-1,1]){
+    const dx=0.955*side, dy=-0.296, nx=0.296*side, ny=0.955, lx=cx+13*side, ly=cy-15.5;
+    for(const t of [-0.5,-0.05,0.4,0.8]) out.push({x:Math.round(lx+dx*t*14+nx*3.4), y:Math.round(ly+dy*t*14+ny*3.4)});
+  }
+  out.push({x:Math.round(cx-6),y:Math.round(cy-9)},{x:Math.round(cx+7),y:Math.round(cy-9)});
+  return out;
+}
 let CARROT_SLOTS=[];
 function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitter
   let sd=7777;
@@ -1154,6 +1277,7 @@ function layoutCarrots(){        // 2 x 5 grid (5 x 2 in a wide bed), fixed jitt
   const x0=BED.x+2+Math.round((BED.w-((cols-1)*10+6))/2);
   const y0=BED.y+2+Math.round((BED.h-((rows-1)*11+6))/2);
   CARROT_SLOTS=[];
+  if(heartOn()){ CARROT_SLOTS=heartSlots(); return; }
   for(let row=0;row<rows;row++) for(let col=0;col<cols;col++)
     CARROT_SLOTS.push({x:x0+col*10+Math.round(r()*2-1), y:y0+row*11+Math.round(r()*2-1)});
 }
@@ -1162,6 +1286,11 @@ function sortCarrots(){          // nearest the gate is eaten first, so the dama
   CARROT_SLOTS.sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y));
 }
 function drawCarrot(x,y,s){
+  if(heartOn()){                                           // a fruit on the Great Sprout
+    const st=s<=0?'gone':(s<0.55?'half':'whole');
+    ctx.drawImage(fruitSprite(st), x-2, y-2);
+    return;
+  }
   ctx.fillStyle='#3f2a1c'; ctx.fillRect(x-1,y+3,4,1);      // the hole it sits in
   if(s<=0) return;
   if(s<0.55){                                              // half eaten: a stub
@@ -1383,7 +1512,7 @@ let BED={x:278,y:66,w:28,h:60,o:'v'}, CARROT_BOX={l:272,t:58,r:312,b:132};
 function setBed(b){
   const w=b.o==='h'?58:28, h=b.o==='h'?27:60;
   BED={x:b.x,y:b.y,w,h,o:b.o};
-  CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
+  CARROT_BOX={l:b.x-6, t:b.y-(heartOn()?16:8), r:b.x+w+6, b:b.y+h+6};   // the Sprout's leaves rise above the bed
 }
 // where the trail crosses into the bed: which side, and how far along it
 function bedGate(){
@@ -1682,7 +1811,7 @@ function step(dt){
         addFx({type:'eaten',x:sl.x,y:sl.y,ttl:.45});
         for(let k=0;k<5;k++) addFx({type:'bit',x:sl.x+1,y:sl.y,
           vx:(Math.random()-.5)*34, vy:-16-Math.random()*16, ttl:.5,
-          color:k<3?'#ff9a3c':'#4f9d4a'});
+          color:heartOn()?(k<3?heartPal(MAPS[G.map-1].pal).fruit:heartPal(MAPS[G.map-1].pal).leaf):(k<3?'#ff9a3c':'#4f9d4a')});
       }
       G.shake=5; G.flash=1; SFX.hurt();
       addFx({type:'txt',x:BED.x+BED.w/2,y:BED.y-10,txt:'-'+loss,color:'#ff7b7b',ttl:1,vy:-14});
