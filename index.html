@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P16';
+const VERSION='V34 P17';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1146,31 +1146,30 @@ function paintBG(pal){
     const HP=heartPal(pal), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42}), LF=ramp(HP.leaf,{h:16});
     const ST=ramp(HP.stem,{h:14,vd:0.42,vl:0.5});
     const [cx,cy]=toA(BED.x+BED.w/2,heartBaseY()), rx=26, ry=10, Hh=42;
-    // P16: no mound. Roots spread over the grass from a small break in the
-    // earth, with root hairs and a few sprouts along them.
-    const RT=ramp(HP.root||'#9a7448',{h:12,vd:0.42,vl:0.5});
-    for(let y=cy-4;y<=cy+5;y++) for(let x=cx-9;x<=cx+9;x++){             // the break
-      const d=Math.hypot((x+0.5-cx)/9,(y+0.5-cy-0.5)/4.5); if(d>1-hash2(x,y,4)*0.25) continue;
-      put(x,y,SOIL[d<0.5?1:2]);
+    // P17: a compact, quiet base. A little darker earth showing through the
+    // grass, and short roots that start the stem's colour and fade into the
+    // ground's, no outline, only a soft shade under each, with grass over them.
+    for(let y=cy-3;y<=cy+4;y++) for(let x=cx-8;x<=cx+8;x++){
+      const d=Math.hypot((x+0.5-cx)/8,(y+0.5-cy-0.5)/3.6); if(d>1-hash2(x,y,4)*0.3) continue;
+      put(x,y,mixc(get(x,y),SOIL[1],0.55*(1-d*0.6)));
     }
-    const RL=layer();
-    const roots=[[3.0,28],[2.5,20],[0.35,26],[-0.15,16],[1.6,13],[1.05,16],[3.6,15]];   // angle (rad), length (art px)
+    const STb=rgb3(HP.stem);
+    const roots=[[3.1,13],[2.55,10],[0.2,13],[0.65,9],[3.55,8]];          // angle (rad), length (art px)
     for(const [ang,len] of roots){
-      let x=cx, y=cy+1, a=ang;
+      let x=cx+Math.cos(ang)*2, y=cy+1, a=ang;
       for(let k=0;k<len;k++){
-        a+=Math.sin(k*0.35+ang*5)*0.16;
-        x+=Math.cos(a); y+=Math.sin(a)*0.7;                                  // flattened: they lie on the ground
-        const w=Math.max(0.6,3.4*(1-k/len));
+        a+=Math.sin(k*0.4+ang*5)*0.14;
+        x+=Math.cos(a); y+=Math.sin(a)*0.6;
+        const f=k/len, w=Math.max(0.5,2.0*(1-f));
         for(let ox=-Math.ceil(w);ox<=Math.ceil(w);ox++) for(let oy=-1;oy<=1;oy++){
-          if(Math.hypot(ox,oy*1.6)>w) continue;
-          lp(RL,Math.round(x+ox),Math.round(y+oy),RT[oy<0?3:(oy>0?1:2)],RT[0]);
+          if(Math.hypot(ox,oy*1.8)>w) continue;
+          const X=Math.round(x+ox), Y=Math.round(y+oy), gr=get(X,Y);
+          const tone=oy<0?mixc(STb,[255,250,220],0.18):(oy>0?mixc(STb,INK,0.3):STb);
+          put(X,Y,mixc(tone,gr,0.12+f*0.6));                                // fades into the grass toward the tip
         }
-        if(k===Math.round(len*0.6) && hash2(Math.round(x),Math.round(y),2)<0.6){   // a sprout on the root
-          lp(RL,Math.round(x),Math.round(y)-2,LF[3],LF[0]); lp(RL,Math.round(x)-1,Math.round(y)-3,LF[2],LF[0]); lp(RL,Math.round(x)+1,Math.round(y)-3,LF[3],LF[0]);
-        }
+        const SX=Math.round(x), SY=Math.round(y+w+1); put(SX,SY,mixc(get(SX,SY),INK,0.12));   // soft shade under
       }
     }
-    lcomp(RL);
     const SP=layer();
     // two strands, the one behind drawn first and darker
     const strand=(s,front)=>{
