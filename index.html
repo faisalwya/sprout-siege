@@ -46,13 +46,13 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P4';
+const VERSION='V34 P5';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
 // starts as the B (1x) art, doubled with Scale2x so curves lose their stairs,
 // then FINE adds detail that only exists at 2x.
-const ART_RES=2, FINE=true;
+const ART_RES=2, FINE=true;   // P5: the ground is painted natively at 2x; FINE now only adds sprite glints
 
 const PAL={'.':null,
   k:'#17141f', K:'#2f2a3d', w:'#ffffff', W:'#ffeedd',
@@ -637,212 +637,394 @@ function vnoise(x,y,cell,s){
   return (a*(1-sx)+b*sx)*(1-sy)+(c*(1-sx)+d*sx)*sy;
 }
 
+/* ---------------------------------------------------------------------------
+   v34 P5: THE A LOOK, painted natively at 2x (one art pixel = half a game unit)
+   Target: a cozy top-down garden. Calm mint ground in big soft patches,
+   packed-dirt trail with grass hanging over its edges, chunky rounded props
+   with coloured outlines, flat soft shadows at their feet, trees and flowers
+   framing the map while the middle stays open for play.
+   Rules carried over from P1: one light from the top left, ramps whose
+   shadows lean cool and highlights warm, outlines never black, no dither.
+   Props only go where no tower can: off the trail, clear of every authored
+   plot, the carrot bed and the HUD.
+   --------------------------------------------------------------------------- */
+const P5_PAL=[
+  {g1:'#93dcaa', dirt:'#e2bd86', edge:'#a8794b', inner:'#efd2a2', hedgeA:'#3f9c86', hedgeB:'#2f7a69',
+   flowers:['#f6a9c8','#ffd866','#fff4e6','#b39ae6']},
+  {g1:'#8fd6a0', dirt:'#dcb480', edge:'#a07246', inner:'#ebcb99', hedgeA:'#3b9277', hedgeB:'#2c705c',
+   flowers:['#b39ae6','#fff4e6','#9fd8f5','#ffd866']},
+  {g1:'#a3d995', dirt:'#e4b97e', edge:'#a87445', inner:'#f0cf9b', hedgeA:'#4a9a6f', hedgeB:'#37795a',
+   flowers:['#ffd866','#ffab6b','#fff4e6','#f6a9c8']},
+];
+MAPS.forEach((m,i)=>{
+  const p=P5_PAL[i%P5_PAL.length];
+  Object.assign(m.pal,p,{g2:p.g1,speck:shade(p.g1,.9),bright:shade(p.g1,1.08),dark:p.hedgeA});
+});
+
 function paintBG(pal){
-  const q=bg.getContext('2d');
-  const CW=ARTW, CH=ARTH, N=CW*CH;
-  const im=q.createImageData(CW,CH), d=im.data;
+  const R=ART_RES, CW=ARTW*R, CH=ARTH*R, N=CW*CH;
+  const out=document.createElement('canvas'); out.width=CW; out.height=CH; out._s=R;
+  const q=out.getContext('2d'), im=q.createImageData(CW,CH), d=im.data;
   const put=(x,y,c)=>{ if(x<0||y<0||x>=CW||y>=CH) return; const i=(y*CW+x)*4; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255; };
-  const area=(CW*CH)/(320*148);
-  const fine=[];
+  const get=(x,y)=>{ x=Math.max(0,Math.min(CW-1,x)); y=Math.max(0,Math.min(CH-1,y)); const i=(y*CW+x)*4; return [d[i],d[i+1],d[i+2]]; };
+  const toW=(x,y)=>[(x+0.5)/R-OX,(y+0.5)/R-OY];
+  const toA=(wx,wy)=>[Math.round((wx+OX)*R),Math.round((wy+OY)*R)];
+  const M=MAPS[G.map-1];
 
-  const G5=ramp(pal.g1,{h:18,vd:0.30,vl:0.45});
-  const GT=[G5[0], mixc(G5[2],G5[1],.45), G5[2], mixc(G5[2],G5[3],.4), G5[4]];
-  const D5=ramp(pal.dirt,{h:14,vd:0.40,vl:0.55});
-  const H5=ramp(pal.hedgeA,{h:20,vd:0.45,vl:0.5});
+  const G5=ramp(pal.g1,{h:10,vd:0.20,vl:0.32});
+  const D5=ramp(pal.dirt,{h:12,vd:0.30,vl:0.45});
+  const T5=ramp(pal.hedgeA,{h:18,vd:0.42,vl:0.55});      // tree teal
+  const P5=ramp(pal.hedgeB,{h:18,vd:0.45,vl:0.5});       // pine, darker
+  const PK=ramp('#f2a7c3',{h:14,vd:0.30,vl:0.55});       // blossom
+  const WD=ramp('#9a6a43',{h:12,vd:0.42,vl:0.5});        // wood
+  const ST=ramp('#b9b8ad',{h:12,vd:0.40,vl:0.55});       // stone
+  const MT=ramp('#6aa6c4',{h:12,vd:0.40,vl:0.55});       // painted tin
+  const RD=ramp('#d9574a',{h:14,vd:0.40,vl:0.5});        // red paint
   const FL=pal.flowers.map(rgb3);
+  const SHADOW=mixc(G5[1],INK,0.16);
 
-  // ---- grass: three close tones in broad organic clusters
-  const gi=new Uint8Array(N);
+  // ---- 1. grass: two close tones in big soft patches, a rare lighter one
   for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){
-    const wx=x-OX+0.5, wy=y-OY+0.5;
-    const n=vnoise(wx,wy,22,3+G.map)*0.7+vnoise(wx,wy,7,4+G.map)*0.3;
-    const k=n<0.36?1:(n>0.64?3:2);
-    gi[y*CW+x]=k; put(x,y,GT[k]);
+    const [wx,wy]=toW(x,y);
+    const n=vnoise(wx,wy,26,7+G.map)*0.72+vnoise(wx,wy,8,9+G.map)*0.28;
+    put(x,y, n<0.40?G5[1]:(n>0.74?G5[3]:G5[2]));
   }
 
-  // ---- the trail, extended straight to the canvas edge as before
+  // ---- 2. the trail, extended to the canvas edge as before
   const T=PTS.map(p=>({x:p.x,y:p.y}));
   {
     const k=Math.min(6,PTS.length-1), ux=PTS[k].x-PTS[0].x, uy=PTS[k].y-PTS[0].y, ul=Math.hypot(ux,uy)||1;
-    for(let n=1; n<60 && PTS[0].x-ux/ul*3*n > -OX-10; n++)
-      T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
+    for(let n=1; n<80 && PTS[0].x-ux/ul*3*n > -OX-10; n++) T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
   }
-  const ext=T.length-PTS.length, widths=[];
+  const ext=T.length-PTS.length, widths=[], runAt=[];
   let run=-3*ext;
   for(let i=0;i<T.length;i++){
     if(i) run+=Math.hypot(T[i].x-T[i-1].x, T[i].y-T[i-1].y);
-    widths.push(6.1 + Math.sin(run*0.105)*0.85 + Math.sin(run*0.047+1.7)*0.75 + Math.sin(run*0.29+0.4)*0.3);
+    runAt.push(run);
+    widths.push(6.0 + Math.sin(run*0.105)*0.7 + Math.sin(run*0.047+1.7)*0.6);
   }
-  // distance to a polyline, per pixel, touching only pixels near each segment
-  function field(P,reach){
-    const D=new Float32Array(N).fill(1e9), SI=new Int32Array(N), NX=new Float32Array(N), NY=new Float32Array(N);
-    for(let i=0;i<P.length-1;i++){
-      const a=P[i], b=P[i+1], dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1e-9;
-      const x0=Math.max(0,Math.floor(Math.min(a.x,b.x)+OX-reach)), x1=Math.min(CW-1,Math.ceil(Math.max(a.x,b.x)+OX+reach));
-      const y0=Math.max(0,Math.floor(Math.min(a.y,b.y)+OY-reach)), y1=Math.min(CH-1,Math.ceil(Math.max(a.y,b.y)+OY+reach));
-      for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
-        const px=x-OX+0.5, py=y-OY+0.5;
-        let t=((px-a.x)*dx+(py-a.y)*dy)/L2; t=t<0?0:(t>1?1:t);
-        const nx=a.x+dx*t, ny=a.y+dy*t, ex=px-nx, ey=py-ny, dd=ex*ex+ey*ey, j=y*CW+x;
-        if(dd<D[j]){ D[j]=dd; SI[j]=i; NX[j]=nx; NY[j]=ny; }
-      }
+  const D=new Float32Array(N).fill(1e9), SI=new Int32Array(N), STt=new Float32Array(N);
+  for(let i=0;i<T.length-1;i++){
+    const a=T[i], b=T[i+1], dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1e-9, reach=12;
+    const [ax0,ay0]=toA(Math.min(a.x,b.x)-reach, Math.min(a.y,b.y)-reach), [ax1,ay1]=toA(Math.max(a.x,b.x)+reach, Math.max(a.y,b.y)+reach);
+    for(let y=Math.max(0,ay0);y<=Math.min(CH-1,ay1);y++) for(let x=Math.max(0,ax0);x<=Math.min(CW-1,ax1);x++){
+      const [px,py]=toW(x,y);
+      let t=((px-a.x)*dx+(py-a.y)*dy)/L2; t=t<0?0:(t>1?1:t);
+      const ex=px-(a.x+dx*t), ey=py-(a.y+dy*t), dd=ex*ex+ey*ey, j=y*CW+x;
+      if(dd<D[j]){ D[j]=dd; SI[j]=i; STt[j]=t; }
     }
-    for(let j=0;j<N;j++) D[j]=Math.sqrt(D[j]);
-    return {D,SI,NX,NY};
   }
-  const F=field(T,12);
-  // the worn middle wanders a little off centre, as before
-  const Tn=T.map((p,i)=>{
-    const a=T[Math.max(0,i-1)], b=T[Math.min(T.length-1,i+1)], dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
-    const sw=Math.sin((i-ext)*0.06)*1.8+Math.sin((i-ext)*0.017+1)*1.2;
-    return {x:p.x+(-dy/L)*sw, y:p.y+(dx/L)*sw};
-  });
-  const F2=field(Tn,5);
-  const RIM=mixc(D5[0],INK,0.35);
+  for(let j=0;j<N;j++) D[j]=Math.sqrt(D[j]);
+  const wAt=j=>widths[SI[j]];
+  // grass hangs over the dirt in soft scallops, period ~5 units
+  const edgeAt=j=>{
+    const i=SI[j], s=runAt[i]+STt[j]*Math.hypot(T[i+1].x-T[i].x,T[i+1].y-T[i].y);
+    const ph=(s/5)%1, sc=Math.sqrt(Math.max(0,1-(2*ph-1)*(2*ph-1)));
+    return wAt(j)-0.1-sc*1.3;
+  };
+  const LIP=G5[4], UNDER=mixc(D5[1],INK,0.12);
   for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){
-    const j=y*CW+x, D=F.D[j], w=widths[F.SI[j]];
-    if(D>w+2.5) continue;
-    const ox=x-OX+0.5-F.NX[j], oy=y-OY+0.5-F.NY[j], on=Math.hypot(ox,oy)||1e-6;
-    const facing=(ox*LIGHT[0]+oy*LIGHT[1])/on;     // >0: this bank is nearest the light
-    if(D>w+1.5){ if(facing<-0.1) put(x,y,G5[4]); continue; }   // lit grass lip on the far bank
-    if(D>w){ put(x,y,RIM); continue; }
-    let k=2;
-    if(F2.D[j]<w*0.45) k=3;
-    if(D>w-1.6){ if(facing>0.15) k=1; else if(facing<-0.25) k=3; }
-    put(x,y,D5[k]);
+    const j=y*CW+x; if(D[j]>wAt(j)+1) continue;
+    const e=edgeAt(j);
+    if(D[j]>e){ if(D[j]<=e+0.5) put(x,y,LIP); continue; }         // lit lip of the overhang
+    const [wx,wy]=toW(x,y);
+    const n=vnoise(wx,wy,5,40+G.map);
+    let c=n<0.20?mixc(D5[2],D5[1],0.5):D5[2];
+    if(D[j]>e-0.5) c=UNDER;                                          // shade under the grass lip
+    put(x,y,c);
   }
-  for(let n=0;n<Math.round(900*T.length/280);n++){            // grit and clods
+  const onTrail=(wx,wy,pad)=>{ const [x,y]=toA(wx,wy); if(x<0||y<0||x>=CW||y>=CH) return false; const j=y*CW+x; return D[j]<wAt(j)+(pad||0); };
+
+  // trail detail: grains, lit pebbles, hairline cracks, weeds at the edge
+  for(let n=0;n<Math.round(T.length*1.2);n++){
     const i=Math.floor(rnd()*(T.length-1)), a=T[i], b=T[i+1];
-    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, t=(rnd()*2-1)*widths[i]*0.8;
-    const x=Math.floor(a.x+(-dy/L)*t+OX), y=Math.floor(a.y+(dx/L)*t+OY), k=rnd();
-    if(FINE){ if(k<0.75) fine.push(['grit',x,y,k]); continue; }
-    if(k<0.55) put(x,y, rnd()<0.6?D5[0]:D5[1]);
-    else if(k<0.75) put(x,y,D5[4]);
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, side=rnd()*2-1, w=widths[i];
+    const wx=a.x+(-dy/L)*side*w*0.75, wy=a.y+(dx/L)*side*w*0.75;
+    const [x,y]=toA(wx,wy), k=rnd();
+    if(k<0.55) put(x,y,D5[0]);
+    else if(k<0.70){ put(x,y,ST[3]); put(x+1,y,ST[2]); put(x,y+1,ST[1]); put(x+1,y+1,ST[1]); put(x,y+2,UNDER); put(x+1,y+2,UNDER); }
+    else if(k<0.80){ const s=rnd()<0.5?1:-1; put(x,y,D5[0]); put(x+1,y+s,D5[0]); put(x+2,y+s,D5[0]); put(x+3,y+2*s,D5[1]); }
+    else if(k<0.86){ put(x,y,D5[4]); }
   }
 
-  // ---- tufts and flowers, kept off the trail and its lip
-  const clearAt=(x,y)=>{ const j=y*CW+x; return F.D[j]>widths[F.SI[j]]+3; };
-  for(let n=0;n<Math.round(520*area);n++){
-    const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), k=rnd();
-    if(y>=CH-1 || !clearAt(x,y)) continue;
-    if(FINE){ fine.push([k<0.8?'tuft':'flower',x,y,rnd()]); continue; }
-    if(k<0.8){ const g=gi[y*CW+x], c=g>1?GT[g-1]:G5[0]; put(x,y,c); put(x,y+1,c); }
-    else put(x,y,FL[Math.floor(rnd()*FL.length)]);
-  }
-
-  // ---- hedges: shaded bushes along the true top and bottom, one outline
-  const hm=new Uint8Array(N);
-  function bush(cx,cy,rx,ry){
-    for(let y=Math.max(0,Math.floor(cy-ry));y<=Math.min(CH-1,Math.ceil(cy+ry));y++)
-      for(let x=Math.max(0,Math.floor(cx-rx));x<=Math.min(CW-1,Math.ceil(cx+rx));x++){
-        const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry, r2=dx*dx+dy*dy;
-        if(r2>1) continue;
-        const I=dx*LIGHT[0]+dy*LIGHT[1]+Math.sqrt(1-r2)*LIGHT[2];
-        put(x,y,H5[shadeIdx(I,5)]); hm[y*CW+x]=1;
-      }
-  }
-  for(const cyBase of [2, CH-2]){
-    let x=-4;
-    while(x<CW+4){
-      const rad=3.6+rnd()*2.4;
-      bush(x, cyBase+(rnd()-0.5)*2, rad, rad*0.85);
-      x+=rad*1.25;
+  // ---- 3. shape layers for props: shaded shapes, coloured outline, composited
+  const LH=[-0.25,0.30,0.72,0.93];
+  function layer(){ return {px:new Map()}; }
+  function lp(L,x,y,c,o){ L.px.set(y*CW+x,[c,o]); }
+  function lell(L,cx,cy,rx,ry,Rm,bias){     // centre and radii in art px
+    for(let y=Math.floor(cy-ry);y<=Math.ceil(cy+ry);y++) for(let x=Math.floor(cx-rx);x<=Math.ceil(cx+rx);x++){
+      if(x<0||y<0||x>=CW||y>=CH) continue;
+      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry, r2=dx*dx+dy*dy; if(r2>1) continue;
+      const I=dx*LIGHT[0]+dy*LIGHT[1]+Math.sqrt(1-r2)*LIGHT[2]+(bias||0);
+      lp(L,x,y,Rm[shadeIdx(I,5)],Rm[0]);
     }
   }
-  const HOL=inkOf(H5[0]), HOL2=inkOf(H5[0],true);
-  for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){
-    const j=y*CW+x; if(hm[j]) continue;
-    const up=y>0&&hm[j-CW], dn=y<CH-1&&hm[j+CW], lf=x>0&&hm[j-1], rt=x<CW-1&&hm[j+1];
-    if(up||lf) put(x,y,HOL); else if(dn||rt) put(x,y,HOL2);
+  function lbox(L,x0,y0,x1,y1,Rm,flat){
+    for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+      if(x<0||y<0||x>=CW||y>=CH) continue;
+      let k=flat;
+      if(k===undefined){ const u=((x+0.5)-(x0+x1)/2)/((x1-x0)/2); k=shadeIdx(u*LIGHT[0]+Math.sqrt(Math.max(0,1-u*u))*LIGHT[2]+0.1,5); }
+      lp(L,x,y,Rm[k],Rm[0]);
+    }
   }
-  for(let n=0;n<Math.round(80*CW/320);n++){                     // blooms in the hedge
-    const x=Math.floor(rnd()*CW), top=rnd()<0.5, y=top?1+Math.floor(rnd()*4):CH-2-Math.floor(rnd()*4);
-    if(hm[y*CW+x]){ if(FINE) fine.push(['bloom',x,y,rnd()]); else put(x,y,FL[Math.floor(rnd()*FL.length)]); }
+  function lscallop(L,cx,cy,rx,ry,Rm,step){   // leafy rows: darker arcs, lit tops
+    for(let row=-ry+step; row<ry; row+=step){
+      const off=(Math.round(row/step)%2)*step/2;
+      for(let col=-rx; col<rx; col+=step){
+        const ax=Math.round(cx+col+off), ay=Math.round(cy+row);
+        for(let k=-2;k<=2;k++){
+          const x=ax+k, y=ay+(Math.abs(k)===2?-1:0), key=y*CW+x, cur=L.px.get(key);
+          if(!cur) continue;
+          const lit=(x-cx)/rx+(y-cy)/ry < -0.4;
+          L.px.set(key,[Math.abs(k)<=1? Rm[lit?2:1] : Rm[lit?3:1], Rm[0]]);
+        }
+        const tk=(ay-2)*CW+ax, tc=L.px.get(tk);
+        if(tc && (ax-cx)/rx+(ay-cy)/ry < 0.2) L.px.set(tk,[Rm[4],Rm[0]]);
+      }
+    }
+  }
+  function lcomp(L){
+    const has=k=>L.px.has(k);
+    const outl=new Map();
+    for(const [k,[c,o]] of L.px){
+      const x=k%CW, y=(k-x)/CW;
+      for(const [dx,dy,lit] of [[0,-1,1],[-1,0,1],[0,1,0],[1,0,0]]){
+        const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=CW||ny>=CH) continue;
+        const nk=ny*CW+nx; if(has(nk)) continue;
+        const col=lit? mixc(o,INK,0.22) : mixc(o,INK,0.55);
+        if(!outl.has(nk) || !lit) outl.set(nk,col);
+      }
+    }
+    for(const [k,c] of outl){ const x=k%CW; put(x,(k-x)/CW,c); }
+    for(const [k,[c]] of L.px){ const x=k%CW; put(x,(k-x)/CW,c); }
+  }
+  function shadowAt(cx,cy,rx,ry){            // flat, soft, at the feet
+    for(let y=Math.floor(cy-ry);y<=Math.ceil(cy+ry);y++) for(let x=Math.floor(cx-rx);x<=Math.ceil(cx+rx);x++){
+      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry; if(dx*dx+dy*dy>1) continue;
+      const c=get(x,y); put(x,y,mixc(c,INK,0.16));
+    }
   }
 
-  // ---- the carrot bed: tilled furrows and a picket fence, open at the gate
-  const S5=ramp('#7a5034',{h:12,vd:0.45,vl:0.45}), F5=ramp('#d4b486',{h:14,vd:0.38,vl:0.6});
-  const bx0=Math.round(BED.x+OX), by0=Math.round(BED.y+OY), bw=BED.w, bh=BED.h;
-  // Tilled earth, not planks: one ridged mound under each row of carrots,
-  // its edges wobbling, lit along the top and shadowed at the foot, with
-  // darker loose soil in the troughs between. Clods break up every surface.
+  // ---- 4. the props
+  const S=R;                                      // art px per unit
+  const tree=(wx,wy,s,Rm)=>{                       // round canopy, scalloped leaves
+    const [x,y]=toA(wx,wy), r=6.5*s*S;
+    shadowAt(x+1*S,y+0.5*S,r*0.85,r*0.32);
+    const L=layer();
+    lbox(L,x-1.2*S,y-4*S,x+1.3*S,y+0.6*S,WD);
+    lell(L,x,y-4*S-r*0.85,r,r*0.9,Rm);
+    lscallop(L,x,y-4*S-r*0.85,r,r*0.9,Rm,Math.round(2.2*S));
+    lcomp(L);
+  };
+  const pine=(wx,wy,s)=>{
+    const [x,y]=toA(wx,wy), h=15*s*S, w=6*s*S;
+    shadowAt(x+1*S,y+0.5*S,w*0.9,w*0.3);
+    const L=layer();
+    lbox(L,x-1*S,y-2.5*S,x+1.2*S,y+0.6*S,WD);
+    for(let t=0;t<3;t++){
+      const top=y-2*S-h+t*h*0.28, base=top+h*0.45, half=w*(0.62+t*0.2);
+      for(let yy=Math.floor(top);yy<base;yy++){
+        const f=(yy-top)/(base-top), hw=half*f;
+        for(let xx=Math.floor(x-hw);xx<=Math.ceil(x+hw);xx++){
+          const u=(xx+0.5-x)/(hw||1);
+          const I=u*LIGHT[0]*0.9-0.3*LIGHT[1]+Math.sqrt(Math.max(0,1-u*u))*LIGHT[2]*0.9 - (f>0.85?0.5:0);
+          lp(L,xx,yy,P5[shadeIdx(I,5)],P5[0]);
+        }
+      }
+    }
+    lcomp(L);
+  };
+  const bush=(wx,wy,s,Rm)=>{
+    const [x,y]=toA(wx,wy), r=3.2*s*S;
+    shadowAt(x+0.5*S,y+0.3*S,r*1.6,r*0.4);
+    const L=layer();
+    lell(L,x-r*0.8,y-r*0.7,r,r*0.85,Rm); lell(L,x+r*0.8,y-r*0.7,r,r*0.85,Rm); lell(L,x,y-r*1.2,r*1.05,r*0.9,Rm);
+    lscallop(L,x,y-r,r*1.8,r*1.1,Rm,Math.round(2*S));
+    lcomp(L);
+  };
+  const rock=(wx,wy,s)=>{
+    const [x,y]=toA(wx,wy), r=2.4*s*S;
+    shadowAt(x+0.5*S,y+0.2*S,r*1.1,r*0.35);
+    const L=layer(); lell(L,x,y-r*0.5,r,r*0.7,ST,0.1); lell(L,x+r*0.9,y-r*0.2,r*0.55,r*0.45,ST); lcomp(L);
+  };
+  const flowers=(wx,wy)=>{
+    const [x,y]=toA(wx,wy), L=layer(), lf=ramp(shade(pal.hedgeA,1.15),{h:16});
+    for(const [dx,dy] of [[-2,0],[2,0],[0,-1],[-1,-2],[2,-3]]) lell(L,x+dx*S*0.8,y+dy*S*0.8,1.4*S*0.6,1.0*S*0.6,lf);
+    lcomp(L);
+    const c=FL[Math.floor(rnd()*FL.length)];
+    for(const [dx,dy] of [[-2,-3],[1,-4],[3,-2]]){
+      const fx=Math.round(x+dx*S*0.7), fy=Math.round(y+dy*S*0.7), dk=mixc(c,INK,0.35);
+      put(fx,fy-1,c); put(fx-1,fy,c); put(fx+1,fy,c); put(fx,fy+1,c);
+      put(fx-1,fy+1,dk); put(fx+1,fy+1,dk); put(fx,fy,[255,196,90]);
+    }
+  };
+  const mushroom=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+1,y+1,4,1.5);
+    const L=layer(); lbox(L,x-1,y-3,x+2,y+1,ramp('#f1e6cf')); lell(L,x+0.5,y-3.5,3.6,2.2,RD,0.1); lcomp(L);
+    put(x-1,y-4,[255,248,236]); put(x+2,y-5,[255,248,236]);
+  };
+  const wateringCan=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,8,2);
+    const L=layer();
+    lbox(L,x-4,y-7,x+4,y+1,MT);
+    for(let k=0;k<6;k++){ lp(L,x+4+k,y-3-k,MT[k<3?2:3],MT[0]); lp(L,x+4+k,y-2-k,MT[1],MT[0]); }
+    lp(L,x+10,y-9,MT[4],MT[0]); lp(L,x+11,y-9,MT[3],MT[0]);
+    for(let k=-3;k<=3;k++) lp(L,x+k,y-9-Math.round(Math.sqrt(9-k*k)*0.8),MT[3],MT[0]);
+    lcomp(L);
+  };
+  const signpost=(wx,wy,flip)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,6,1.8);
+    const L=layer();
+    lbox(L,x-1,y-12,x+2,y+1,WD);
+    const bx0=flip?x-8:x-3, bx1=flip?x+3:x+9;
+    lbox(L,bx0,y-15,bx1,y-9,WD,3);
+    lcomp(L);
+    for(let k=bx0+2;k<bx1-2;k++){ if(k%3) put(k,y-13,WD[0]); if(k%4) put(k,y-11,WD[1]); }
+  };
+  const birdhouse=(wx,wy)=>{
+    const [x,y]=toA(wx,wy); shadowAt(x+2,y+1,5,1.6);
+    const L=layer();
+    lbox(L,x-1,y-12,x+2,y+1,WD);
+    lbox(L,x-4,y-19,x+5,y-12,ramp('#e8d6b0'));
+    for(let r=0;r<5;r++) for(let k=-5+r;k<=5-r;k++) lp(L,x+k,y-19-r,RD[r<2?1:(k<0?3:2)],RD[0]);
+    lcomp(L);
+    put(x,y-16,[60,40,30]); put(x+1,y-16,[60,40,30]); put(x,y-15,[60,40,30]); put(x+1,y-15,[60,40,30]);
+  };
+
+  // where a prop may stand: off the trail, clear of plots, bed and HUD
+  const B0={l:BED.x-8,r:BED.x+BED.w+8,t:BED.y-8,b:BED.y+BED.h+6};
+  const plotsW=(M.plots||[]).map(p=>({x:p[0],y:p[1]}));
+  const taken=[];
+  function free(wx,wy,rad){
+    if(onTrail(wx,wy,rad+2.5) || onTrail(wx,wy-rad,rad+1)) return false;
+    for(const p of plotsW) if(Math.hypot(p.x-wx,(p.y-wy)*1.3)<rad+15) return false;
+    if(wx+rad>B0.l && wx-rad<B0.r && wy>B0.t && wy-rad*2<B0.b) return false;
+    if(wy-rad*2<16 && wx<132) return false;                         // top bar
+    if(wy-rad*2<17 && wx>258) return false;                         // buttons
+    if(wy>110 && wx-rad<-OX+100) return false;                      // dock
+    for(const t of taken) if(Math.hypot(t.x-wx,t.y-wy)<(t.r+rad)*0.75) return false;
+    return true;
+  }
+  const items=[];
+  function tryPut(kind,wx,wy,rad,extra){ if(!free(wx,wy,rad)) return false; taken.push({x:wx,y:wy,r:rad}); items.push([wy,kind,wx,extra]); return true; }
+
+  // framing: trees, pines and bushes along the top and bottom edges and out
+  // into any spare margin; a blossom tree now and then
+  const left=-OX-6, right=W+OX+6;
+  for(const band of [{y0:-OY+3,y1:11},{y0:141,y1:H+OY+10}]){
+    for(let wx=left; wx<right; wx+=5+rnd()*5){
+      const wy=band.y0+rnd()*(band.y1-band.y0), k=rnd();
+      if(k<0.35) tryPut('tree',wx,wy,7,rnd()<0.2?'pink':'teal') || tryPut('bush',wx,wy,4);
+      else if(k<0.55) tryPut('pine',wx,wy,5) || tryPut('bush',wx,wy,4);
+      else if(k<0.85) tryPut('bush',wx,wy,4);
+      else tryPut('rock',wx,wy,3);
+    }
+  }
+  for(const xs of [[-OX-4,6],[W-6,W+OX+4]]){                         // left and right edges
+    for(let wy=12; wy<H-8; wy+=6+rnd()*5){
+      const wx=xs[0]+rnd()*(xs[1]-xs[0]), k=rnd();
+      if(k<0.3) tryPut('tree',wx,wy,7,rnd()<0.2?'pink':'teal') || tryPut('bush',wx,wy,4);
+      else if(k<0.55) tryPut('pine',wx,wy,5) || tryPut('bush',wx,wy,4);
+      else tryPut('bush',wx,wy,4);
+    }
+  }
+  for(let n=0;n<Math.round((OX*H+OY*W)/120);n++){                   // spare margins on tall/wide screens
+    const wx=left+rnd()*(right-left), wy=-OY+rnd()*(H+2*OY);
+    if(wx>4&&wx<W-4&&wy>4&&wy<H-4) continue;
+    const k=rnd(); tryPut(k<0.4?'tree':(k<0.7?'bush':'pine'),wx,wy,k<0.4?7:5,rnd()<0.25?'pink':'teal');
+  }
+  // character: things a gardener left lying around
+  {
+    const bx=BED.x, by=BED.y, bw=BED.w, bh=BED.h;
+    const spots=[['can',bx+bw+14,by+bh+5,3],['can',bx-13,by+bh+5,3],['can',bx+bw/2,by+bh+14,3],['bird',bx+bw+13,by+6,3],['bird',bx-12,by+4,3],['bird',bx+bw-6,by-12,3]];
+    let can=false, bird=false;
+    for(const [k,x,y,r] of spots){
+      if(k==='can'&&!can&&tryPut('can',x,y,r)) can=true;
+      if(k==='bird'&&!bird&&tryPut('bird',x,y,r)) bird=true;
+    }
+    // a signpost where the trail comes on screen
+    for(let i=0;i<PTS.length-1;i++){
+      if(PTS[i].x<4 || PTS[i].x>W-4 || PTS[i].y<4 || PTS[i].y>H-4) continue;
+      const a=PTS[i], b=PTS[Math.min(PTS.length-1,i+2)], dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+      let ok=false;
+      for(const side of [-1,1]){ if(tryPut('sign',a.x+(-dy/L)*side*11,a.y+(dx/L)*side*11+3,4,a.x>W/2)){ ok=true; break; } }
+      if(ok) break;
+    }
+  }
+  for(let n=0;n<70;n++){ const wx=rnd()*W, wy=8+rnd()*(H-16), k=rnd();
+    if(k<0.55) tryPut('flowers',wx,wy,2.5); else if(k<0.7) tryPut('rock',wx,wy,2.2,0.7); else if(k<0.85) tryPut('mush',wx,wy,1.8); }
+
+  items.sort((a,b)=>a[0]-b[0]);
+  for(const [wy,k,wx,ex] of items){
+    if(k==='tree') tree(wx,wy,1,ex==='pink'?PK:T5);
+    else if(k==='pine') pine(wx,wy,1);
+    else if(k==='bush') bush(wx,wy,1,T5);
+    else if(k==='rock') rock(wx,wy,ex||1);
+    else if(k==='flowers') flowers(wx,wy);
+    else if(k==='mush') mushroom(wx,wy);
+    else if(k==='can') wateringCan(wx,wy);
+    else if(k==='bird') birdhouse(wx,wy);
+    else if(k==='sign') signpost(wx,wy,ex);
+  }
+
+  // ---- 5. sparse grass tufts, little V marks, on open grass only
+  for(let n=0;n<Math.round(CW*CH/700);n++){
+    const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), [wx,wy]=toW(x,y);
+    if(onTrail(wx,wy,2)) continue;
+    const c=get(x,y); if(Math.abs(c[1]-G5[1][1])>18 && Math.abs(c[1]-G5[2][1])>18) continue;  // grass only
+    const dk=mixc(c,G5[0],0.6);
+    put(x,y,dk); put(x+1,y+1,dk); put(x+2,y,dk); if(rnd()<0.5){ put(x+3,y+1,dk); put(x+4,y,dk); }
+  }
+
+  // ---- 6. the carrot bed: a raised planter with a front face, tilled rows,
+  // and a round-topped picket fence, open at the gate
+  const S5=ramp('#8a5a3a',{h:12,vd:0.42,vl:0.42}), F5=ramp('#b98a5c',{h:12,vd:0.40,vl:0.55});
+  const [bx0,by0]=toA(BED.x,BED.y), bw=BED.w*R, bh=BED.h*R;
   const rowsY=[];
   for(const c of CARROT_SLOTS){ if(!rowsY.some(r=>Math.abs(r-c.y)<4)) rowsY.push(c.y); }
-  const bm=new Uint8Array(N);
-  for(let y=by0-1;y<=by0+bh;y++) for(let x=bx0-1;x<=bx0+bw;x++){
-    const inside=x>=bx0&&x<bx0+bw&&y>=by0&&y<by0+bh;
-    const chew=(y===by0-1||y===by0+bh||x===bx0-1||x===bx0+bw) && hash2(x,y,77)<0.45;
-    if(!(inside||chew) || x<0||y<0||x>=CW||y>=CH) continue;
-    bm[y*CW+x]=1;
-    const wx=x-OX, n=vnoise(x+0.5,y+0.5,2.2,90+G.map);
-    let k=n<0.38?0:1;                                   // trough: loose, darker
+  for(let y=by0;y<by0+bh+4;y++) for(let x=bx0;x<bx0+bw;x++){
+    if(y>=by0+bh){ put(x,y, y===by0+bh?S5[1]:S5[0]); continue; }        // front face
+    const [wx,wy]=toW(x,y), n=vnoise(wx,wy,1.6,90+G.map);
+    let k=n<0.4?0:1;
     for(const ry of rowsY){
-      const my=ry+OY+2, wob=Math.round(Math.sin(wx*0.75+ry)*0.6+(hash2(x,ry,5)-0.5)*1.2);
+      const my=ry+2, wob=Math.sin(wx*0.8+ry)*0.35;
       const top=my-3+wob, bot=my+2+wob;
-      if(y>=top && y<=bot){ k=y===top?3:(y===bot?1:(n>0.68?3:2)); break; }
-      if(y===bot+1){ k=0; break; }                     // shadow at the mound's foot
+      if(wy>=top && wy<bot){ k = wy<top+0.5?3:(wy>=bot-0.5?1:(n>0.7?3:2)); break; }
+      if(wy>=bot && wy<bot+0.5){ k=0; break; }
     }
     put(x,y,S5[k]);
   }
-  for(let n=0;n<Math.round(bw*bh/450);n++){              // a few pale stones
-    const x=bx0+1+Math.floor(rnd()*(bw-2)), y=by0+1+Math.floor(rnd()*(bh-2));
-    if(CARROT_SLOTS.some(c=>Math.abs(c.x+OX-x)<4&&Math.abs(c.y+OY-y)<5)) continue;
-    put(x,y,[176,168,150]); put(x+1,y,[138,130,116]); put(x,y+1,S5[0]); put(x+1,y+1,S5[0]);
-  }
-  const SOL=inkOf(S5[0]);
-  for(let y=Math.max(0,by0-2);y<=Math.min(CH-1,by0+bh+1);y++) for(let x=Math.max(0,bx0-2);x<=Math.min(CW-1,bx0+bw+1);x++){
-    const j=y*CW+x; if(bm[j]) continue;
-    if((x>0&&bm[j-1])||(x<CW-1&&bm[j+1])||(y>0&&bm[j-CW])||(y<CH-1&&bm[j+CW])) put(x,y,SOL);
-  }
-  const gate=bedGate(), gt=(gate.side==='l'||gate.side==='r')?gate.t+OY:gate.t+OX;
+  for(let x=bx0;x<bx0+bw;x++) put(x,by0,S5[3]);                         // lit rim
+  const SOL=mixc(S5[0],INK,0.5);
+  for(let x=bx0-1;x<=bx0+bw;x++){ put(x,by0-1,SOL); put(x,by0+bh+4,SOL); }
+  for(let y=by0;y<by0+bh+4;y++){ put(bx0-1,y,SOL); put(bx0+bw,y,SOL); }
+  // fence
+  const gate=bedGate(), gt=(gate.side==='l'||gate.side==='r')?gate.t:gate.t;
+  const fl=BED.x-3, fr=BED.x+BED.w+3, ft=BED.y-3, fb=BED.y+BED.h+4;
   const open=(side,t)=>gate.side===side && Math.abs(t-gt)<9;
-  const fl=bx0-3, fr=bx0+bw+1, ft=by0-3, fb=by0+bh+1;
-  const FOL=inkOf(F5[0]), FOL2=inkOf(F5[1],true);
-  for(let x=fl;x<=fr+1;x++){
-    if(!open('t',x)){ put(x,ft-1,FOL2); put(x,ft,F5[3]); put(x,ft+1,F5[1]); put(x,ft+2,FOL); }
-    if(!open('b',x)){ put(x,fb-1,FOL2); put(x,fb,F5[3]); put(x,fb+1,F5[1]); put(x,fb+2,FOL); }
-  }
-  for(let y=ft;y<=fb+1;y++){
-    if(!open('l',y)){ put(fl-1,y,FOL2); put(fl,y,F5[3]); put(fl+1,y,F5[1]); }
-    if(!open('r',y)){ put(fr,y,F5[3]); put(fr+1,y,F5[1]); put(fr+2,y,FOL); }
-  }
-  const post=(px,py)=>{                       // 3 wide, lit on its left and top
-    px=Math.round(px); py=Math.round(py);
-    for(let y=py-2;y<=py+2;y++){ put(px-1,y,F5[3]); put(px,y,F5[2]); put(px+1,y,F5[1]); }
-    put(px-1,py-2,F5[4]); put(px,py-2,F5[4]); put(px+1,py-2,F5[3]);
-    for(let y=py-3;y<=py+3;y++){ put(px-2,y,FOL2); put(px+2,y,FOL); }
-    for(let x=px-1;x<=px+1;x++){ put(x,py-3,FOL2); put(x,py+3,FOL); }
+  const FL5=layer();
+  const railH=(wy,x0,x1,side)=>{ const [, y]=toA(0,wy); for(let wx=x0; wx<=x1; wx+=0.5){ if(open(side,wx)) continue; const [x]=toA(wx,0); lp(FL5,x,y-2,F5[3],F5[0]); lp(FL5,x,y-1,F5[2],F5[0]); lp(FL5,x,y,F5[1],F5[0]); } };
+  const railV=(wx,y0,y1,side)=>{ const [x]=toA(wx,0); for(let wy=y0; wy<=y1; wy+=0.5){ if(open(side,wy)) continue; const [,y]=toA(0,wy); lp(FL5,x-1,y,F5[3],F5[0]); lp(FL5,x,y,F5[2],F5[0]); lp(FL5,x+1,y,F5[1],F5[0]); } };
+  railH(ft,fl,fr,'t'); railH(fb,fl,fr,'b'); railV(fl,ft,fb,'l'); railV(fr,ft,fb,'r');
+  const post=(wx,wy)=>{ const [x,y]=toA(wx,wy);
+    for(let yy=y-7;yy<=y+3;yy++) for(let xx=x-2;xx<=x+2;xx++){
+      if(yy===y-7 && Math.abs(xx-x)===2) continue;                     // round top
+      const k=yy<=y-6?4:(xx===x-2?3:(xx===x+2?1:2));
+      lp(FL5,xx,yy,F5[k],F5[0]);
+    }
+    lp(FL5,x,y-3,F5[1],F5[0]);                                          // a knot
   };
   const posts=[];
-  for(let x=fl; x<=fr; x+=14){ if(!open('t',x)) posts.push([x+1,ft+1]); if(!open('b',x)) posts.push([x+1,fb+1]); }
-  for(let y=ft; y<=fb; y+=14){ if(!open('l',y)) posts.push([fl+1,y+1]); if(!open('r',y)) posts.push([fr+1,y+1]); }
-  posts.push([fl+1,ft+1],[fr+1,ft+1],[fl+1,fb+1],[fr+1,fb+1]);
-  if(gate.side==='l'||gate.side==='r'){ const xx=gate.side==='l'?fl+1:fr+1; posts.push([xx,gt-10],[xx,gt+9]); }
-  else { const yy=gate.side==='t'?ft+1:fb+1; posts.push([gt-10,yy],[gt+9,yy]); }
-  for(const [px,py] of posts) post(px,py);
+  for(let x=fl; x<=fr+0.1; x+=(fr-fl)/Math.max(1,Math.round((fr-fl)/12))){ if(!open('t',x)) posts.push([x,ft]); if(!open('b',x)) posts.push([x,fb]); }
+  for(let y=ft; y<=fb+0.1; y+=(fb-ft)/Math.max(1,Math.round((fb-ft)/12))){ if(!open('l',y)) posts.push([fl,y]); if(!open('r',y)) posts.push([fr,y]); }
+  if(gate.side==='l'||gate.side==='r'){ const xx=gate.side==='l'?fl:fr; posts.push([xx,gt-9],[xx,gt+9]); }
+  else { const yy=gate.side==='t'?ft:fb; posts.push([gt-9,yy],[gt+9,yy]); }
+  for(const [x,y] of posts) post(x,y);
+  lcomp(FL5);
 
   q.putImageData(im,0,0);
-  BGX=scale2x(bg);
-  const z=BGX.getContext('2d'), Z=z.getImageData(0,0,BGX.width,BGX.height), zd=Z.data, ZW=BGX.width, ZH=BGX.height;
-  const zp=(x,y,c)=>{ if(x<0||y<0||x>=ZW||y>=ZH) return; const i=(y*ZW+x)*4; zd[i]=c[0]; zd[i+1]=c[1]; zd[i+2]=c[2]; zd[i+3]=255; };
-  const zg=(x,y)=>{ const i=(Math.min(ZH-1,Math.max(0,y))*ZW+Math.min(ZW-1,Math.max(0,x)))*4; return [zd[i],zd[i+1],zd[i+2]]; };
-  for(const [t,x,y,k] of fine){
-    const X=x*2+(k<0.5?0:1), Y=y*2+(k*7%1<0.5?0:1);
-    if(t==='grit'){                              // single grains, and the odd lit pebble
-      if(k<0.12){ zp(X,Y,[196,188,168]); zp(X+1,Y,[150,142,126]); zp(X,Y+1,D5[0]); zp(X+1,Y+1,D5[0]); }
-      else zp(X,Y, k<0.5?D5[0]:(k<0.6?D5[1]:D5[4]));
-    } else if(t==='tuft'){                       // three blades, a lit tip
-      const base=zg(X,Y), dk=mixc(base,G5[0],0.55);
-      zp(X,Y,dk); zp(X,Y+1,dk); zp(X-1,Y+1,dk); zp(X+1,Y+1,dk); zp(X-2,Y,dk); zp(X+2,Y,dk); zp(X,Y-1,G5[4]);
-    } else if(t==='flower'){                     // four petals round a warm centre
-      const c=FL[Math.floor(k*FL.length)];
-      zp(X,Y-1,c); zp(X-1,Y,c); zp(X+1,Y,c); zp(X,Y+1,c); zp(X,Y,[255,180,60]); zp(X,Y+2,G5[0]);
-    } else {                                     // blooms in the hedge
-      const c=FL[Math.floor(k*FL.length)];
-      zp(X,Y,c); zp(X+1,Y,c); zp(X,Y+1,c); zp(X+1,Y+1,[255,180,60]);
-    }
-  }
-  z.putImageData(Z,0,0);
+  BGX=out;
+  const qb=bg.getContext('2d'); qb.clearRect(0,0,ARTW,ARTH); qb.drawImage(out,0,0,ARTW,ARTH);
 }
 
 /* ======================================================================
@@ -1808,10 +1990,28 @@ function pxLine(x0,y0,x1,y1,col){
     if(e2<=dx){ err+=dx; y0+=sy; }
   }
 }
+// P5: a flat soft shadow at the feet, a cool dark tint rather than black,
+// drawn on the 2x grid so its ends round off
 function shadow(x,y,w){
-  ctx.fillStyle='rgba(0,0,0,.18)';
-  ctx.fillRect(Math.round(x-w/2),Math.round(y),w,1);
-  ctx.fillRect(Math.round(x-w/2)+1,Math.round(y)+1,w-2,1);
+  ctx.fillStyle='rgba(28,60,52,.22)';
+  const X=Math.round(x*2)/2, Y=Math.round(y*2)/2, hw=w/2;
+  ctx.fillRect(X-hw+1,Y-0.5,w-2,0.5);
+  ctx.fillRect(X-hw,Y,w,1);
+  ctx.fillRect(X-hw+1,Y+1,w-2,0.5);
+}
+// P5: petals drifting across the garden, one art pixel each, tumbling
+const PETALS=[];
+function drawPetals(){
+  if(!PETALS.length) for(let i=0;i<14;i++) PETALS.push({x:Math.random()*400, y:Math.random()*200, s:0.25+Math.random()*0.35, ph:Math.random()*6, w:i%3===2});
+  const t=performance.now()/1000, SW=W+2*OX+20, SH=H+2*OY+20;
+  for(const p of PETALS){
+    const a=t*p.s;
+    const x=((p.x+a*18+Math.sin(t*0.9+p.ph)*4)%SW+SW)%SW-OX-10;
+    const y=((p.y+a*9)%SH+SH)%SH-OY-10;
+    ctx.fillStyle=p.w?'#fff4e6':'#f6a9c8';
+    const flip=Math.sin(t*3+p.ph)>0;
+    ctx.fillRect(Math.round(x*2)/2, Math.round(y*2)/2, flip?1:0.5, 0.5);
+  }
 }
 function drawSprite(key,flip,x,y,w,h){
   const img=(flip===-1?FLIP[key]:ART[key])||ART[key];
@@ -2007,6 +2207,7 @@ function draw(){
 
   // dock last so it paints over the field, but appended last so in-world
   // buttons keep hit priority where they overlap
+  drawPetals();
   G.btns=G.btns.concat(drawDock());
   G.btns=G.btns.concat(drawHUD());
 
