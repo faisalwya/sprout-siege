@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P17';
+const VERSION='V34 P18';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -724,12 +724,17 @@ function paintBG(pal){
     for(let n=1; n<80 && PTS[0].x-ux/ul*3*n > -OX-10; n++) T.unshift({x:PTS[0].x-ux/ul*3*n, y:PTS[0].y-uy/ul*3*n});
   }
   const ext=T.length-PTS.length, widths=[], runAt=[];
+  // P18: the trail runs on to the foot of the Sprout and narrows into it
+  if(heartOn()){ const bx=BED.x+BED.w/2, by=heartBaseY()-0.5, e=T[T.length-1];
+    for(let k=1;k<=3;k++) T.push({x:e.x+(bx-e.x)*k/3, y:e.y+(by-e.y)*k/3}); }
   let run=-3*ext;
   for(let i=0;i<T.length;i++){
     if(i) run+=Math.hypot(T[i].x-T[i-1].x, T[i].y-T[i-1].y);
     runAt.push(run);
     widths.push(6.0 + Math.sin(run*0.105)*0.7 + Math.sin(run*0.047+1.7)*0.6);
   }
+  if(heartOn()){ const rEnd=runAt[runAt.length-1];
+    for(let i=0;i<T.length;i++){ const d=rEnd-runAt[i]; if(d<36) widths[i]*=Math.max(0.15, Math.min(1,(d-4)/32)); } }   // a footpath by the time it reaches the stalk
   const D=new Float32Array(N).fill(1e9), SI=new Int32Array(N), STt=new Float32Array(N);
   for(let i=0;i<T.length-1;i++){
     const a=T[i], b=T[i+1], dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1e-9, reach=12;
@@ -1170,6 +1175,16 @@ function paintBG(pal){
         const SX=Math.round(x), SY=Math.round(y+w+1); put(SX,SY,mixc(get(SX,SY),INK,0.12));   // soft shade under
       }
     }
+    // P18: every pod hangs on a short twig from the stalk, sagging a little
+    const TW=mixc(rgb3(HP.stem),INK,0.25), TWL=mixc(rgb3(HP.stem),[255,250,220],0.15);
+    for(const sl of heartSlots()){
+      const [px,py]=toA(sl.x,sl.y), tx=px-1, ty=py-3;
+      const side=Math.sign(sl.x-(BED.x+BED.w/2))||1, sx=cx+side*2, sy=ty-3;
+      const n=Math.max(4,Math.abs(tx-sx)+2);
+      for(let k=0;k<=n;k++){ const t=k/n, x=Math.round(sx+(tx-sx)*t), y=Math.round(sy+(ty-sy)*t-Math.sin(t*Math.PI)*1.5);
+        put(x,y,TW); if(k<n-1) put(x,y-1,TWL); }
+      put(tx,ty+1,TW);
+    }
     const SP=layer();
     // two strands, the one behind drawn first and darker
     const strand=(s,front)=>{
@@ -1256,7 +1271,7 @@ function heartBaseY(){ return BED.y+BED.h/2+5; }
 function heartSlots(){
   const cx=BED.x+BED.w/2, by=heartBaseY(), out=[];
   // staggered and zigzagging so they read as separate pods, not two ropes
-  [[-5,2.5],[6,4.5],[-7.5,7],[4.5,9],[-4.5,11.5],[7.5,13.5],[-7,16],[5,18],[-4,20.5],[7,22]]
+  [[-5,2.5],[6,4],[-7.5,6],[4.5,8],[-4.5,10],[7.5,11.5],[-7,13.5],[5,15],[-4,17],[6.5,18.5]]
     .forEach(([dx,h])=>out.push({x:Math.round(cx+dx), y:Math.round(by-h)}));
   return out;
 }
