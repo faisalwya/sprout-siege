@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P7';
+const VERSION='V34 P8';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -672,6 +672,7 @@ MAPS.forEach((m,i)=>{
 });
 
 const GROUND_STYLE='both';
+const SCALE_EDGE=1.6, SCALE_INNER=1.15;   // P8: the world is bigger than the towers; edge trees most, inner groves a little
 function paintBG(pal){
   const R=ART_RES, CW=ARTW*R, CH=ARTH*R, N=CW*CH;
   const out=document.createElement('canvas'); out.width=CW; out.height=CH; out._s=R;
@@ -766,7 +767,7 @@ function paintBG(pal){
   // ---- 3. shape layers for props: shaded shapes, coloured outline, composited
   const LH=[-0.25,0.30,0.72,0.93];
   function layer(){ return {px:new Map()}; }
-  function lp(L,x,y,c,o){ L.px.set(y*CW+x,[c,o]); }
+  function lp(L,x,y,c,o){ if(x<0||y<0||x>=CW||y>=CH) return; L.px.set(y*CW+x,[c,o]); }   // off canvas: drop, never wrap
   function lell(L,cx,cy,rx,ry,Rm,bias){     // centre and radii in art px
     for(let y=Math.floor(cy-ry);y<=Math.ceil(cy+ry);y++) for(let x=Math.floor(cx-rx);x<=Math.ceil(cx+rx);x++){
       if(x<0||y<0||x>=CW||y>=CH) continue;
@@ -959,7 +960,8 @@ function paintBG(pal){
   const SP=pal.species||{round:0.4,pine:0.2,bush:0.3,blossom:0.1};
   const species=()=>{ let r=rnd(), acc=0; for(const k in SP){ acc+=SP[k]; if(r<acc) return k; } return 'bush'; };
   const RAD={round:6.5,blossom:6.5,fruit:6.5,birch:4.4,pine:5,bush:3.5};
-  const plant=(kind,wx,wy,s)=>tryPut(kind,wx,wy,RAD[kind]*s,{s,R:CAN[Math.floor(rnd()*CAN.length)]});
+  let WS=SCALE_EDGE;
+  const plant=(kind,wx,wy,s)=>{ s*=WS; return tryPut(kind,wx,wy,RAD[kind]*s,{s,R:CAN[Math.floor(rnd()*CAN.length)]}); };
   function grove(cx,cy,n,spread,sMin,sMax,inx,iny){
     let placed=0;
     for(let k=0;k<n*8 && placed<n;k++){
@@ -1017,7 +1019,7 @@ function paintBG(pal){
     }
     cand.sort((a,b)=>b[0]-a[0]);
     let made=0;
-    OVERLAP=0.75;
+    OVERLAP=0.75; WS=SCALE_INNER;
     for(const [,wx,wy] of cand){ if(made>=3) break; if(!free(wx,wy,8)) continue; grove(wx,wy,2+Math.floor(rnd()*2),6,0.75,1.0,0,1); made++; }
   }
   // character: things a gardener left lying around
