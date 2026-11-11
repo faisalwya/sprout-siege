@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P13';
+const VERSION='V34 P14';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1138,80 +1138,24 @@ function paintBG(pal){
   lcomp(FL5);
 
   } else {
-  // ---- 6b. THE GREAT SPROUT (P13): the heart of the map, replacing the
-  // carrot bed in wide beds. A ring of mossy stones open at the gate, dark
-  // soil, and a giant seedling: two big leaves and a glowing bud. Its ten
-  // fruits are the lives (drawn live by drawCarrot); this paints the rest.
+  // ---- 6b. THE SPROUT, placeholder (P14): a plain round patch of soil with
+  // a small sprout in the middle; its ten fruits sit in a ring round it and
+  // are drawn live by drawCarrot. Shape, size and style are the art pass's job.
   {
-    const HP=heartPal(pal), LF=ramp(HP.leaf,{h:16,vd:0.42,vl:0.5}), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42});
-    const STN=ramp(HP.stone,{h:10,vd:0.42,vl:0.55}), MOSS=ramp(HP.moss,{h:14});
-    const cxW=BED.x+BED.w/2, cyW=BED.y+BED.h/2+1, rxW=BED.w/2-1, ryW=BED.h/2-1;
-    const [cx,cy]=toA(cxW,cyW), rx=rxW*R, ry=ryW*R;
-    const g=bedGate(), [gx,gy]=toA(g.x,g.y);
-    // soft glow on the ground round the bud
-    const [bx,by]=toA(cxW,cyW-14);
-    for(let y=by-34;y<=by+34;y++) for(let x=bx-46;x<=bx+46;x++){
-      const d=Math.hypot((x-bx)/46,(y-by)/34); if(d>1) continue;
-      put(x,y,mixc(get(x,y),HP.glow,0.10*(1-d)));
+    const HP=heartPal(pal), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42}), LF=ramp(HP.leaf,{h:16});
+    const [cx,cy]=toA(BED.x+BED.w/2,BED.y+BED.h/2), rx=(BED.w/2-2)*R, ry=(BED.h/2-2)*R;
+    const PL=layer();
+    for(let y=Math.floor(cy-ry);y<=cy+ry+3;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){
+      const dx=(x+0.5-cx)/rx, dy=(Math.min(y,cy+ry)+0.5-cy)/ry; if(dx*dx+dy*dy>1) continue;
+      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,2,70+G.map);
+      const k=y>cy+ry*Math.sqrt(Math.max(0,1-dx*dx))-1?0:(dy<-0.8?3:(n<0.4?1:2));   // lit rim, a front face
+      lp(PL,x,y,SOIL[k],SOIL[0]);
     }
-    // soil inside the ring, a little moss
-    for(let y=cy-ry;y<=cy+ry;y++) for(let x=cx-rx;x<=cx+rx;x++){
-      const dx=(x+0.5-cx)/rx, dy=(y+0.5-cy)/ry, r2=dx*dx+dy*dy; if(r2>1) continue;
-      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,2.2,70+G.map);
-      let c=SOIL[n<0.35?1:(n>0.75?3:2)];
-      if(dy<-0.75+0.1*Math.sin(dx*9)) c=SOIL[3];                       // lit far rim
-      if(vnoise(wx,wy,6,71+G.map)>0.80) c=mixc(c,MOSS[1],0.35);
-      put(x,y,c);
-    }
-    // the stone ring, a gap where the trail comes in
-    const SL=layer();
-    const per=2*Math.PI*Math.sqrt((rx*rx+ry*ry)/2), n=Math.round(per/7);
-    for(let k=0;k<n;k++){
-      const a=k/n*Math.PI*2, sx=cx+Math.cos(a)*rx, sy=cy+Math.sin(a)*ry;
-      if(Math.hypot(sx-gx,sy-gy)<19) continue;
-      const s=3.4+hash2(k,G.map,5)*1.4;
-      lell(SL,sx,sy-1,s*1.15,s*0.85,STN,0.05);
-    }
-    lcomp(SL);
-    for(let k=0;k<n;k++){                                               // moss tufts on some stones
-      if(hash2(k,G.map,9)>0.35) continue;
-      const a=k/n*Math.PI*2, sx=Math.round(cx+Math.cos(a)*rx), sy=Math.round(cy+Math.sin(a)*ry)-3;
-      if(Math.hypot(sx-gx,sy-gy)<19) continue;
-      put(sx,sy,MOSS[3]); put(sx+1,sy,MOSS[2]); put(sx-1,sy+1,MOSS[2]);
-    }
-    // the sprout: a curved stem, two big leaves with a midrib, and the bud
-    const SP=layer(), STEM=ramp(HP.stem,{h:14});
-    for(let y=cy+6;y>=cy-24;y--){
-      const t=(cy+6-y)/30, x0=Math.round(cx+Math.sin(t*2.4)*2);
-      for(let k=-2;k<=2;k++){ const u=k/2.5; lp(SP,x0+k,y,STEM[shadeIdx(u*LIGHT[0]+Math.sqrt(1-u*u)*LIGHT[2]+0.1,5)],STEM[0]); }
-    }
-    const leaf=(lx,ly,len,wid,ang)=>{                                  // a pointed leaf, tilted
-      const ca=Math.cos(ang), sa=Math.sin(ang);
-      for(let y=Math.floor(ly-len);y<=ly+len;y++) for(let x=Math.floor(lx-len);x<=lx+len;x++){
-        const dx=x+0.5-lx, dy=y+0.5-ly, u=(dx*ca+dy*sa)/len, v=(-dx*sa+dy*ca)/wid;
-        if(u<-1||u>1) continue;
-        const half=Math.sqrt(Math.max(0,1-u*u))*(u>0?1-u*0.35:1);     // tapers to a point at the tip
-        if(Math.abs(v)>half) continue;
-        const nv=v/(half||1), nz=Math.sqrt(Math.max(0,1-nv*nv));
-        const nx=-sa*nv, ny=ca*nv;
-        let I=nx*LIGHT[0]+ny*LIGHT[1]+nz*LIGHT[2]*0.85+0.1;
-        let c=LF[shadeIdx(I,5)];
-        if(Math.abs(v)<0.12 && u>-0.85 && u<0.9) c=LF[1];             // midrib
-        else if(Math.abs((v*3+u*2)%1)<0.08 && Math.abs(v)<half*0.8) c=LF[Math.max(1,shadeIdx(I,5)-1)];  // veins
-        lp(SP,x,y,c,LF[0]);
-      }
-    };
-    leaf(cx-26,cy-31,32,13,Math.PI+0.3);
-    leaf(cx+26,cy-31,32,13,-0.3);
-    lell(SP,cx+1,cy-27,7,7.5,ramp(HP.bud,{h:14,vl:0.7}),0.2);         // bud
+    lcomp(PL);
+    const SP=layer();
+    for(let y=cy+1;y>=cy-9;y--) for(let k=-1;k<=1;k++) lp(SP,cx+k,y,LF[k<0?3:(k>0?1:2)],LF[0]);
+    lell(SP,cx-5,cy-10,5,2.6,LF,0.1); lell(SP,cx+6,cy-11,5,2.6,LF,0.1);
     lcomp(SP);
-    put(cx-2,cy-31,[255,255,250]); put(cx-1,cy-31,[255,255,250]); put(cx-2,cy-30,[255,255,250]);
-    if(HP.snow){                                                       // snow resting on the leaves
-      for(let x=cx-44;x<=cx+44;x++){
-        let top=-1; for(let y=cy-44;y<cy;y++){ const c=get(x,y); if(c[0]===LF[3][0]&&c[1]===LF[3][1]||c[0]===LF[4][0]&&c[1]===LF[4][1]){ top=y; break; } }
-        if(top>0){ put(x,top,[248,252,255]); if(hash2(x,1,3)<0.5) put(x,top+1,[232,242,250]); }
-      }
-    }
   }
   }
   q.putImageData(im,0,0);
@@ -1258,14 +1202,10 @@ function fruitSprite(st){
   const c=mkSpriteP(FRUIT_ROWS[st],pal); c._s=2;
   return FRUIT_CACHE[key]=c;
 }
-// ten fruits: four along each leaf, hanging just under it, and two by the bud
+// ten fruits in a ring round the sprout (placeholder layout)
 function heartSlots(){
-  const cx=BED.x+BED.w/2, cy=BED.y+BED.h/2+1, out=[];
-  for(const side of [-1,1]){
-    const dx=0.955*side, dy=-0.296, nx=0.296*side, ny=0.955, lx=cx+13*side, ly=cy-15.5;
-    for(const t of [-0.5,-0.05,0.4,0.8]) out.push({x:Math.round(lx+dx*t*14+nx*3.4), y:Math.round(ly+dy*t*14+ny*3.4)});
-  }
-  out.push({x:Math.round(cx-6),y:Math.round(cy-9)},{x:Math.round(cx+7),y:Math.round(cy-9)});
+  const cx=BED.x+BED.w/2, cy=BED.y+BED.h/2, out=[];
+  for(let k=0;k<10;k++){ const a=k/10*Math.PI*2; out.push({x:Math.round(cx+Math.cos(a)*19-1), y:Math.round(cy+Math.sin(a)*7-1)}); }
   return out;
 }
 let CARROT_SLOTS=[];
@@ -1512,7 +1452,7 @@ let BED={x:278,y:66,w:28,h:60,o:'v'}, CARROT_BOX={l:272,t:58,r:312,b:132};
 function setBed(b){
   const w=b.o==='h'?58:28, h=b.o==='h'?27:60;
   BED={x:b.x,y:b.y,w,h,o:b.o};
-  CARROT_BOX={l:b.x-6, t:b.y-(heartOn()?16:8), r:b.x+w+6, b:b.y+h+6};   // the Sprout's leaves rise above the bed
+  CARROT_BOX={l:b.x-6, t:b.y-8, r:b.x+w+6, b:b.y+h+6};
 }
 // where the trail crosses into the bed: which side, and how far along it
 function bedGate(){
