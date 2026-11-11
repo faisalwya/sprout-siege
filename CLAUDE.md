@@ -1,6 +1,6 @@
 # Sprout Siege
 
-Pixel-art tower defense. Bugs march a trail toward a carrot patch; you plant
+Pixel-art tower defense. Bugs march a trail toward the Great Sprout; you plant
 garden-themed towers to stop them. Owner: Faisal.
 
 Full context lives in `SPROUT-SIEGE-BRIEF.md`. Read it before any design
@@ -27,8 +27,12 @@ do not re-propose anything listed there without a new reason.
   requests. Art is char-row sprites or data URIs inside the file.
 - **Primary target: iPhone 15 Pro, landscape** (852x393 pt, DPR 3). Desktop
   must stay usable.
-- **Pixel art**: 320x144 art canvas, 16px tile, integer-scaled where it costs
-  under 5% of size.
+- **Pixel art at 2x** (since v34): game logic runs in 320x144 units with
+  16-unit tiles; art is drawn on a 640x288 canvas (`ART_RES=2`), so a tile is
+  32 art pixels. Integer-scaled where it costs under 5% of size.
+- **All art is drawn in code** (sprites, ground, props, UI). Image-model
+  output is reference only: concepts, poses, animation ideas. Nothing in the
+  game depends on an imported image.
 - **All in-play UI is painted on the canvas.** No DOM over the playfield.
 - **No em dashes** anywhere: UI copy, comments, docs, commit messages.
 
@@ -71,13 +75,22 @@ and follow `WORKFLOW.md`.
 - A crash can hide behind valid syntax. Always run the smoke test.
 - The 3x5 `GLYPH` table has digits, A to Z and `+ - / % ? : . , !`. Anything
   else draws blank: add a glyph before using it. Measure text with `textW()`.
-- `#6cc16b` is the grass colour. Never use it for foliage or anything that
-  must stand out from the ground.
+- Grass colour is per season (`P5_PAL[..].g1`). Never reuse it for foliage
+  or anything that must stand out from the ground.
+- In the background painter, a pixel past the canvas edge must be dropped,
+  not wrapped (`lp()` checks bounds). Wrapping put a map 2 pine behind the
+  dock on the opposite edge.
+- A sprite canvas carries its scale in `_s` (2 for native 2x art). The
+  `drawImage` wrapper divides by it when called with only a position, so
+  callers keep using game units; size sprites with `gw()`/`gh()`, not
+  `.width`. A 2x sprite without `_s` draws at double size.
+- The smoke test taps in game units: it divides the canvas size by
+  `ART_RES` before mapping. If the art scale changes, export it to the test.
 - Don't use `globalCompositeOperation='source-atop'` over an opaque
   background; it tints a square.
 - Plot geometry (`BED_*`, `TOWER_DY`, `PIP_Y`) is the single source of truth
   for spacing, tap targets and button keep-out. Change it together with the
-  drawn soil, never separately.
+  drawn footing and feedback soil, never separately.
 - Buttons are hit-tested from `G.btns` and drawn last. Guard clause order in
   `doAction` matters.
 
