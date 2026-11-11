@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P18';
+const VERSION='V34 P19';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -734,7 +734,7 @@ function paintBG(pal){
     widths.push(6.0 + Math.sin(run*0.105)*0.7 + Math.sin(run*0.047+1.7)*0.6);
   }
   if(heartOn()){ const rEnd=runAt[runAt.length-1];
-    for(let i=0;i<T.length;i++){ const d=rEnd-runAt[i]; if(d<36) widths[i]*=Math.max(0.15, Math.min(1,(d-4)/32)); } }   // a footpath by the time it reaches the stalk
+    for(let i=0;i<T.length;i++){ const d=rEnd-runAt[i]; if(d<24) widths[i]*=Math.max(0.8, d/24); } }   // P19: only slightly tighter as it arrives
   const D=new Float32Array(N).fill(1e9), SI=new Int32Array(N), STt=new Float32Array(N);
   for(let i=0;i<T.length-1;i++){
     const a=T[i], b=T[i+1], dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1e-9, reach=12;
@@ -1151,6 +1151,23 @@ function paintBG(pal){
     const HP=heartPal(pal), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42}), LF=ramp(HP.leaf,{h:16});
     const ST=ramp(HP.stem,{h:14,vd:0.42,vl:0.5});
     const [cx,cy]=toA(BED.x+BED.w/2,heartBaseY()), rx=26, ry=10, Hh=42;
+    // P19: the trail opens into a worn clearing round the Sprout: an uneven
+    // oval of the same packed dirt, with the same scalloped grass edge
+    {
+      const [ccx,ccy]=toA(BED.x+BED.w/2, heartBaseY()-2.5), RX=12.5*R, RY=6.2*R;
+      const Dc=ramp(pal.dirt,{h:12,vd:0.30,vl:0.45}), UNDc=mixc(Dc[1],INK,0.12);
+      for(let y=Math.floor(ccy-RY-4);y<=ccy+RY+4;y++) for(let x=Math.floor(ccx-RX-4);x<=ccx+RX+4;x++){
+        const dx=x+0.5-ccx, dy=y+0.5-ccy, th=Math.atan2(dy/RY,dx/RX);
+        const wob=1+0.11*Math.sin(3*th+G.map*1.7)+0.06*Math.sin(5*th+G.map);
+        const rn=Math.hypot(dx/RX,dy/RY)/wob;
+        const ph=(((th+Math.PI)*(RX+RY)/2/(2.5*R))%1), edge=1-0.07*Math.sqrt(Math.max(0,1-(2*ph-1)*(2*ph-1)));
+        const on=Math.hypot(dx,dy)||1, facing=(dx*LIGHT[0]+dy*LIGHT[1])/on;
+        if(rn<edge){
+          const [wx,wy]=toW(x,y), n=vnoise(wx,wy,5,40+G.map);
+          put(x,y, rn>edge-0.07&&facing>0.1 ? UNDc : (n<0.2?mixc(Dc[2],Dc[1],0.5):Dc[2]));
+        } else if(rn<edge+0.06 && facing<-0.1) put(x,y,G5[4]);
+      }
+    }
     // P17: a compact, quiet base. A little darker earth showing through the
     // grass, and short roots that start the stem's colour and fade into the
     // ground's, no outline, only a soft shade under each, with grass over them.
