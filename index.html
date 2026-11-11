@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P5';
+const VERSION='V34 P6';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -648,14 +648,20 @@ function vnoise(x,y,cell,s){
    Props only go where no tower can: off the trail, clear of every authored
    plot, the carrot bed and the HUD.
    --------------------------------------------------------------------------- */
+// P6: one season per map. Fields beyond the colours: leaves scatters fallen
+// leaves on the grass, snow turns grass tufts off and frosts the ground.
 const P5_PAL=[
-  {g1:'#93dcaa', dirt:'#e2bd86', edge:'#a8794b', inner:'#efd2a2', hedgeA:'#3f9c86', hedgeB:'#2f7a69',
-   flowers:['#f6a9c8','#ffd866','#fff4e6','#b39ae6']},
-  {g1:'#8fd6a0', dirt:'#dcb480', edge:'#a07246', inner:'#ebcb99', hedgeA:'#3b9277', hedgeB:'#2c705c',
-   flowers:['#b39ae6','#fff4e6','#9fd8f5','#ffd866']},
-  {g1:'#a3d995', dirt:'#e4b97e', edge:'#a87445', inner:'#f0cf9b', hedgeA:'#4a9a6f', hedgeB:'#37795a',
-   flowers:['#ffd866','#ffab6b','#fff4e6','#f6a9c8']},
+  {name:'spring', g1:'#93dcaa', dirt:'#e2bd86', edge:'#a8794b', inner:'#efd2a2', hedgeA:'#3f9c86', hedgeB:'#2f7a69',
+   blossom:'#f2a7c3', soil:'#8a5a3a', fence:'#b98a5c', flowers:['#f6a9c8','#ffd866','#fff4e6','#b39ae6']},
+  {name:'summer', g1:'#7fcf8c', dirt:'#e8be82', edge:'#a5733f', inner:'#f3d29d', hedgeA:'#2f8f5a', hedgeB:'#24704a',
+   blossom:'#5cbf6e', soil:'#835333', fence:'#c0905a', flowers:['#ffd23f','#ff7a59','#fff4e6','#5ab0f0']},
+  {name:'autumn', g1:'#a9b878', dirt:'#d39a63', edge:'#8a5733', inner:'#e2b583', hedgeA:'#d9772f', hedgeB:'#3f6b4a',
+   blossom:'#c8452f', soil:'#7a4a2e', fence:'#b0804e', flowers:['#e8a23a','#c8452f','#f5e6c8','#9a5bb8'],
+   leaves:['#d9772f','#c8452f','#e8a23a','#9c5a2c']},
 ];
+const WINTER_PAL={name:'winter', g1:'#e3ecf0', dirt:'#bfae95', edge:'#7d6a55', inner:'#d3c5ae', hedgeA:'#4f8a86', hedgeB:'#2f5f62',
+   blossom:'#f4f8fb', soil:'#6e4e3a', fence:'#9a8068', flowers:['#d6403a','#fff','#c9dff0','#d6403a'], snow:true};
+
 MAPS.forEach((m,i)=>{
   const p=P5_PAL[i%P5_PAL.length];
   Object.assign(m.pal,p,{g2:p.g1,speck:shade(p.g1,.9),bright:shade(p.g1,1.08),dark:p.hedgeA});
@@ -675,7 +681,7 @@ function paintBG(pal){
   const D5=ramp(pal.dirt,{h:12,vd:0.30,vl:0.45});
   const T5=ramp(pal.hedgeA,{h:18,vd:0.42,vl:0.55});      // tree teal
   const P5=ramp(pal.hedgeB,{h:18,vd:0.45,vl:0.5});       // pine, darker
-  const PK=ramp('#f2a7c3',{h:14,vd:0.30,vl:0.55});       // blossom
+  const PK=ramp(pal.blossom||'#f2a7c3',{h:14,vd:0.30,vl:0.55});   // blossom
   const WD=ramp('#9a6a43',{h:12,vd:0.42,vl:0.5});        // wood
   const ST=ramp('#b9b8ad',{h:12,vd:0.40,vl:0.55});       // stone
   const MT=ramp('#6aa6c4',{h:12,vd:0.40,vl:0.55});       // painted tin
@@ -968,7 +974,7 @@ function paintBG(pal){
   }
 
   // ---- 5. sparse grass tufts, little V marks, on open grass only
-  for(let n=0;n<Math.round(CW*CH/700);n++){
+  for(let n=0;n<(pal.snow?0:Math.round(CW*CH/700));n++){
     const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), [wx,wy]=toW(x,y);
     if(onTrail(wx,wy,2)) continue;
     const c=get(x,y); if(Math.abs(c[1]-G5[1][1])>18 && Math.abs(c[1]-G5[2][1])>18) continue;  // grass only
@@ -976,9 +982,20 @@ function paintBG(pal){
     put(x,y,dk); put(x+1,y+1,dk); put(x+2,y,dk); if(rnd()<0.5){ put(x+3,y+1,dk); put(x+4,y,dk); }
   }
 
+  // fallen leaves: two-pixel flecks, a few lying across the trail edge
+  if(pal.leaves){
+    const LV=pal.leaves.map(rgb3);
+    for(let n=0;n<Math.round(CW*CH/260);n++){
+      const x=Math.floor(rnd()*CW), y=Math.floor(rnd()*CH), [wx,wy]=toW(x,y);
+      if(onTrail(wx,wy,-1.5)) continue;
+      const c=LV[Math.floor(rnd()*LV.length)], k=rnd();
+      put(x,y,c); if(k<0.5) put(x+1,y,c); else put(x,y+1,c); if(k<0.25) put(x+1,y+1,mixc(c,INK,0.3));
+    }
+  }
+
   // ---- 6. the carrot bed: a raised planter with a front face, tilled rows,
   // and a round-topped picket fence, open at the gate
-  const S5=ramp('#8a5a3a',{h:12,vd:0.42,vl:0.42}), F5=ramp('#b98a5c',{h:12,vd:0.40,vl:0.55});
+  const S5=ramp(pal.soil||'#8a5a3a',{h:12,vd:0.42,vl:0.42}), F5=ramp(pal.fence||'#b98a5c',{h:12,vd:0.40,vl:0.55});
   const [bx0,by0]=toA(BED.x,BED.y), bw=BED.w*R, bh=BED.h*R;
   const rowsY=[];
   for(const c of CARROT_SLOTS){ if(!rowsY.some(r=>Math.abs(r-c.y)<4)) rowsY.push(c.y); }
