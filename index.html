@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P19';
+const VERSION='V34';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -555,7 +555,7 @@ function distToPath(px,py){
    ====================================================================== */
 let ARTW=W, ARTH=H, OX=0, OY=0;
 // Wider than the game (Safari's toolbars eat height): plain bars at the sides,
-// so the trail and carrot patch sit exactly where the home-screen app puts
+// so the trail and Sprout sit exactly where the home-screen app puts
 // them. Taller than the game still grows garden above and below.
 const MAX_PAD_X=0, MAX_PAD_Y=52;
 
@@ -1347,7 +1347,7 @@ function drawCarrot(x,y,s){
 const SOIL_SX=0.6, SOIL_SR=0.85, SOIL_SY=0.9;
 const BED_W=15, BED_H=13;        // logical footprint, for spacing and hit-tests (v33: 20x14)
 const BED_L=-7, BED_T=-4;        // relative to the anchor
-const BED_R=BED_L+BED_W-1;       // +8
+const BED_R=BED_L+BED_W-1;       // +7
 const BED_B=BED_T+BED_H-1;       // +8, rows of soil in front of the feet
 const TOWER_DY=-2;               // sprite centre, so the feet land on the soil
 const PIP_Y=6;                   // level pips sit on the apron, clear of the feet (was 7)
@@ -2866,7 +2866,7 @@ function screenContent(kind){
   const M=MAPS[G.map-1];
   if(kind==='title') return {
     title:'Sprout Siege', col:SC_TITLE, shade:'#7a4a12',
-    body:[['Bugs are marching on your carrot patch. \n Tap a card, then any open ground to plant. \n Level 3 picks a specialty. GO sends the next wave.',SC_BODY]],
+    body:[['Bugs are marching on the Great Sprout. \n Tap a card, then any open ground to plant. \n Level 3 picks a specialty. GO sends the next wave.',SC_BODY]],
     btns:[{act:'sc_start',label:'Start',skin:'go'}], ver:true };
   if(kind==='rift'){
     const nx=MAPS[G.map], rate=carrotRate(G.map+1);
