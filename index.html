@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P14';
+const VERSION='V34 P15';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1138,24 +1138,51 @@ function paintBG(pal){
   lcomp(FL5);
 
   } else {
-  // ---- 6b. THE SPROUT, placeholder (P14): a plain round patch of soil with
-  // a small sprout in the middle; its ten fruits sit in a ring round it and
-  // are drawn live by drawCarrot. Shape, size and style are the art pass's job.
+  // ---- 6b. THE SPROUT (P15): a beanstalk about a quarter taller than a
+  // tower, two strands twisting round each other, heart-shaped bean leaves,
+  // tendrils, a curled tip, on a small mound of soil. Its ten bean pods are
+  // the lives, drawn live by drawCarrot. Placeholder for the art pass.
   {
     const HP=heartPal(pal), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42}), LF=ramp(HP.leaf,{h:16});
-    const [cx,cy]=toA(BED.x+BED.w/2,BED.y+BED.h/2), rx=(BED.w/2-2)*R, ry=(BED.h/2-2)*R;
+    const ST=ramp(HP.stem,{h:14,vd:0.42,vl:0.5});
+    const [cx,cy]=toA(BED.x+BED.w/2,heartBaseY()), rx=26, ry=10, Hh=42;
+    // the mound
     const PL=layer();
-    for(let y=Math.floor(cy-ry);y<=cy+ry+3;y++) for(let x=Math.floor(cx-rx);x<=cx+rx;x++){
+    for(let y=cy-ry;y<=cy+ry+3;y++) for(let x=cx-rx;x<=cx+rx;x++){
       const dx=(x+0.5-cx)/rx, dy=(Math.min(y,cy+ry)+0.5-cy)/ry; if(dx*dx+dy*dy>1) continue;
-      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,2,70+G.map);
-      const k=y>cy+ry*Math.sqrt(Math.max(0,1-dx*dx))-1?0:(dy<-0.8?3:(n<0.4?1:2));   // lit rim, a front face
+      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,1.6,70+G.map);
+      const k=y>cy+ry*Math.sqrt(Math.max(0,1-dx*dx))-1?0:(dy<-0.7?3:(n<0.4?1:2));
       lp(PL,x,y,SOIL[k],SOIL[0]);
     }
     lcomp(PL);
     const SP=layer();
-    for(let y=cy+1;y>=cy-9;y--) for(let k=-1;k<=1;k++) lp(SP,cx+k,y,LF[k<0?3:(k>0?1:2)],LF[0]);
-    lell(SP,cx-5,cy-10,5,2.6,LF,0.1); lell(SP,cx+6,cy-11,5,2.6,LF,0.1);
+    // two strands, the one behind drawn first and darker
+    const strand=(s,front)=>{
+      for(let y=0;y<=Hh;y++){
+        const t=y/Hh, ph=t*Math.PI*2.4+s*Math.PI, x0=cx+Math.sin(ph)*(4.5-t*2), isFront=Math.cos(ph)>0;
+        if(isFront!==front) continue;
+        const w=2.6-t*1.4;
+        for(let x=Math.floor(x0-w);x<=Math.ceil(x0+w);x++){
+          const u=(x+0.5-x0)/w; if(Math.abs(u)>1) continue;
+          let k=shadeIdx(u*LIGHT[0]+Math.sqrt(1-u*u)*LIGHT[2]+0.1,5); if(!front) k=Math.max(0,k-1);
+          lp(SP,x,cy-y,ST[k],ST[0]);
+        }
+      }
+    };
+    strand(0,false); strand(1,false); strand(0,true); strand(1,true);
+    // heart-shaped bean leaves at the nodes, alternating sides
+    const leaf=(lx,ly,side)=>{
+      lell(SP,lx-2.2*side,ly-1,3.4,3.0,LF,0.1); lell(SP,lx+1.2*side,ly-1.6,3.4,3.0,LF,0.1);
+      for(let r=0;r<6;r++) for(let k=-3+Math.floor(r/2);k<=3-Math.floor(r/2);k++) lp(SP,Math.round(lx+side*(r+2)),Math.round(ly+1+k*0.6),LF[r<3?2:1],LF[0]);
+    };
+    leaf(cx+10,cy-12,1); leaf(cx-10,cy-21,-1); leaf(cx+9,cy-30,1); leaf(cx-8,cy-37,-1);
+    // a curled tip
+    for(let a=0;a<5.5;a+=0.35){ const r=3.2-a*0.45; lp(SP,Math.round(cx+1+Math.cos(a)*r),Math.round(cy-Hh-2+Math.sin(a)*r),LF[3],LF[0]); }
     lcomp(SP);
+    // tendrils: thin curls, no outline
+    for(const [tx,ty,sd] of [[cx-6,cy-14,-1],[cx+6,cy-25,1],[cx-5,cy-33,-1]]){
+      for(let a=0;a<6;a+=0.4){ const r=2.6-a*0.38; put(Math.round(tx+sd*(2+Math.cos(a)*r)),Math.round(ty+Math.sin(a)*r),LF[1]); }
+    }
   }
   }
   q.putImageData(im,0,0);
@@ -1188,10 +1215,11 @@ function heartPal(pal){
   };
   return H[pal.name]||H.spring;
 }
+// P15: bean pods, beaded where the beans swell, hanging from a short stem
 const FRUIT_ROWS={
-  whole:["...s.gg.","..oso...",".oolhmo.","olhhmmdo","olmmmmdo","ommmmddo",".odddoo.","..ooo..."],
-  half: ["...s....","..oso...",".oolbo..","olhmbbo.","olmmbo..","ommmbbo.",".oddoo..","..ooo..."],
-  gone: ["........","........","........","...s....","..oso...","...o....","........","........"],
+  whole:["..s..",".oso.","olmdo","ohmdo",".omo.","olmdo","ohmdo",".ooo."],
+  half: ["..s..",".oso.","olmdo","ohmdo",".obo.","obbbo",".oo..","....."],
+  gone: ["..s..",".oso.","..o..",".....",".....",".....",".....","....."],
 };
 const FRUIT_CACHE={};
 function fruitSprite(st){
@@ -1202,10 +1230,14 @@ function fruitSprite(st){
   const c=mkSpriteP(FRUIT_ROWS[st],pal); c._s=2;
   return FRUIT_CACHE[key]=c;
 }
-// ten fruits in a ring round the sprout (placeholder layout)
+// the beanstalk stands low in the bed so its top stays inside the no-build box
+function heartBaseY(){ return BED.y+BED.h/2+5; }
+// ten bean pods: five pairs up the stalk, hanging either side of it
 function heartSlots(){
-  const cx=BED.x+BED.w/2, cy=BED.y+BED.h/2, out=[];
-  for(let k=0;k<10;k++){ const a=k/10*Math.PI*2; out.push({x:Math.round(cx+Math.cos(a)*19-1), y:Math.round(cy+Math.sin(a)*7-1)}); }
+  const cx=BED.x+BED.w/2, by=heartBaseY(), out=[];
+  // staggered and zigzagging so they read as separate pods, not two ropes
+  [[-5,2.5],[6,4.5],[-7.5,7],[4.5,9],[-4.5,11.5],[7.5,13.5],[-7,16],[5,18],[-4,20.5],[7,22]]
+    .forEach(([dx,h])=>out.push({x:Math.round(cx+dx), y:Math.round(by-h)}));
   return out;
 }
 let CARROT_SLOTS=[];
@@ -1228,7 +1260,7 @@ function sortCarrots(){          // nearest the gate is eaten first, so the dama
 function drawCarrot(x,y,s){
   if(heartOn()){                                           // a fruit on the Great Sprout
     const st=s<=0?'gone':(s<0.55?'half':'whole');
-    ctx.drawImage(fruitSprite(st), x-2, y-2);
+    ctx.drawImage(fruitSprite(st), x-1.25, y-1);       // pods hang from the slot point
     return;
   }
   ctx.fillStyle='#3f2a1c'; ctx.fillRect(x-1,y+3,4,1);      // the hole it sits in
