@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34 P15';
+const VERSION='V34 P16';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1146,15 +1146,31 @@ function paintBG(pal){
     const HP=heartPal(pal), SOIL=ramp(HP.soil,{h:12,vd:0.42,vl:0.42}), LF=ramp(HP.leaf,{h:16});
     const ST=ramp(HP.stem,{h:14,vd:0.42,vl:0.5});
     const [cx,cy]=toA(BED.x+BED.w/2,heartBaseY()), rx=26, ry=10, Hh=42;
-    // the mound
-    const PL=layer();
-    for(let y=cy-ry;y<=cy+ry+3;y++) for(let x=cx-rx;x<=cx+rx;x++){
-      const dx=(x+0.5-cx)/rx, dy=(Math.min(y,cy+ry)+0.5-cy)/ry; if(dx*dx+dy*dy>1) continue;
-      const [wx,wy]=toW(x,y), n=vnoise(wx,wy,1.6,70+G.map);
-      const k=y>cy+ry*Math.sqrt(Math.max(0,1-dx*dx))-1?0:(dy<-0.7?3:(n<0.4?1:2));
-      lp(PL,x,y,SOIL[k],SOIL[0]);
+    // P16: no mound. Roots spread over the grass from a small break in the
+    // earth, with root hairs and a few sprouts along them.
+    const RT=ramp(HP.root||'#9a7448',{h:12,vd:0.42,vl:0.5});
+    for(let y=cy-4;y<=cy+5;y++) for(let x=cx-9;x<=cx+9;x++){             // the break
+      const d=Math.hypot((x+0.5-cx)/9,(y+0.5-cy-0.5)/4.5); if(d>1-hash2(x,y,4)*0.25) continue;
+      put(x,y,SOIL[d<0.5?1:2]);
     }
-    lcomp(PL);
+    const RL=layer();
+    const roots=[[3.0,28],[2.5,20],[0.35,26],[-0.15,16],[1.6,13],[1.05,16],[3.6,15]];   // angle (rad), length (art px)
+    for(const [ang,len] of roots){
+      let x=cx, y=cy+1, a=ang;
+      for(let k=0;k<len;k++){
+        a+=Math.sin(k*0.35+ang*5)*0.16;
+        x+=Math.cos(a); y+=Math.sin(a)*0.7;                                  // flattened: they lie on the ground
+        const w=Math.max(0.6,3.4*(1-k/len));
+        for(let ox=-Math.ceil(w);ox<=Math.ceil(w);ox++) for(let oy=-1;oy<=1;oy++){
+          if(Math.hypot(ox,oy*1.6)>w) continue;
+          lp(RL,Math.round(x+ox),Math.round(y+oy),RT[oy<0?3:(oy>0?1:2)],RT[0]);
+        }
+        if(k===Math.round(len*0.6) && hash2(Math.round(x),Math.round(y),2)<0.6){   // a sprout on the root
+          lp(RL,Math.round(x),Math.round(y)-2,LF[3],LF[0]); lp(RL,Math.round(x)-1,Math.round(y)-3,LF[2],LF[0]); lp(RL,Math.round(x)+1,Math.round(y)-3,LF[3],LF[0]);
+        }
+      }
+    }
+    lcomp(RL);
     const SP=layer();
     // two strands, the one behind drawn first and darker
     const strand=(s,front)=>{
@@ -1179,6 +1195,11 @@ function paintBG(pal){
     // a curled tip
     for(let a=0;a<5.5;a+=0.35){ const r=3.2-a*0.45; lp(SP,Math.round(cx+1+Math.cos(a)*r),Math.round(cy-Hh-2+Math.sin(a)*r),LF[3],LF[0]); }
     lcomp(SP);
+    // a few tufts at the base, like the towers' footing
+    for(const [ox,oy] of [[-8,3],[7,3],[-3,5],[3,5]]){
+      const dk=mixc(G5[0],INK,0.3);
+      for(let b=0;b<3;b++){ const h=2+((ox*7+b*3)&1); for(let k=0;k<h;k++) put(cx+ox+b-1,cy+oy-k,k===h-1?G5[4]:(b===1?dk:G5[0])); }
+    }
     // tendrils: thin curls, no outline
     for(const [tx,ty,sd] of [[cx-6,cy-14,-1],[cx+6,cy-25,1],[cx-5,cy-33,-1]]){
       for(let a=0;a<6;a+=0.4){ const r=2.6-a*0.38; put(Math.round(tx+sd*(2+Math.cos(a)*r)),Math.round(ty+Math.sin(a)*r),LF[1]); }
@@ -1460,7 +1481,7 @@ function drawPlot(p){
     ctx.fillStyle='#4f9d4a'; ctx.fillRect(x-8,y+1,1,1); ctx.fillRect(x+7,y+2,1,1);
     return;
   }
-  drawSoil(x,y,1,null,SOIL_TILLED);
+  // P16: a built tower has no soil patch; footing() grows grass round its feet
 }
 function drawPlots(){
   for(let i=0;i<G.plots.length;i++) drawPlot(G.plots[i]);
@@ -2152,6 +2173,28 @@ function digSpecks(x,y,age){
   }
 }
 
+// P16: grass tufts and a pebble round a tower's feet, drawn in front of it on
+// the 2x grid, so the tower stands in the lawn instead of on a patch
+const FOOT_CACHE={};
+function footing(x,y){
+  const key=G.map; let C=FOOT_CACHE[key];
+  if(!C){ const g=ramp(MAPS[G.map-1].pal.g1,{h:10,vd:0.20,vl:0.32});
+    C=FOOT_CACHE[key]={dk:hexc(mixc(g[0],INK,0.3)), md:hexc(g[0]), lt:hexc(g[4])}; }
+  const r=soilRnd(Math.round(x)+3,Math.round(y)+5);
+  const spots=[[-6.5,5.6],[6,5.4],[-3,6.6],[3.5,6.8]];
+  for(const [sx,sy] of spots){
+    if(r()<0.25) continue;
+    const bx0=Math.round((x+sx+(r()-0.5))*2)/2, by=Math.round((y+sy)*2)/2;
+    for(let b=0;b<3;b++){
+      const h=1+Math.floor(r()*3)*0.5, bx=bx0+(b-1)*0.5;
+      ctx.fillStyle=b===1?C.dk:C.md; ctx.fillRect(bx,by-h,0.5,h);
+      ctx.fillStyle=C.lt; ctx.fillRect(bx,by-h,0.5,0.5);
+    }
+  }
+  if(r()<0.6){ const px=Math.round((x+(r()<0.5?-4.5:4))*2)/2, py=Math.round((y+6.4)*2)/2;
+    ctx.fillStyle='#c9c6b8'; ctx.fillRect(px,py,1,0.5); ctx.fillStyle='#8f8b7e'; ctx.fillRect(px,py+0.5,1,0.5); }
+}
+
 // mode: 'hover' | 'armed' | 'bad' | 'selected'
 function plotMark(cx,cy,age,mode){
   if(age<=0) return;
@@ -2339,6 +2382,7 @@ function draw(){
     const kick=t.kick>0?1:0;
     const bob=Math.round(Math.sin(t.bob*2.2)*0.5);
     drawSprite(artOf(t), (TOWERS[t.fam].flip&&t.face===-1)?-1:1, t.x, t.y+TOWER_DY+bob+kick, 16,16);
+    footing(t.x,t.y);
     // level pips ride the bed's bottom frame row, under the tower's feet
     const lv=t.level;
     for(let i=0;i<lv;i++){
