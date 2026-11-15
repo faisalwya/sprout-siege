@@ -17,7 +17,27 @@ the theme switch, endless-mode tuning.
 
 ---
 
-## Pillars
+## Status: provisional (15 Nov 2026)
+
+The pillars and everything from v35 on were proposed in the v34 session and
+accepted quickly. They are **not settled**. The next session critiques the
+whole project and should challenge them: suggest missing or merged pillars,
+and reorder the versions. Aim: good coverage, not excessive; a system that
+works but leaves room to explore and have fun. Faisal has not designed a
+game before, so explain choices.
+
+**Faisal's priorities** (15 Nov 2026), which outrank the order below:
+1. **Art, style and design:** needs the most refinement. Maps, towers,
+   the Sprout and their feel in play come first.
+2. **UI and UX:** slight improvements.
+3. **Mechanics and story:** important, but later. The story should grow out
+   of playtesting the look and feel, not lead it.
+
+Next sessions: (1) critique, (2) sprite pass with ChatGPT's image model
+(towers first, then the Sprout and map assets), needing a framework from the
+critique: brief open item 4.
+
+## Pillars (provisional)
 
 Every piece of work belongs to one pillar. Before a version starts, check
 which pillar it serves and that the ones it depends on are settled enough.
@@ -27,7 +47,7 @@ which pillar it serves and that the ones it depends on are settled enough.
 | **Game design** | Rules, towers and forks, leveling, economy, enemies, balance | Rules stable since v12. Armor bug and balance open (v37). |
 | **World and story** | Setting, the Sprout, the garden year, campaign arc, theme switch | Sprout settled. Garden year agreed, not written down: v35. |
 | **Level design** | Map layouts, trail shapes, wave lists, per-map tuning | v32 maps carry the v34 look; layouts not revisited (v36). |
-| **Art direction** | The rulebook: references, resolution, palettes, light, outlines, proportions | Settled in v34 (brief decisions 15 to 21). |
+| **Art direction** | The rulebook: references, resolution, palettes, light, outlines, proportions | First pass in v34 (brief decisions 15 to 21); needs the most refinement. |
 | **Art production** | Characters (towers by stage, bugs, the Sprout); environment kit (ground, trail, trees, props, seasons); UI kit (plates, buttons, icons, font); effects (shots, hits, placement) | Environment kit first pass done. Level 1 towers as reference. Rest in parallel tracks below. |
 | **UX and game feel** | Controls, tap targets, feedback, readability, juice, screens | Working; tap target under 44 pt (v38). |
 | **Audio** | Sound effects, music | Parked. |
@@ -259,8 +279,9 @@ A small strip of the next wave's bug icons and counts beside the GO button.
 ## Art tracks (parallel)
 
 Run alongside the versions above, each in its own branch and preview, never
-blocking a version. All drawn in code to the brief's art rules; image models
-(Faisal's pick) supply concepts, poses and animation ideas. Order:
+blocking a version. Art from ChatGPT's image model (sprites and animated
+GIFs) or code, cleaned to the 2x grid and embedded, following the brief's art
+rules (decision 18, open item 4). Order:
 
 1. **Tower progression:** all 7 stages of each of the four families, each
    stage visibly different and rewarding, with subtle idle movement.
@@ -281,6 +302,6 @@ the UI kit.
 
 - `THEME` object (palette, sprites, names), then the theme switch (space
   and beyond), after the garden year.
-- ~~Hand-drawn sprite pipeline, Sprout Lands pack.~~ Superseded in v34:
-  everything is drawn in code.
+- Hand-drawn touch-ups over the sprite pass: a late nice-to-have.
+- ~~Sprout Lands pack.~~ Dropped: art is made for this game.
 - Authored `plots` arrays predate the v32 maps; redo them if `'plots'` mode returns.

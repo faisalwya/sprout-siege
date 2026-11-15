@@ -30,9 +30,11 @@ do not re-propose anything listed there without a new reason.
 - **Pixel art at 2x** (since v34): game logic runs in 320x144 units with
   16-unit tiles; art is drawn on a 640x288 canvas (`ART_RES=2`), so a tile is
   32 art pixels. Integer-scaled where it costs under 5% of size.
-- **All art is drawn in code** (sprites, ground, props, UI). Image-model
-  output is reference only: concepts, poses, animation ideas. Nothing in the
-  game depends on an imported image.
+- **Art may be drawn in code or imported** (15 Nov 2026). Image-model
+  sprites (ChatGPT, Claude) are allowed as the actual art once cleaned up to
+  the 2x pixel grid and embedded in the file (char-rows or data URIs, never
+  a link). Animations become frame strips. Hand-drawn touch-ups are a late
+  nice-to-have. See brief decision 18.
 - **All in-play UI is painted on the canvas.** No DOM over the playfield.
 - **No em dashes** anywhere: UI copy, comments, docs, commit messages.
 

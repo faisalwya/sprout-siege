@@ -15,7 +15,7 @@ towers along the way to stop them.
 |---|---|
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
-| Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Everything drawn in code. |
+| Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Code-drawn or image-model sprites, embedded in the file. |
 | Current version | **v34** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages) and `sprout-siege.netlify.app` (Netlify), both serve `main`. See section 9. |
 
@@ -165,12 +165,17 @@ Do not re-open these without a reason. Each cost at least one version to reach.
 17. **One season per map.** Map 1 spring, 2 summer, 3 autumn. Each season
     sets grass, trail, hedges, tree species, flowers and the Sprout's
     colours. Winter has a palette but no map yet.
-18. **Everything is drawn in code** (12 Nov 2026). Sprites, ground, props
-    and UI are code-drawn pixel art: shape-shaded layers, one light from the
-    top left, hue-shifted ramps, coloured outlines. Image models (Faisal's
-    pick) are for concepts, poses and animation ideas only; the game never
-    depends on an imported image. Supersedes the earlier hand-drawn and
-    generated sprite pipeline.
+18. **Art can come from code or image models** (15 Nov 2026, replacing
+    the 12 Nov "code only" line). The goal is pixel sprites with charm and
+    quirk that fit their world. Faisal will explore ChatGPT's image model
+    for characters and animated sprites (GIFs) first, starting with towers,
+    the Sprout and map assets such as trees; code-drawn art (Claude or
+    ChatGPT) is equally fine. Imported art is cleaned to the 2x grid and
+    palette and embedded in the file; animations become frame strips.
+    Hand-drawn art is the ideal but a late nice-to-have, for touch-ups.
+    Whatever the source, it follows the art rules below (one light from the
+    top left, hue-shifted ramps, coloured outlines). The pipeline is open:
+    see open item 4.
 19. **Towers stand in the grass.** A built tower draws a few tufts and a
     pebble at its feet (`footing()`), no soil. Soil only shows as feedback:
     hover, armed, blocked, selected.
@@ -243,9 +248,11 @@ can be felt in play first.
 2. ~~Deploy.~~ Done: GitHub Pages serves `main`. See section 9.
 3. **Theme swap** to space, as a `THEME` object. The soil palette already
    derives from the map palette, so it will follow automatically.
-4. ~~Hand-drawn sprite pipeline.~~ Superseded (v34): everything is drawn in
-   code, image models are reference only. Art no longer blocks other work;
-   it runs in parallel tracks (see the roadmap).
+4. **Sprite pipeline** (open, 15 Nov 2026). How image-model sprites and
+   GIFs get from ChatGPT into the game: canvas sizes per piece (towers
+   36x48 at level 1), palette, cleanup to the 2x grid, frame counts,
+   embedding and file size budget. To be framed by the critique session,
+   used by the sprite session. Art does not block other work.
 5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
    were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
@@ -324,7 +331,7 @@ season palette in `P5_PAL`:
   wrong side in P7).
 
 ### Code-drawn art rules (v34)
-All art follows the same rules, so new pieces match without imported images:
+All art follows the same rules, so pieces match whatever made them:
 one light from the top left, shapes shaded as spheres, cylinders and cones;
 5-step ramps that shift hue (shadows towards blue-violet, highlights towards
 warm yellow); coloured selective outlines towards a dark ink (`INK`), not
