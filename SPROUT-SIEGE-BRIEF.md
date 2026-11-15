@@ -1,7 +1,8 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v34. Read this
-first; it replaces re-reading the chat.
+Working document for continuing the build. Last updated with v34 and the
+critique decisions of 15 Nov 2026. Read this first; it replaces re-reading
+the chat.
 
 ---
 
@@ -13,7 +14,7 @@ towers along the way to stop them.
 
 | | |
 |---|---|
-| Format | One self-contained HTML file. No build step, no dependencies. |
+| Format | One self-contained HTML file is what ships: no dependencies, no external requests. Art sources may live as PNG sheets in `assets/`, inlined by an embed script (decision 25). |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Code-drawn or image-model sprites, embedded in the file. |
 | Current version | **v34** |
@@ -25,11 +26,14 @@ Gold resets per map and is re-granted as a base plus a bounty on surviving
 lives, so protecting the Sprout compounds.
 
 Direction (Faisal, 12 Nov 2026): **the garden is a year.** Each map is a
-season, and the campaign grows to more maps that move through the seasons:
-2 to 3 per season, or 12, one per month, with the palette shifting
-gradually. Today map 1 is spring, 2 summer, 3 autumn. The theme switch
-(space and beyond) comes after the garden year. Map count and what 1.0 is
-are settled in v35 (see the roadmap).
+season. **1.0 is four maps, one per season** (15 Nov 2026, decision 23):
+today map 1 is spring, 2 summer, 3 autumn, and winter gets the fourth. More
+maps per season (2 to 3 each, or 12, one per month) and the theme switch
+(space and beyond) come after 1.0. Map 1 is finished first, as a vertical
+slice, before maps 2 to 4 (see the roadmap).
+
+The story is a half-page note written after the map 1 slice has been
+played, not a pillar and not a version (decision 22).
 
 ### Target feel
 Pleasing to look at and cozy, but challenging and fun to play. Leveling a
@@ -96,7 +100,19 @@ This is a standing requirement, not a one-off.
 
 ## 3. Settled decisions
 
-Do not re-open these without a reason. Each cost at least one version to reach.
+Three groups since the 15 Nov 2026 critique:
+
+- **1 to 14: settled.** Do not re-open these without a reason. Each cost at
+  least one version to reach.
+- **15 to 21: taste calls.** These are how v34 looks, decided by eye. Faisal
+  can reopen any of them at any time, with no new reason needed, and the
+  sprite pilot is expected to test some (the tower canvas in 20 above all).
+  Build on them, but do not build anything that only works if they never
+  change.
+- **22 to 25: plan decisions** from the critique. Faisal's calls on how the
+  project is organised.
+
+### Settled (1 to 14)
 
 1. **All UI is painted on the canvas.** No DOM elements over the playfield.
    Native `<button>` rendering, focus rings and canvas filters put a faint box
@@ -155,6 +171,8 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     body text and plate buttons. While `G.screen` is set its buttons are the
     only ones `G.btns` holds, so nothing behind can be tapped. Body text is
     wrapped to even lines (`wrapEven`); a ` \n ` word forces a break.
+### Taste calls Faisal can reopen (15 to 21)
+
 15. **Art at 2x** (v34). 640x288 art pixels over unchanged 320x144 game
     units. Chosen over refining at 1x for the depth of detail the
     references have; gameplay, timings and tap mapping are untouched.
@@ -174,8 +192,9 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     palette and embedded in the file; animations become frame strips.
     Hand-drawn art is the ideal but a late nice-to-have, for touch-ups.
     Whatever the source, it follows the art rules below (one light from the
-    top left, hue-shifted ramps, coloured outlines). The pipeline is open:
-    see open item 4.
+    top left, hue-shifted ramps, coloured outlines). The pipeline is framed
+    in `docs/sprite-framework.md` and proved by the Gnome pilot: see open
+    item 4.
 19. **Towers stand in the grass.** A built tower draws a few tufts and a
     pebble at its feet (`footing()`), no soil. Soil only shows as feedback:
     hover, armed, blocked, selected.
@@ -185,6 +204,26 @@ Do not re-open these without a reason. Each cost at least one version to reach.
 21. **Calm ground.** Grass patches sparse and soft, groves framing the edges
     with a back row, props kept off the trail, plots, the Sprout, the HUD
     and the dock.
+
+### Plan decisions from the 15 Nov 2026 critique (22 to 25)
+
+22. **Four pillars: Look, Play, Feel, Tech.** Not the eight proposed after
+    v34. Each pillar holds one open question and a version must answer one
+    (the questions live in the roadmap). Story is a half-page note written
+    after the map 1 slice, not a pillar or a version.
+23. **1.0 is four maps, one per season.** Winter gets its map. The longer
+    garden year (several maps per season) is after 1.0.
+24. **Art queues like everything else.** There are no parallel art tracks:
+    anything that touches `index.html` waits for the change in flight.
+    Order: copy fixes, sprite pilot (Gnome family, 7 stages), map 1 as a
+    vertical slice (all towers, bugs, the Sprout final), save and install,
+    balance, maps 2 to 4.
+25. **Art lives as PNG sheets in `assets/`, inlined by an embed script.**
+    A small script writes the sheets into `index.html` as data URIs. The
+    shipped game stays one self-contained file with no external requests;
+    the old "no build step" rule bends to that one command. Option A of the
+    sprite framework, chosen over converting everything to char-rows (the
+    file would roughly triple and the source images would have no home).
 
 ---
 
@@ -248,11 +287,15 @@ can be felt in play first.
 2. ~~Deploy.~~ Done: GitHub Pages serves `main`. See section 9.
 3. **Theme swap** to space, as a `THEME` object. The soil palette already
    derives from the map palette, so it will follow automatically.
-4. **Sprite pipeline** (open, 15 Nov 2026). How image-model sprites and
-   GIFs get from ChatGPT into the game: canvas sizes per piece (towers
-   36x48 at level 1), palette, cleanup to the 2x grid, frame counts,
-   embedding and file size budget. To be framed by the critique session,
-   used by the sprite session. Art does not block other work.
+4. **Sprite pipeline** (framed 15 Nov 2026, not yet proved). The
+   framework is `docs/sprite-framework.md`: a pilot on the Gnome family, 7
+   stages, through cleanup, contact sheet and an in-game preview, with a
+   fallback of redrawing in code. Settled so far: storage is PNG sheets
+   plus the embed script (decision 25); the master palette is extracted
+   from the v34 level 1 towers. Still open, settled at the start of the
+   pilot: whether forks get a taller canvas than 36x48, and which stages
+   get idle motion. Tools and plumbing come first (roadmap C2 and C4). Art
+   queues with everything else (decision 24).
 5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
    were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
@@ -262,11 +305,16 @@ can be felt in play first.
 7. **Bug outlines** (v34). `BUG_OUTLINE=true` outlines bugs to match the
    towers. They were unoutlined to read small and quick; re-test in play.
 8. **Tap target** (v34). The smaller footprint (15x13 units) is about 41x35
-   points on the iPhone, under the 44 point guideline. Fix in the UI and UX
-   version (v38) with a padded hit area, not a bigger footprint.
-9. **Winter.** A palette exists (`WINTER_PAL`) but no map. Settled with the
-   map count in v35.
-10. **Grub contrast** on late summer and autumn grass is weak. Art track.
+   points on the iPhone, under the 44 point guideline. Fix with a padded
+   hit area, not a bigger footprint. Not placed in the roadmap order yet;
+   snapping a refused tap to the nearest legal spot (roadmap C3) helps
+   with near misses in the meantime.
+9. **Winter.** A palette exists (`WINTER_PAL`) but no map. 1.0 has a
+   winter map (decision 23); it is built with maps 2 to 4.
+10. **Grub contrast** on late summer and autumn grass is weak. Fix with the
+    bugs in the map 1 slice.
+11. **Stale copy.** Screens and map 1's name still say plots and carrots.
+    Roadmap C1 (v34.1).
 
 ---
 
@@ -366,7 +414,7 @@ before shipping any version.**
 | File | Purpose | Status |
 |---|---|---|
 | `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer taps on the canvas for every screen button (title, map cleared, won, lost) and the dock, checks no DOM shows in landscape (v33), builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
-| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, lives lost per wave. | Planned, ROADMAP v37 |
+| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, lives lost per wave. | Planned, roadmap "Armor and balance" |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 
 The old `shim.js`, `run.js` and `shot28.js` were lost with the chat sessions
@@ -409,8 +457,9 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 - High-density structured output.
 - Mockups and rendered comparisons before committing to a visual direction;
   for the overall look, numbered in-game previews.
-- Review the pillars (roadmap) before starting a version, so work stays in
-  order and nothing drifts.
+- Review the four pillars (roadmap) before starting a version: name the
+  pillar and the open question the version answers, so work stays in order
+  and nothing drifts.
 
 ---
 
@@ -441,6 +490,8 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 
 Since 25 Oct 2026 the project is a GitHub repo, `faisalwya/sprout-siege`,
 and `main` on GitHub is the source of truth. See `README.md` for which file
-decides what, `WORKFLOW.md` for syncing, and `ROADMAP.md` for what's next.
+decides what, `WORKFLOW.md` for syncing, `ROADMAP.md` for what's next,
+`docs/roadmap-history.md` for the shipped roadmap sections and
+`docs/sprite-framework.md` for the sprite pipeline.
 Versions v1 to v3 and v6 were never recovered; everything from v4 on is in
 `versions/` and in the git history.

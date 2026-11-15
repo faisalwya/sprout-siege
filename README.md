@@ -16,7 +16,9 @@ https://sprout-siege.netlify.app (built for iPhone in landscape).
 | `index.html` | **The game itself.** The only file players ever load. | Players | Every version |
 | `CLAUDE.md` | **How work gets done:** hard constraints, sync rules, the version routine, known traps. Read automatically by every Claude Code session. | Claude | Rarely, when the process changes |
 | `SPROUT-SIEGE-BRIEF.md` | **What the game is and why:** design, settled and rejected decisions, lessons, version history. | Claude and Faisal | Every version (version map row) |
-| `ROADMAP.md` | **What comes next:** each upcoming version as a task list with a "done when". "Make vN" means build that section. | Claude and Faisal | When a version ships or plans change |
+| `ROADMAP.md` | **What comes next:** the four pillars (Look, Play, Feel, Tech) and each upcoming version as a task list with a "done when". "Make vN" means build that section. | Claude and Faisal | When a version ships or plans change |
+| `docs/roadmap-history.md` | What shipped versions set out to do: their roadmap sections, moved here once done. | Both | When a version ships |
+| `docs/sprite-framework.md` | **How image-model sprites get into the game:** the Gnome pilot, cleanup, gates and checklist. Provisional until the pilot proves it. | Claude and Faisal | When the pilot teaches something |
 | `WORKFLOW.md` | **How to sync and avoid conflicts,** in plain language. | Faisal | Rarely |
 | `versions/` | Frozen copy of every version, for comparing or reverting. | Both | Every version (one new file) |
 | `labs/` | Throwaway mockups used to settle visual questions. | Both | When a visual question needs a mockup |

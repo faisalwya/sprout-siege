@@ -6,8 +6,11 @@ garden-themed towers to stop them. Owner: Faisal.
 Full context lives in `SPROUT-SIEGE-BRIEF.md`. Read it before any design
 change. `README.md` lists which file decides what. When files disagree:
 Faisal's message in the session wins, then this file for process, the brief
-for design, the roadmap for scope. Sections 3 (settled decisions) and 4 (rejected ideas) are closed:
-do not re-propose anything listed there without a new reason.
+for design, the roadmap for scope. Brief section 3 decisions 1 to 14
+(settled) and section 4 (rejected ideas) are closed: do not re-propose
+anything listed there without a new reason. Decisions 15 to 21 are taste
+calls about the v34 look: Faisal can reopen them whenever he likes, so
+build on them without hard-coding them as permanent.
 
 ## Layout
 
@@ -17,14 +20,22 @@ do not re-propose anything listed there without a new reason.
 | `versions/sprout-siege-vN.html` | Every numbered version, kept so any can be reverted to. |
 | `labs/` | Throwaway mockups used to settle visual questions. |
 | `tools/smoke.js` | Headless test: plays all 15 waves in Chromium, fails on any error. |
+| `assets/` | Art source as PNG sheets, inlined into `index.html` by the embed script. Arrives with roadmap C4. |
 | `SPROUT-SIEGE-BRIEF.md` | Design brief, decisions, lessons, version map. |
 | `WORKFLOW.md` | Plain-language guide to syncing, branches and avoiding conflicts. |
-| `ROADMAP.md` | What each upcoming version contains and when it's done. |
+| `ROADMAP.md` | The four pillars, and what each upcoming version contains and when it's done. |
+| `docs/roadmap-history.md` | Roadmap sections of shipped versions, moved out of the roadmap. |
+| `docs/sprite-framework.md` | How image-model sprites get into the game: pilot, cleanup, gates, checklist. |
 
 ## Hard constraints
 
-- **One self-contained HTML file.** No build step, no dependencies, no external
-  requests. Art is char-row sprites or data URIs inside the file.
+- **One self-contained HTML file is what ships.** No dependencies, no
+  external requests: the game never loads a file from `assets/` or anywhere
+  else. Art is char-row sprites or data URIs inside the file.
+- **One build step is allowed: the embed script** (15 Nov 2026). Art may
+  live as PNG sheets in `assets/`; a small script inlines them into
+  `index.html` as data URIs. Nothing else gets a build step. The script
+  arrives with roadmap C4; see brief decision 25.
 - **Primary target: iPhone 15 Pro, landscape** (852x393 pt, DPR 3). Desktop
   must stay usable.
 - **Pixel art at 2x** (since v34): game logic runs in 320x144 units with
@@ -34,7 +45,7 @@ do not re-propose anything listed there without a new reason.
   sprites (ChatGPT, Claude) are allowed as the actual art once cleaned up to
   the 2x pixel grid and embedded in the file (char-rows or data URIs, never
   a link). Animations become frame strips. Hand-drawn touch-ups are a late
-  nice-to-have. See brief decision 18.
+  nice-to-have. See brief decision 18 and `docs/sprite-framework.md`.
 - **All in-play UI is painted on the canvas.** No DOM over the playfield.
 - **No em dashes** anywhere: UI copy, comments, docs, commit messages.
 
@@ -47,7 +58,9 @@ and follow `WORKFLOW.md`.
   copy has uncommitted changes or has diverged, stop and tell Faisal before
   doing anything else.
 - **One change in flight.** If an unmerged branch or open PR touches
-  `index.html`, say so before starting new edits to it.
+  `index.html`, say so before starting new edits to it. Art is not a
+  parallel track: anything that touches `index.html` queues, sprites
+  included.
 - **Versions go through a branch.** Any change to `index.html` is made on a
   branch named `vN-short-name`, previewed, and merged by Faisal through a pull
   request, whether the session is local or in the cloud. Doc-only edits may
@@ -60,7 +73,10 @@ and follow `WORKFLOW.md`.
 ## Making a new version (every time)
 
 0. "Make vN" means build the vN section of `ROADMAP.md`. Do only what it
-   lists; note anything else you spot under a later version instead.
+   lists; note anything else you spot under a later version instead. Name
+   the pillar (Look, Play, Feel, Tech) and the open question the version
+   answers; cleanup or preparation that answers none says so and stays
+   small.
 1. Edit `index.html`.
 2. Bump the version label: `const VERSION` near the top of the script.
 3. Run `npm test`. It must print all PASS. Then look at the screenshots in
@@ -68,7 +84,8 @@ and follow `WORKFLOW.md`.
 4. Copy `index.html` to `versions/sprout-siege-vN.html`.
 5. Update the brief: version map row, and any decision that was settled or
    rejected along the way.
-6. Tick the version's box in `ROADMAP.md`.
+6. Tick the version's box in `ROADMAP.md` and move its section to
+   `docs/roadmap-history.md`.
 7. Commit as `vN: one-line summary`. In the pull request, attach or describe
    the screenshots so Faisal can review from his phone.
 
