@@ -155,3 +155,55 @@ pixel art. Iterated in-game as 19 numbered previews
 **Done when:** smoke test all PASS; Faisal plays the preview on his iPhone
 and merges.
 
+## C0: Record the critique decisions [x]
+
+Docs only, straight to `main`. This rewrite of the roadmap, the brief and
+`CLAUDE.md` updated to match, v30 to v34 moved to `docs/roadmap-history.md`,
+brief decisions 15 to 21 marked as taste calls Faisal can reopen,
+`docs/sprite-framework.md` saved.
+
+## C1: v34.1, stale copy [x]
+
+Cleanup, answers no pillar question. The game still talks about plots and
+carrots; since v34 it is the Great Sprout and its pods.
+
+Replace these, and only these:
+
+1. Map-cleared screen title: "Plot held".
+2. Map-cleared heading: "The carrot patch cleared" (the map name plus
+   "cleared").
+3. Map-cleared body: "You pack up the kit and step through".
+4. Won screen heading: "All 3 plots held".
+5. Won screen line at 20 lives: "Not one carrot lost".
+6. Map 1's name: "The Carrot Patch".
+
+Claude proposes the new wording in the pull request; Faisal picks. Every
+character must be in the `GLYPH` table and every line must fit its plate
+(check the screenshots).
+
+Added by Faisal when C1 started ("include the three extra lines"):
+
+7. Lost screen title: "Patch eaten".
+8. Won screen line at 6 to 12 lives: "More stem than carrot now, but it
+   held."
+9. Won screen line at 1 to 5 lives: "Down to the last row. That was close."
+
+**Done when:** `npm test` all PASS; title, map-cleared, won and lost
+screenshots checked; none of the nine strings left in `index.html`.
+
+**Shipped wording** (Claude's proposal, Faisal to change any in review):
+
+| Was | Now |
+|---|---|
+| Plot held | Sprout safe |
+| The Carrot Patch | The Spiral Lawn |
+| You pack up the kit and step through: | The season turns and you move on: |
+| All 3 plots held | All 3 seasons held |
+| Not one carrot lost. | Not one bite taken. |
+| More stem than carrot now, but it held. | More stalk than pod now, but it held. |
+| Down to the last row. That was close. | Down to the last pods. That was close. |
+| Patch eaten | Sprout eaten |
+
+"The carrot patch cleared" was the map name plus "cleared", so the new name
+fixes it. Left alone: `'plots'` mode toasts ("Plot taken", "Tap a plot to
+preview", "Overgrown plot"), which only show if that mode returns.

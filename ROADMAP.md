@@ -69,39 +69,8 @@ Set by Faisal on 15 Nov. One at a time; stop after each and wait for
 "next". The numbers for C3 and C4 (v34.2, v34.3) are Claude's suggestion;
 C1's is Faisal's.
 
-### C0: Record the critique decisions [x]
-
-Docs only, straight to `main`. This rewrite of the roadmap, the brief and
-`CLAUDE.md` updated to match, v30 to v34 moved to `docs/roadmap-history.md`,
-brief decisions 15 to 21 marked as taste calls Faisal can reopen,
-`docs/sprite-framework.md` saved.
-
-### C1: v34.1, stale copy [ ]
-
-Cleanup, answers no pillar question. The game still talks about plots and
-carrots; since v34 it is the Great Sprout and its pods.
-
-Replace these, and only these:
-
-1. Map-cleared screen title: "Plot held".
-2. Map-cleared heading: "The carrot patch cleared" (the map name plus
-   "cleared").
-3. Map-cleared body: "You pack up the kit and step through".
-4. Won screen heading: "All 3 plots held".
-5. Won screen line at 20 lives: "Not one carrot lost".
-6. Map 1's name: "The Carrot Patch".
-
-Claude proposes the new wording in the pull request; Faisal picks. Every
-character must be in the `GLYPH` table and every line must fit its plate
-(check the screenshots).
-
-Spotted next to these, not in the list, so left alone until Faisal says:
-the lost screen's title "Patch eaten", and the won screen's other lines
-"More stem than carrot now, but it held." and "Down to the last row. That
-was close."
-
-**Done when:** `npm test` all PASS; title, map-cleared and won screenshots
-checked; none of the six strings left in `index.html`.
+**Done:** C0 (docs, 15 Nov) and C1 (v34.1, stale copy). Their sections are
+in `docs/roadmap-history.md`.
 
 ### C2: Sprite tools [ ]
 

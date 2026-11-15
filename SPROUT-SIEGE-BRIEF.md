@@ -1,6 +1,6 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v34 and the
+Working document for continuing the build. Last updated with v34.1 and the
 critique decisions of 15 Nov 2026. Read this first; it replaces re-reading
 the chat.
 
@@ -17,7 +17,7 @@ towers along the way to stop them.
 | Format | One self-contained HTML file is what ships: no dependencies, no external requests. Art sources may live as PNG sheets in `assets/`, inlined by an embed script (decision 25). |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Code-drawn or image-model sprites, embedded in the file. |
-| Current version | **v34** |
+| Current version | **v34.1** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages) and `sprout-siege.netlify.app` (Netlify), both serve `main`. See section 9. |
 
 ### Campaign
@@ -89,6 +89,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v34.1** | Stale copy from before the Sprout replaced: no more plots, carrots, patches or "pack up the kit" on the map-cleared, won and lost screens. Map 1 is The Spiral Lawn (was The Carrot Patch); maps are counted as seasons ("All 3 seasons held"). Copy only, same rules. |
 | **v34** | Look pass, iterated in 19 in-game previews (`versions/sprout-siege-v34-p1.html` to `p19`). Art at 2x (640x288). Native 2x ground painter: calm grass patches, trail with a scalloped grass lip, groves framing the map, props. One season per map (spring, summer, autumn). World kept at P7's size, towers 10% smaller, standing in grass with no soil patch. Level 1 towers redrawn as a canvas reference (36x48). The carrot bed becomes the Great Sprout, a beanstalk with 10 bean pods as lives, the trail opening into a clearing round it. Same rules, same balance. |
 | **v33.2** | No drop shadow under plates (buttons, panels, price chips): on grass it read as a murky green band. |
 | **v33.1** | Still 20 lives, drawn as 10 carrots of 2 bites each (Faisal's call): a bite leaves a half-eaten carrot, beds are half the size (wide 58x27, upright 28x60), freeing ground for towers. Top bar and screens count lives. |
@@ -313,8 +314,7 @@ can be felt in play first.
    winter map (decision 23); it is built with maps 2 to 4.
 10. **Grub contrast** on late summer and autumn grass is weak. Fix with the
     bugs in the map 1 slice.
-11. **Stale copy.** Screens and map 1's name still say plots and carrots.
-    Roadmap C1 (v34.1).
+11. ~~Stale copy.~~ Done in v34.1.
 
 ---
 
