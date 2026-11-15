@@ -1,16 +1,45 @@
 # Roadmap
 
 The plan from the v29 review (25 Oct 2026). Reordered after v31: look and
-feel (v32, v33) comes before armor and balance (now v34), at Faisal's call. Each version is one focused
-change, small enough to review on a phone. Work them in order, one at a
-time. When a version ships, tick its box and move anything left over to the
-next one.
+feel (v32, v33) before armor and balance, at Faisal's call. Reordered again
+after v34 (12 Nov 2026): the look pass shipped as v34, world and story come
+next, armor and balance moved to v37. Each version is one focused change,
+small enough to review on a phone. Work them in order, one at a time. Art
+tracks run in parallel and never block a version. When a version ships, tick
+its box and move anything left over to the next one.
 
 Line numbers refer to v29 and will drift; search for the quoted text.
 
-**1.0 means:** three maps balanced, progress saves, installable on iPhone,
-deployed, played by five people. Not in 1.0: space theme, endless-mode
-tuning, new towers or enemies.
+**1.0 means:** being redefined in v35 now that the garden grows into a year
+of maps. Until then the old line stands as a floor: maps balanced, progress
+saves, installable on iPhone, deployed, played by five people. Not in 1.0:
+the theme switch, endless-mode tuning.
+
+---
+
+## Pillars
+
+Every piece of work belongs to one pillar. Before a version starts, check
+which pillar it serves and that the ones it depends on are settled enough.
+
+| Pillar | Covers | Status after v34 |
+|---|---|---|
+| **Game design** | Rules, towers and forks, leveling, economy, enemies, balance | Rules stable since v12. Armor bug and balance open (v37). |
+| **World and story** | Setting, the Sprout, the garden year, campaign arc, theme switch | Sprout settled. Garden year agreed, not written down: v35. |
+| **Level design** | Map layouts, trail shapes, wave lists, per-map tuning | v32 maps carry the v34 look; layouts not revisited (v36). |
+| **Art direction** | The rulebook: references, resolution, palettes, light, outlines, proportions | Settled in v34 (brief decisions 15 to 21). |
+| **Art production** | Characters (towers by stage, bugs, the Sprout); environment kit (ground, trail, trees, props, seasons); UI kit (plates, buttons, icons, font); effects (shots, hits, placement) | Environment kit first pass done. Level 1 towers as reference. Rest in parallel tracks below. |
+| **UX and game feel** | Controls, tap targets, feedback, readability, juice, screens | Working; tap target under 44 pt (v38). |
+| **Audio** | Sound effects, music | Parked. |
+| **Technical** | Engine, 2x rendering, performance, save, install, tests, deploy | 2x engine in. Save and install (v39). |
+
+**Process** is the spine, not a pillar: branches, previews, numbered
+versions, tests, these docs.
+
+Small parts live in Art production when the question is how they look
+(trees and trail in the environment kit, buttons in the UI kit) and in UX
+when the question is how they behave (button size, where it sits, what a
+tap does).
 
 ---
 
@@ -141,7 +170,52 @@ counting lives.
 Faisal, 27 Oct: the 2px translucent shadow under every plate (buttons,
 panels, price chips) read as a murky green band on grass. Removed.
 
-## v34: Armor and balance [ ]
+## v34: Look pass [x]
+
+Faisal, Nov 2026: refine the look before the tower sprite pass, keeping
+pixel art. Iterated in-game as 19 numbered previews
+(`versions/sprout-siege-v34-p1.html` to `p19`).
+
+1. Art at 2x (640x288), game units unchanged.
+2. Native 2x ground painter: calm grass, trail with a grass lip, groves,
+   props, one season per map.
+3. Proportions: world at P7's size, towers 10% smaller, no soil under built
+   towers.
+4. Level 1 towers redrawn in code as the reference canvas (36x48).
+5. The carrot bed becomes the Great Sprout, pods as lives, a clearing where
+   the trail meets it.
+
+**Done when:** smoke test all PASS; Faisal plays the preview on his iPhone
+and merges.
+
+## v35: World and story doc [ ]
+
+No code. A written doc that every later version builds on.
+
+1. **The garden year:** how many maps (2 to 3 per season, or 12, one per
+   month), how the seasons shift between them, where winter goes.
+2. **The Sprout:** what it is, why bugs want it, how it changes through the
+   year.
+3. **Campaign arc:** what carries between maps, how a season ends, what
+   comes after the year (the theme switch).
+4. **Redefine 1.0:** how many maps ship, what is in, what is out.
+5. **Tower progression as a promise:** what each of the 7 stages per family
+   (levels 1 to 3, then 4 and 5 on each fork) must show, so the art tracks
+   have a target.
+
+**Done when:** Faisal approves the doc; the brief and this roadmap are
+updated to match.
+
+## v36: Map layout [ ]
+
+1. Revisit maps 1 to 3 for play and scenery together: trail shape, where the
+   Sprout sits, room for towers, framing.
+2. A plan (sketches or mocks) for the rest of the garden year's maps.
+3. Trail lengths stay within about 15% of today's until v37 re-tunes.
+
+**Done when:** Faisal picks layouts from rendered mocks; smoke test all PASS.
+
+## v37: Armor and balance [ ]
 
 1. **Armor bug:** armor is a flat cut per hit, so small fast hits are gutted.
    Pollen Bloom loses 62% of its damage against the Grand Slug (armor 4),
@@ -156,9 +230,19 @@ panels, price chips) read as a murky green band on grass. Removed.
    the field from the centre).
 4. Faisal plays each map twice on the phone and says how it felt.
 
-**Target:** a competent run finishes map 3 with 8 to 15 carrots left.
+**Target:** a competent run finishes map 3 with 8 to 15 lives left
+(4 to 8 pods), challenging but fair.
 
-## v35: Save and install [ ]
+## v38: UI kit and UX [ ]
+
+1. Plates, buttons, price chips and icons redrawn for 2x in the v34 style.
+2. A 2x pixel font (the 3x5 font stays as a fallback or for tiny labels).
+3. Tap areas at least 44 points, padded hit boxes where the art is smaller.
+4. Re-test bug outlines (`BUG_OUTLINE`) in play and settle it.
+
+**Done when:** smoke test all PASS; screenshots of every screen and the dock.
+
+## v39: Save and install [ ]
 
 1. **Save** to `localStorage` at each map start and on pause: map, wave,
    carrots, gold, towers. A Continue button on the title screen. Wrap every
@@ -168,15 +252,35 @@ panels, price chips) read as a murky green band on grass. Removed.
 3. **Add to Home Screen hint** for iPhone Safari users who aren't installed
    yet.
 
-## v36: Next-wave preview [ ]
+## v40: Next-wave preview [ ]
 
 A small strip of the next wave's bug icons and counts beside the GO button.
 
+## Art tracks (parallel)
+
+Run alongside the versions above, each in its own branch and preview, never
+blocking a version. All drawn in code to the brief's art rules; image models
+(Faisal's pick) supply concepts, poses and animation ideas. Order:
+
+1. **Tower progression:** all 7 stages of each of the four families, each
+   stage visibly different and rewarding, with subtle idle movement.
+2. **Bugs:** the five bugs at 2x, with walk cycles, readable on every
+   season's grass (grub contrast is weak today).
+3. **The Sprout:** final art, pod states, how it reacts to bites, seasonal
+   changes.
+4. **Environment kit:** trees, props and flowers per season, winter, and
+   the extra maps' set dressing as v35 and v36 define them.
+5. **Effects:** shots, hits, placement mark (brief section 5, item 6).
+
+## Audio
+
+Important but parked. Sound effects and music get their own version after
+the UI kit.
+
 ## Later
 
-- `THEME` object (palette, sprites, names), then the space theme.
-- Hand-drawn sprite pipeline. The Sprout Lands pack (16px, Cup Nooble) fits
-  the style. Its licence is non-commercial with credit required:
-  "Assets from Sprout Lands by Cup Nooble".
-- Placement mark refinement (brief section 5, item 6).
+- `THEME` object (palette, sprites, names), then the theme switch (space
+  and beyond), after the garden year.
+- ~~Hand-drawn sprite pipeline, Sprout Lands pack.~~ Superseded in v34:
+  everything is drawn in code.
 - Authored `plots` arrays predate the v32 maps; redo them if `'plots'` mode returns.

@@ -17,7 +17,7 @@ const FILE = path.resolve(ROOT, process.argv[2] || 'index.html');
 const OUT = path.join(__dirname, 'out');
 fs.mkdirSync(OUT, { recursive: true });
 
-const EXPORTS = `window.__SS={G,TOWERS,MAPS,FAMS,placeOK,placeGhost,doAction,
+const EXPORTS = `window.__SS={ART_RES:(typeof ART_RES==='undefined'?1:ART_RES),G,TOWERS,MAPS,FAMS,placeOK,placeGhost,doAction,
   startWave,step,statsOf,nextCost,get PLACEMENT(){return PLACEMENT},
   plaqueContent,plaqueW,PLQ_L,PLQ_R,PLQ_H,loadMap,distToPath,TRAIL_CLEAR};`;
 
@@ -76,9 +76,10 @@ function instrument(src) {
       const b = __SS.G.btns.find(q => q.act === a);
       if (!b) return null;
       const c = document.getElementById('cv'), r = c.getBoundingClientRect();
-      const OX = (c.width - 320) / 2, OY = (c.height - 144) / 2;
-      return { x: r.left + (b.x + b.w / 2 + OX) / c.width * r.width,
-               y: r.top + (b.y + b.h / 2 + OY) / c.height * r.height };
+      const R = __SS.ART_RES, cw = c.width / R, ch = c.height / R;
+      const OX = (cw - 320) / 2, OY = (ch - 144) / 2;
+      return { x: r.left + (b.x + b.w / 2 + OX) / cw * r.width,
+               y: r.top + (b.y + b.h / 2 + OY) / ch * r.height };
     }, act);
     if (!pt) return false;
     await page.mouse.click(pt.x, pt.y);
@@ -100,9 +101,10 @@ function instrument(src) {
   // Real pointer tap on the first dock card: proves hit-testing, not just logic.
   const tapped = await page.evaluate(() => {
     const c = document.getElementById('cv'), r = c.getBoundingClientRect();
-    const OX = (c.width - 320) / 2, OY = (c.height - 144) / 2;
+    const R = __SS.ART_RES, cw = c.width / R, ch = c.height / R;
+    const OX = (cw - 320) / 2, OY = (ch - 144) / 2;
     const wx = -OX + 4 + 9, wy = 144 + OY - 3 - 27 + 9;
-    return { x: r.left + (wx + OX) / c.width * r.width, y: r.top + (wy + OY) / c.height * r.height };
+    return { x: r.left + (wx + OX) / cw * r.width, y: r.top + (wy + OY) / ch * r.height };
   });
   await page.mouse.click(tapped.x, tapped.y);
   await page.waitForTimeout(150);

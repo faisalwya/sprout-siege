@@ -1,9 +1,10 @@
 # Sprout Siege
 
 A pixel-art tower defense game in a single HTML file. Bugs march a winding
-trail toward your carrot patch; plant gnomes, sprinklers, zap lamps and
-beehives to stop them. Three maps, five waves each, towers that fork into
-specialities at level 3.
+trail toward the Great Sprout, a beanstalk whose bean pods are your lives;
+plant gnomes, sprinklers, zap lamps and beehives to stop them. Three maps,
+one per season, five waves each, towers that fork into specialities at
+level 3.
 
 **Play:** https://faisalwya.github.io/sprout-siege/ or
 https://sprout-siege.netlify.app (built for iPhone in landscape).

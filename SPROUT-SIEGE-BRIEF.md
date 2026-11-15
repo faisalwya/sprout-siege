@@ -1,27 +1,39 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v33.2. Read this
+Working document for continuing the build. Last updated with v34. Read this
 first; it replaces re-reading the chat.
 
 ---
 
 ## 1. What it is
 
-A pixel-art tower defense game. Bugs march a winding trail toward a carrot
-patch; you plant garden-themed towers along the way to stop them.
+A pixel-art tower defense game. Bugs march a winding trail toward the Great
+Sprout, a beanstalk whose bean pods are your lives; you plant garden-themed
+towers along the way to stop them.
 
 | | |
 |---|---|
 | Format | One self-contained HTML file. No build step, no dependencies. |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
-| Art | Retro pixel, quirky and charming. 320x144 art canvas, 16px tile, integer-scaled. |
-| Current version | **v33.2** |
+| Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Everything drawn in code. |
+| Current version | **v34** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages) and `sprout-siege.netlify.app` (Netlify), both serve `main`. See section 9. |
 
 ### Campaign
-Three maps, five waves each. Lives carry between maps, towers do not. Gold
-resets per map and is re-granted as a base plus a bounty on surviving lives,
-so protecting carrots compounds.
+Today: three maps, five waves each. Lives carry between maps, towers do not.
+Gold resets per map and is re-granted as a base plus a bounty on surviving
+lives, so protecting the Sprout compounds.
+
+Direction (Faisal, 12 Nov 2026): **the garden is a year.** Each map is a
+season, and the campaign grows to more maps that move through the seasons:
+2 to 3 per season, or 12, one per month, with the palette shifting
+gradually. Today map 1 is spring, 2 summer, 3 autumn. The theme switch
+(space and beyond) comes after the garden year. Map count and what 1.0 is
+are settled in v35 (see the roadmap).
+
+### Target feel
+Pleasing to look at and cozy, but challenging and fun to play. Leveling a
+tower must feel rewarding and look different at every one of its stages.
 
 ### Towers
 Four families. Each levels 1 to 3, then **forks permanently** into one of two
@@ -35,12 +47,14 @@ specialisations at level 3, reaching level 5.
 | Beehive | 85 | Swarm | Wasp Nest (fast single target) / Pollen Bloom (damage aura) |
 
 ### Lives
-20 lives, shown as 10 carrots in a fenced bed whose place each map sets
-(since v32). Each carrot takes two bites (v33.1): whole, half eaten, gone.
-Bugs break in through the gate where the trail meets the fence and eat
-**nearest the gate first**, so damage visibly advances inward from the
-breach.
-The HUD counter is a carrot icon, not a heart.
+20 lives, shown as 10 bean pods hanging on the Great Sprout (v34), a
+beanstalk about 25% taller than a tower that stands where each map's bed
+used to be. Each pod takes two bites: whole, half eaten, gone. Bugs still
+eat **nearest the trail's end first** (gate-first, `sortCarrots`), so the
+damage climbs the stalk from where they arrive. The trail opens into a worn
+clearing around the Sprout's base. The HUD counter is a small Sprout icon.
+All three maps use wide (`'h'`) beds, so all show the Sprout; an upright
+(`'v'`) bed would still draw the old carrots (`heartOn()`).
 
 ---
 
@@ -71,6 +85,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v34** | Look pass, iterated in 19 in-game previews (`versions/sprout-siege-v34-p1.html` to `p19`). Art at 2x (640x288). Native 2x ground painter: calm grass patches, trail with a scalloped grass lip, groves framing the map, props. One season per map (spring, summer, autumn). World kept at P7's size, towers 10% smaller, standing in grass with no soil patch. Level 1 towers redrawn as a canvas reference (36x48). The carrot bed becomes the Great Sprout, a beanstalk with 10 bean pods as lives, the trail opening into a clearing round it. Same rules, same balance. |
 | **v33.2** | No drop shadow under plates (buttons, panels, price chips): on grass it read as a murky green band. |
 | **v33.1** | Still 20 lives, drawn as 10 carrots of 2 bites each (Faisal's call): a bite leaves a half-eaten carrot, beds are half the size (wide 58x27, upright 28x60), freeing ground for towers. Top bar and screens count lives. |
 | **v33** | Title, map-cleared, won and lost screens painted on the canvas in the pixel font, on a wooden plate, with canvas buttons. The page is now only the canvas (plus the portrait notice). The version label is `const VERSION`, drawn on the title. |
@@ -92,12 +107,16 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    that tries the preferred side then the others, rejecting anything off-frame
    or overlapping.
 4. **Towers level 1 to 3, fork, then 4 to 5.** The fork is permanent.
-5. **Carrots are lives**, eaten gate-first, **drawn two lives per carrot**
-   (v33.1, Faisal's call: 20 carrots made the bed too big). There are 20
-   lives (`MAX_LIVES`) and every number the player reads counts them: HUD,
-   screens, the red "-N". Only the bed shows them in halves (`BITES`): 10
-   carrots, whole, half eaten, gone. Counting carrots in the HUD was tried
-   in the same version and dropped: Faisal wants the total to read 20.
+5. **The Great Sprout's pods are lives** (v34, Faisal's call, replacing
+   the carrots of v20 to v33.2), eaten gate-first, **two lives per pod**
+   (v33.1: 20 of anything made the bed too big). There are 20 lives
+   (`MAX_LIVES`) and every number the player reads counts them: HUD,
+   screens, the red "-N". Only the Sprout shows them in halves (`BITES`):
+   10 pods, whole, half eaten, gone. Counting pods in the HUD was tried
+   (as carrots, v33.1) and dropped: Faisal wants the total to read 20.
+   The Sprout is about 25% taller than a tower, with a compact base that
+   blends into the grass (no dirt patch) and the trail opening into a worn
+   clearing around it (P19).
 6. **Scaling: fill, do not letterbox.** Integer-snap only when it costs under
    5% of size, otherwise fill and accept uneven pixels. An adaptive margin
    (`ARTW/ARTH/OX/OY`) extends the world into taller-than-game screens
@@ -106,8 +125,10 @@ Do not re-open these without a reason. Each cost at least one version to reach.
    toolbars make the screen wider than the game, and side margin moved the
    trail and patch away from where the home-screen app puts them. The game
    is height-limited there either way, so bars cost no size.
-7. **Garden theme for now.** A space theme stays on the table and should be
-   built as a swappable `THEME` object when it happens, not a fork.
+7. **Garden theme first, as a year of seasons** (12 Nov 2026). The theme
+   switch (space and beyond) is still wanted, after the garden year, built
+   as a swappable `THEME` object, not a fork. Season palettes (`P5_PAL`)
+   are the first step towards it.
 8. **Every version kept as a numbered file.**
 9. **No em dashes** in written output.
 10. **HUD map and wave use icons, not letters.** A 3px-wide M and W both read
@@ -134,6 +155,31 @@ Do not re-open these without a reason. Each cost at least one version to reach.
     body text and plate buttons. While `G.screen` is set its buttons are the
     only ones `G.btns` holds, so nothing behind can be tapped. Body text is
     wrapped to even lines (`wrapEven`); a ` \n ` word forces a break.
+15. **Art at 2x** (v34). 640x288 art pixels over unchanged 320x144 game
+    units. Chosen over refining at 1x for the depth of detail the
+    references have; gameplay, timings and tap mapping are untouched.
+16. **The look is the cozy farm reference (A)**, with The Messenger and
+    Eastward as references for feel, depth of detail and character, applied
+    to the map and the towers. No separate "B layer" or toggles.
+    Reference board: private artifact from the v34 session.
+17. **One season per map.** Map 1 spring, 2 summer, 3 autumn. Each season
+    sets grass, trail, hedges, tree species, flowers and the Sprout's
+    colours. Winter has a palette but no map yet.
+18. **Everything is drawn in code** (12 Nov 2026). Sprites, ground, props
+    and UI are code-drawn pixel art: shape-shaded layers, one light from the
+    top left, hue-shifted ramps, coloured outlines. Image models (Faisal's
+    pick) are for concepts, poses and animation ideas only; the game never
+    depends on an imported image. Supersedes the earlier hand-drawn and
+    generated sprite pipeline.
+19. **Towers stand in the grass.** A built tower draws a few tufts and a
+    pebble at its feet (`footing()`), no soil. Soil only shows as feedback:
+    hover, armed, blocked, selected.
+20. **Proportions** (P9 and P10): the world at P7's size, towers 10%
+    smaller than v33. A level 1 tower's canvas is 36x48 art pixels, feet on
+    row 39, drawn about 24 to 34 wide and 30 to 37 tall. A pod is 5x8.
+21. **Calm ground.** Grass patches sparse and soft, groves framing the edges
+    with a back row, props kept off the trail, plots, the Sprout, the HUD
+    and the dock.
 
 ---
 
@@ -156,6 +202,14 @@ Keeping these on record so they do not get re-proposed.
 | **Drop shadow under plates** (removed v33.2) | A 2px strip of translucent black under every button and panel read as a murky green band on grass, not a shadow. The plate's light rim lifts it enough. |
 | **Plaque at the bottom, beside the dock** (v31 mock B) | Covers the trail's bottom loop on maps 1 and 3 and grazes it on map 2. Comparison in `labs/v31-plaque/`. |
 | **Three-line plaque, or a tower picture in it** (v31) | No three-line spot is clear of the trail on map 3. With a picture, the Sprinkler's stats ran to 168px of a 120px band. |
+| **Refining at 1x** (v34 mock B) | Picked first, then dropped: at 320x144 there is no room for the detail and character of the references. 2x costs nothing in gameplay. |
+| **Redrawing everything procedurally at 2x** (v34 mock C) | "The artwork looked off": generic shapes lost the charm of the old sprites. 2x came back through a native ground painter and hand-tuned code sprites instead. |
+| **A bigger world around the towers** (v34 P8) | Proportions still felt off, partly because the trees looked underbaked. Back to P7's size with towers 10% smaller. |
+| **Soil patch under every built tower** (v34 P9 to P11) | Even narrowed, it read as generic and drew the eye. Towers stand in grass; soil is feedback only. |
+| **The carrot bed** (v20 to v33.2) | Faisal wanted something more unique and special. Replaced by the Great Sprout. |
+| **The big leafy Sprout** (v34 P13) | Shape, size and style felt off. |
+| **The Sprout on a round dirt patch** (v34 P14 to P15) | The patch read as generic, like the tower soil. The base now merges into the grass. |
+| **Trail narrowing into the Sprout** (v34 P18) | Faisal preferred P17's width; P19 keeps it and opens a clearing instead. |
 
 ---
 
@@ -189,14 +243,23 @@ can be felt in play first.
 2. ~~Deploy.~~ Done: GitHub Pages serves `main`. See section 9.
 3. **Theme swap** to space, as a `THEME` object. The soil palette already
    derives from the map palette, so it will follow automatically.
-4. **Hand-drawn sprite pipeline.** Intent is to draw sprites externally and
-   bring them in. Art integration work should wait for this.
+4. ~~Hand-drawn sprite pipeline.~~ Superseded (v34): everything is drawn in
+   code, image models are reference only. Art no longer blocks other work;
+   it runs in parallel tracks (see the roadmap).
 5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
    were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
 6. **Placement mark depth.** What exists is deliberately minimal: the patch
    grows, six clods of dirt fly, a gold rim marks the spot. Built to be
    refined, not to be final.
+7. **Bug outlines** (v34). `BUG_OUTLINE=true` outlines bugs to match the
+   towers. They were unoutlined to read small and quick; re-test in play.
+8. **Tap target** (v34). The smaller footprint (15x13 units) is about 41x35
+   points on the iPhone, under the 44 point guideline. Fix in the UI and UX
+   version (v38) with a padded hit area, not a bigger footprint.
+9. **Winter.** A palette exists (`WINTER_PAL`) but no map. Settled with the
+   map count in v35.
+10. **Grub contrast** on late summer and autumn grass is weak. Art track.
 
 ---
 
@@ -207,16 +270,18 @@ Added in v27 after three versions of the bed, the sprite, the selector and the
 tap target drifting apart. Everything on a plot derives from these:
 
 ```
-BED_W=20, BED_H=14     logical footprint
-BED_L=-10, BED_T=-4    relative to the anchor
-BED_R=+9,  BED_B=+9    four rows of soil in front of the feet
-TOWER_DY=-2            sprite centre, so the feet land on the soil
-PIP_Y=7                level pips sit on the apron, clear of the feet
+BED_W=15, BED_H=13     logical footprint (v33: 20x14)
+BED_L=-7,  BED_T=-4    relative to the anchor
+BED_R=+7,  BED_B=+8    derived from the above
+TOWER_DY=-2            sprite centre, so the feet land on the ground
+PIP_Y=6                level pips sit in front of the feet (v33: 7)
+SOIL_SX=0.6, SOIL_SY=0.9, SOIL_SR=0.85   feedback soil scaled to match
 ```
 
 As of v29 these are **purely logical**: nothing is drawn as a rectangle. They
 drive spacing between plots, the tap target and the button keep-out box. Keep
-the invariant. If the drawn patch changes size, change these with it.
+the invariant. If the drawn footing or feedback soil changes size, change
+these with it.
 
 ### The soil (v29)
 A patch is the union of eleven small overlapping discs along a shallow line,
@@ -233,10 +298,44 @@ a neat oval. Three things make it work, each learned the hard way:
 Cached per position, palette and growth step, so settled plots cost one
 `drawImage` and only the animating patch re-renders.
 
+### The 2x engine (v34)
+- `ART_RES=2`: the canvas backing is twice the art size and `draw()` sets
+  `ctx.setTransform(ART_RES,...)`, so all game code keeps using 320x144
+  units.
+- Sprite canvases carry `_s` (their pixel scale). The `drawImage` wrapper
+  draws a tagged canvas at game size when called with only a position;
+  `gw(img)` and `gh(img)` give a sprite's size in game units. Old 1x sprites are upscaled with
+  Scale2x (`scale2x()`) plus `glint()` highlights; native 2x sprites
+  (`mkSpriteP`) are drawn at 2x directly.
+- The smoke test reads `ART_RES` and divides the canvas size by it before
+  tapping.
+
+### The ground painter (v34)
+`paintBG(pal)` paints each map once into a 2x canvas (`BGX`), from the
+season palette in `P5_PAL`:
+- grass: a flat base with sparse value-noise patches;
+- trail: a distance field with a scalloped grass lip, extended into a worn
+  clearing round the Sprout;
+- props: groves (front and back rows framing the edges), species per season,
+  tall grass, flowers, rocks, mushrooms and a few objects (watering can,
+  birdhouse, signpost), placed by `free()` rules that keep them off the
+  trail, the plots, the Sprout, the HUD and the dock;
+- `lp()` drops any pixel past the canvas edge (wrapping put a tree on the
+  wrong side in P7).
+
+### Code-drawn art rules (v34)
+All art follows the same rules, so new pieces match without imported images:
+one light from the top left, shapes shaded as spheres, cylinders and cones;
+5-step ramps that shift hue (shadows towards blue-violet, highlights towards
+warm yellow); coloured selective outlines towards a dark ink (`INK`), not
+black. Mock renderers and reference sheets are in `labs/v34-towers/` and
+`labs/v34-sprout/`.
+
 ### Other load-bearing details
 - **Sprites** are char-row strings run through `mkSprite()`, which keeps
   `_rows` so a sprite can be re-derived with a 1px contour via `mkOutlined()`.
-  Palette is a single shared `PAL` map.
+  Old sprites share the `PAL` map; v34 level 1 towers carry their own
+  palette (`mkSpriteP(rows, pal)`).
 - **Hit flash** uses pre-rendered white silhouette canvases. Do not use
   `globalCompositeOperation='source-atop'`; over an opaque background it tints
   a square.
@@ -248,8 +347,8 @@ Cached per position, palette and growth step, so settled plots cost one
   a blank: add it first. A missing G and O shipped a blank GO button in v22.
 - **Buttons** are hit-tested from `G.btns` via `hitBtn()` with 3px padding, and
   drawn last so nothing covers them.
-- **Foliage colours** must not match the grass. `#6cc16b` is the grass colour;
-  using it for leaves made them invisible in v15.
+- **Foliage colours** must not match the grass. Grass is per season
+  (`P5_PAL[..].g1`); reusing it for leaves made them invisible in v15.
 - **Price tags** use the same `plate()` skin as buttons. A translucent fill let
   the trail show through.
 
@@ -260,7 +359,7 @@ before shipping any version.**
 | File | Purpose | Status |
 |---|---|---|
 | `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer taps on the canvas for every screen button (title, map cleared, won, lost) and the dock, checks no DOM shows in landscape (v33), builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
-| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, carrots lost per wave. | Planned, ROADMAP v34 |
+| `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, lives lost per wave. | Planned, ROADMAP v37 |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 
 The old `shim.js`, `run.js` and `shot28.js` were lost with the chat sessions
@@ -287,6 +386,12 @@ Mac, run `npm install` and `npx playwright install chromium` once.
   returned early for anything without a selected tower, so it never fired.
 - **Render before judging.** Three of the placement iterations were settled by
   rendering mockups and looking, not by reasoning about pixel coordinates.
+- **Mocks are not the game** (v34). Static mocks of a look were judged
+  wrong twice; building it into the real game as numbered previews and
+  playing them settled it. Iterate looks in-game.
+- **Proportions are relative.** Towers looked too big because the trees were
+  underbaked, not only because of their size. Change one thing at a time
+  and compare against the previous preview.
 
 ---
 
@@ -295,7 +400,10 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 - Keep every prior version as a numbered reference file.
 - No em dashes.
 - High-density structured output.
-- Mockups and rendered comparisons before committing to a visual direction.
+- Mockups and rendered comparisons before committing to a visual direction;
+  for the overall look, numbered in-game previews.
+- Review the pillars (roadmap) before starting a version, so work stays in
+  order and nothing drifts.
 
 ---
 
