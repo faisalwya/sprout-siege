@@ -1,5 +1,6 @@
-// Contact sheet: every sprite on all four season grounds at the size it has on
-// the phone, the same again enlarged, and as black silhouettes.
+// Contact sheet: every sprite on the season ground at the size it has on the
+// phone, the same again enlarged, and as black silhouettes. Spring (map 1)
+// unless asked for more.
 //
 //   node tools/sprite/sheet.js sprite.png [more.png ...] [--out sheet.png]
 //   node tools/sprite/sheet.js "L2 satchel=out/gnome-L2.png" ...   (a label before =)
@@ -7,6 +8,7 @@
 // Options:
 //   --out FILE      where to write (default: tools/out/sprite/contact-sheet.png)
 //   --title TEXT    heading
+//   --grounds LIST  spring (default), all, or names: spring,autumn
 //   --no-refs       leave out the four v34 level 1 reference towers
 //   --palette FILE  another palette file
 //
@@ -29,13 +31,15 @@ const PAPER = [232, 228, 218];                   // behind the silhouettes
 
 async function sheet(items, P, o) {
   o = o || {};
-  const n = items.length, seasons = Object.keys(P.grounds);
+  const n = items.length, want = !o.grounds || o.grounds === true ? 'spring' : String(o.grounds);
+  const seasons = want === 'all' ? Object.keys(P.grounds) : want.split(',').filter(s => P.grounds[s]);
+  if (!seasons.length) throw new Error('no such ground: ' + want + ' (have ' + Object.keys(P.grounds).join(', ') + ')');
   const cw = Math.max(...items.map(s => s.img.w)), chh = Math.max(...items.map(s => s.img.h));
   const LEFT = 150, PAD = 24;
   const zoom = Math.max(PHONE + 1, Math.min(8, Math.floor((SHEET_W - LEFT - PAD) / n / (cw + 6))));
   const band = z => chh * z + 2 * 3 * z, colW = (SHEET_W - LEFT - PAD) / n;
   const head = 190, gapS = 70;
-  const H = head + (band(PHONE) * 4 + gapS) + (band(zoom) * 4 + gapS) + (band(zoom) + band(PHONE) + gapS) + 40;
+  const H = head + (band(PHONE) * seasons.length + gapS) + (band(zoom) * seasons.length + gapS) + (band(zoom) + band(PHONE) + gapS) + 40;
   const img = L.blank(SHEET_W, H, BG);
 
   L.text(img, PAD, 24, o.title || 'CONTACT SHEET', TXT, 6);

@@ -26,6 +26,7 @@ build on them without hard-coding them as permanent.
 | `WORKFLOW.md` | Plain-language guide to syncing, branches and avoiding conflicts. |
 | `ROADMAP.md` | The four pillars, and what each upcoming version contains and when it's done. |
 | `docs/roadmap-history.md` | Roadmap sections of shipped versions, moved out of the roadmap. |
+| `docs/tower-session-kit.md` | The one page Faisal takes to the external tower design session, with its pictures in `docs/tower-kit/`. |
 | `docs/sprite-framework.md` | How image-model sprites get into the game: pilot, cleanup, gates, checklist. |
 
 ## Hard constraints

@@ -6,7 +6,7 @@ and 4). They need Node only. None of them touches `index.html`.
 | Say to Claude | Runs | What you get |
 |---|---|---|
 | "clean this sprite" | `node tools/sprite/clean.js picture.png` | The picture as a real sprite: on the pixel grid, in the master palette, backdrop gone, outline rebuilt, feet on the feet row. Plus a pass or fail line for each automatic check. |
-| "make a contact sheet" | `node tools/sprite/sheet.js a.png b.png` | One picture of the sprites beside the four v34 towers: on spring, summer, autumn and winter ground at phone size, enlarged, and as black silhouettes. |
+| "make a contact sheet" | `node tools/sprite/sheet.js a.png b.png` | One picture of the sprites beside the four v34 towers: on spring ground at phone size, enlarged, and as black silhouettes. `--grounds all` adds summer, autumn and winter. |
 | "test the sprite tools" | `npm run sprite:test` | The tools prove themselves on wrecked copies of the v34 towers. Must print all PASS. |
 | "rebuild the palette" | `node tools/sprite/palette.js` | `master-palette.json`, the swatch `master-palette.png` and `ref/*.png`, read out of the frozen v34 file. Only needed if the rules change. |
 
@@ -15,10 +15,11 @@ gets copied into the repo by hand.
 
 ## What is locked here
 
-- **Master palette:** 73 colours, every colour the four v34 level 1 towers
-  use (`master-palette.json`, swatch in `master-palette.png`). The framework
-  hoped for 32 to 48. Trimming it means redrawing the v34 towers a little, so
-  it is left whole until the Gnome pilot shows whether 73 is a problem.
+- **Master palette: provisional.** 73 colours, every colour the four v34
+  level 1 towers use (`master-palette.json`, swatch in `master-palette.png`).
+  Those towers are placeholders (brief decision 26), so this is a stand-in:
+  the real palette is locked from the designs Faisal picks. `clean.js` takes
+  any palette file with `--palette`.
 - **Tower canvas:** 36x48 art pixels by default, read from the palette file.
   Nothing assumes it: `--canvas 40x56` gives a taller one with the same
   headroom rule, and the contact sheet lines sprites up by their feet whatever

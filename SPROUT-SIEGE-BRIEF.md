@@ -43,6 +43,10 @@ tower must feel rewarding and look different at every one of its stages.
 Four families. Each levels 1 to 3, then **forks permanently** into one of two
 specialisations at level 3, reaching level 5.
 
+**The characters below are placeholders** (16 Nov 2026, decision 26). The
+four jobs, the costs and the forks stand; who does each job is being
+explored. Names and looks in this table describe today's build only.
+
 | Family | Cost | Role | Forks |
 |---|---|---|---|
 | Gnome Post | 45 | Workhorse single target | Deadeye (sniper) / Rascal (fast, short) |
@@ -110,8 +114,8 @@ Three groups since the 15 Nov 2026 critique:
   sprite pilot is expected to test some (the tower canvas in 20 above all).
   Build on them, but do not build anything that only works if they never
   change.
-- **22 to 25: plan decisions** from the critique. Faisal's calls on how the
-  project is organised.
+- **22 to 26: plan decisions** from the critique and the 16 Nov pulse
+  check. Faisal's calls on how the project is organised.
 
 ### Settled (1 to 14)
 
@@ -208,7 +212,7 @@ Three groups since the 15 Nov 2026 critique:
     with a back row, props kept off the trail, plots, the Sprout, the HUD
     and the dock.
 
-### Plan decisions from the 15 Nov 2026 critique (22 to 25)
+### Plan decisions from the 15 and 16 Nov 2026 sessions (22 to 26)
 
 22. **Four pillars: Look, Play, Feel, Tech.** Not the eight proposed after
     v34. Each pillar holds one open question and a version must answer one
@@ -227,6 +231,18 @@ Three groups since the 15 Nov 2026 critique:
     the old "no build step" rule bends to that one command. Option A of the
     sprite framework, chosen over converting everything to char-rows (the
     file would roughly triple and the source images would have no home).
+
+26. **The tower characters are open; the four jobs are fixed** (16 Nov
+    2026). The jobs are workhorse (steady single shots), soaker (splash and
+    slow), chainer (hits one bug and jumps to its neighbours) and swarm
+    (fast homing hits), each leveling 1 to 3 and forking to 5. Gnome Post,
+    Sprinkler, Zap Lamp and Beehive are placeholders that happen to fill
+    them. What each tower is gets settled by Faisal in an external ChatGPT
+    session from `docs/tower-session-kit.md`, level 1 first, then tried in
+    the game on the phone before any tower is drawn at all 7 stages. One
+    palette for every tower, judged on spring ground; season variations
+    are a later pass. A design that needs a different power comes back to a
+    Code session first.
 
 ---
 
@@ -294,14 +310,16 @@ can be felt in play first.
    framework is `docs/sprite-framework.md`: a pilot on the Gnome family, 7
    stages, through cleanup, contact sheet and an in-game preview, with a
    fallback of redrawing in code. Settled so far: storage is PNG sheets
-   plus the embed script (decision 25); the master palette is extracted
-   from the v34 level 1 towers. The cleanup and contact sheet tools exist
-   (`tools/sprite/`, roadmap C2). Still open, settled at the start of the
-   pilot: whether forks get a taller canvas than 36x48, which stages get
-   idle motion, and whether the master palette stays at 73 colours (the
-   framework hoped for 32 to 48; trimming means touching up the v34
-   towers). Plumbing comes next (roadmap C4). Art queues with everything
-   else (decision 24).
+   plus the embed script (decision 25). The cleanup and contact sheet
+   tools exist (`tools/sprite/`, roadmap C2). **Changed 16 Nov** (decision
+   26): the pilot is no longer the Gnome. Faisal first explores who the
+   four towers are, from `docs/tower-session-kit.md`; the picks are tried
+   in the game (roadmap v35), and only then drawn at 7 stages. The master
+   palette taken from the v34 towers (73 colours) is provisional: the real
+   one is locked from the picked designs. Still open, settled when the
+   full stages start: whether forks get a taller canvas than 36x48 and
+   which stages get idle motion. Plumbing (roadmap C4) waits for the
+   picks. Art queues with everything else (decision 24).
 5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
    were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
@@ -497,7 +515,8 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 Since 25 Oct 2026 the project is a GitHub repo, `faisalwya/sprout-siege`,
 and `main` on GitHub is the source of truth. See `README.md` for which file
 decides what, `WORKFLOW.md` for syncing, `ROADMAP.md` for what's next,
-`docs/roadmap-history.md` for the shipped roadmap sections and
-`docs/sprite-framework.md` for the sprite pipeline.
+`docs/roadmap-history.md` for the shipped roadmap sections,
+`docs/tower-session-kit.md` for the one page Faisal takes to the tower
+design session, and `docs/sprite-framework.md` for the sprite pipeline.
 Versions v1 to v3 and v6 were never recovered; everything from v4 on is in
 `versions/` and in the git history.
