@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34.1';
+const VERSION='V34.2';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -1366,6 +1366,7 @@ const PLACEMENT='open';
 const SNAP=2;                    // placements land on even pixels, so beds align
 const TRAIL_CLEAR=10;            // the drawn trail runs ~9.5px either side
 const BED_GAP=3;                 // breathing room between two beds
+const SNAP_REACH=10;             // a tap this close to legal ground slides there instead of being refused
 
 /* ---- the soil ------------------------------------------------------------
    A patch is the union of eleven small overlapping discs along a shallow
@@ -1567,6 +1568,23 @@ function placeOK(x,y){
   return clearOfTrail(x,y);
 }
 function snapTo(v){ return Math.round(v/SNAP)*SNAP; }
+/* A near miss is not a refusal (v34.2). A tap whose bed would clip the trail,
+   another tower or the UI by a few units slides to the nearest legal spot
+   within SNAP_REACH. Only a tap with nothing legal that close (the middle of
+   the trail, deep inside the Sprout's ground) is still turned down.
+   Offsets are sorted nearest first, so the first legal one is the answer. */
+const SNAP_OFFS=(()=>{
+  const o=[];
+  for(let dy=-SNAP_REACH;dy<=SNAP_REACH;dy+=SNAP) for(let dx=-SNAP_REACH;dx<=SNAP_REACH;dx+=SNAP){
+    const d=Math.hypot(dx,dy); if(d>0 && d<=SNAP_REACH) o.push([dx,dy,d]);
+  }
+  return o.sort((a,b)=>a[2]-b[2]);
+})();
+function nearestSpot(x,y){
+  if(placeOK(x,y)) return {x,y};
+  for(const [dx,dy] of SNAP_OFFS) if(placeOK(x+dx,y+dy)) return {x:x+dx,y:y+dy};
+  return null;
+}
 function drawCarrots(){
   const lost=MAX_LIVES-G.lives;       // bites taken, nearest the gate first
   for(let i=0;i<MAX_CARROTS;i++){
@@ -2664,15 +2682,15 @@ cv.addEventListener('pointerdown',ev=>{
       // tapping a standing tower says so; anywhere else is a build attempt, so
       // the only way out is the cross or re-tapping the dock card
       if(i>=0 && G.plots[i].tower){ toast('Plot taken'); return; }
-      const gx=snapTo(p.x), gy=snapTo(p.y);
-      if(!placeOK(gx,gy)){
+      const gx=snapTo(p.x), gy=snapTo(p.y), spot=nearestSpot(gx,gy);
+      if(!spot){
         // leave the red frame standing where they tapped: on a touch screen
         // there is no hover, so the refusal has to be visible somewhere
         G.hoverPos={x:gx,y:gy,ok:false}; G.hoverAge=SEL_GROW;
         toast('No room there'); SFX.bad(); return;
       }
-      if(!G.ghost||G.ghost.x!==gx||G.ghost.y!==gy){
-        G.ghost={i:-1,x:gx,y:gy,age:0}; G.hoverPos=null; SFX.tick();
+      if(!G.ghost||G.ghost.x!==spot.x||G.ghost.y!==spot.y){
+        G.ghost={i:-1,x:spot.x,y:spot.y,age:0}; G.hoverPos=null; SFX.tick();
       }
       return;
     }
@@ -2703,8 +2721,9 @@ cv.addEventListener('pointermove',ev=>{
   if(!G.placing){ G.hover=-1; G.hoverPos=null; return; }
   if(PLACEMENT==='open'){
     // the frame grows once, when the tower is armed, then tracks the pointer
-    const gx=snapTo(p.x), gy=snapTo(p.y);
-    G.hoverPos={x:gx, y:gy, ok:placeOK(gx,gy)};
+    // it shows where a tap would land, so it slides to legal ground too
+    const gx=snapTo(p.x), gy=snapTo(p.y), spot=nearestSpot(gx,gy);
+    G.hoverPos=spot ? {x:spot.x, y:spot.y, ok:true} : {x:gx, y:gy, ok:false};
     return;
   }
   const i=plotAt(p.x,p.y);
@@ -2763,6 +2782,46 @@ function effects(st){
 function numbers(st){
   return 'DMG '+st.dmg+' RNG '+(st.rng/TILE).toFixed(1)+' '+(st.aura?'AURA':'DPS '+Math.round(st.dmg*st.rate));
 }
+/* What the next level buys (v34.2). A selected tower that can still be
+   upgraded shows each number that grows with a green "+n" after it, worked
+   out from the numbers as displayed so they add up on screen. The level
+   itself is no longer written out: the pips under the tower show it, and the
+   band has no room for both. A tower at level 5 says MAX. */
+function nextStats(t){
+  const F=TOWERS[t.fam];
+  if(t.branch) return t.level<5 ? F.forks[t.branch].lv[t.level-3] : null;
+  return t.level<3 ? F.lv[t.level] : null;      // level 3 is the fork, which has its own plaque
+}
+function gain(a,b){
+  const v=+(b-a).toFixed(1);
+  return v>0 ? '+'+String(v).replace(/^0\./,'.') : '';
+}
+const pct=v=>Math.round(v*100);
+// like effects(), as plaque segments, with what the next level adds in green
+function effectSegs(st,nx){
+  const out=[], add=(txt,up)=>{ out.push([' '+txt,PLQ_STAT]); if(up) out.push({gap:1},[up,PLQ_UP]); };
+  if(st.chain) add('CHAIN '+(st.chain+1), nx&&nx.chain ? gain(st.chain,nx.chain) : '');
+  if(st.stun) add('STUN');
+  if(st.splash) add('SPLASH');
+  if(st.slow) add('SLOW '+pct(st.slow)+'%', nx&&nx.slow ? gain(pct(st.slow),pct(nx.slow)) : '');
+  if(nx){                                        // an effect the tower does not have yet
+    if(nx.chain && !st.chain) out.push([' +CHAIN '+(nx.chain+1),PLQ_UP]);
+    if(nx.stun && !st.stun) out.push([' +STUN',PLQ_UP]);
+    if(nx.splash && !st.splash) out.push([' +SPLASH',PLQ_UP]);
+    if(nx.slow && !st.slow) out.push([' +SLOW '+pct(nx.slow)+'%',PLQ_UP]);
+  }
+  return out;
+}
+function numberSegs(st,nx){
+  const rng=s=>(s.rng/TILE).toFixed(1), dps=s=>Math.round(s.dmg*s.rate);
+  const groups=[['DMG '+st.dmg, gain(st.dmg,nx.dmg)], ['RNG '+rng(st), gain(+rng(st),+rng(nx))],
+                st.aura ? ['AURA',''] : ['DPS '+dps(st), gain(dps(st),dps(nx))]];
+  const build=gap=>{ const out=[];
+    groups.forEach(([txt,up],i)=>{ if(i) out.push({gap}); out.push([txt,PLQ_STAT]); if(up) out.push({gap:1},[up,PLQ_UP]); });
+    return out; };
+  const wide=build(3);                           // the widest (Jolt Post) needs the tighter spacing
+  return lineW(wide)+7 <= PLQ_R-PLQ_L ? wide : build(2);
+}
 
 // The info plaque used to be a DOM panel over the field, and it hid part of
 // map 1's bottom loop. It is painted now, in the one spot that is clear of the
@@ -2773,7 +2832,7 @@ function numbers(st){
 // Line one says what it is and does, line two gives the numbers.
 // A line is a list of segments: [text,colour] or {glyph,colour}.
 const PLQ_L=146, PLQ_R=266, PLQ_H=18;
-const PLQ_NAME='#ffeedd', PLQ_STAT='#cbb495', PLQ_GOLD='#ffd452', PLQ_SH='#241a10';
+const PLQ_NAME='#ffeedd', PLQ_STAT='#cbb495', PLQ_GOLD='#ffd452', PLQ_SH='#241a10', PLQ_UP='#8ee88a';
 function plqTop(){ return -OY+1; }
 function plaqueContent(){
   if(G.placing){
@@ -2796,17 +2855,17 @@ function plaqueContent(){
       [[B.name+': ',PLQ_NAME],[B.desc+' ',PLQ_STAT],{glyph:'play',col:PLQ_GOLD}]
     ]};
   }
-  const st=statsOf(t);
-  return {lines:[[[nameOf(t),PLQ_NAME],[effects(st),PLQ_STAT]],
-    [['LV '+t.level+' ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
+  const st=statsOf(t), nx=nextStats(t);
+  return {lines:[[[nameOf(t),PLQ_NAME]].concat(effectSegs(st,nx)),
+    nx ? numberSegs(st,nx) : [['MAX ',PLQ_GOLD],[numbers(st),PLQ_STAT]]]};
 }
-function segW(s){ return s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
+function segW(s){ return s.gap ? s.gap : s.glyph ? GL[s.glyph][0].length+1 : textW(s[0]); }
 function lineW(l){ return l.reduce((w,s)=>w+segW(s),0); }
 function drawLine(l,x,y,sh){
   sh=sh||PLQ_SH;
   for(const s of l){
     if(s.glyph) glyph(GL[s.glyph],x,y,s.col,sh);
-    else drawText(x,y,s[0],s[1],sh);
+    else if(!s.gap) drawText(x,y,s[0],s[1],sh);
     x+=segW(s);
   }
 }

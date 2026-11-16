@@ -1,7 +1,7 @@
 # Sprout Siege: project brief
 
-Working document for continuing the build. Last updated with v34.1 and the
-critique decisions of 15 Nov 2026. Read this first; it replaces re-reading
+Working document for continuing the build. Last updated with v34.2 and the
+decisions of 15 and 16 Nov 2026. Read this first; it replaces re-reading
 the chat.
 
 ---
@@ -17,7 +17,7 @@ towers along the way to stop them.
 | Format | One self-contained HTML file is what ships: no dependencies, no external requests. Art sources may live as PNG sheets in `assets/`, inlined by an embed script (decision 25). |
 | Primary target | **Mobile, horizontal, iPhone 15 Pro.** Desktop is secondary and must stay usable. |
 | Art | Retro pixel, quirky and charming, refined (v34). Drawn at 2x: 640x288 art pixels over 320x144 game units, 16-unit tiles. Code-drawn or image-model sprites, embedded in the file. |
-| Current version | **v34.1** |
+| Current version | **v34.2** |
 | Live | `faisalwya.github.io/sprout-siege/` (GitHub Pages) and `sprout-siege.netlify.app` (Netlify), both serve `main`. See section 9. |
 
 ### Campaign
@@ -93,6 +93,7 @@ This is a standing requirement, not a one-off.
 | v30 | Cleanup. Dead CSS and JS removed, title copy rewritten for open placement, em dashes gone, HUD shows map and wave with flag and wave icons instead of the unreadable 3px M and W. |
 | v30.1 | Trail drawn to the canvas edge and clipped at the carrot bed, bugs fade at the path ends, so wide screens (Safari with toolbars) look right. No gameplay change. |
 | v30.2 | Wide screens (Safari with toolbars, wide desktop windows) get plain side bars instead of extra garden, so the layout matches the home-screen app. |
+| **v34.2** | Placement snap: a tap that misses legal ground by up to 10 units (about a fingertip) arms the nearest legal spot instead of "No room there"; the middle of the trail still refuses. The upgrade plaque shows what the next level adds, as a green "+n" after each number and effect; level 5 says MAX. The plaque no longer writes the level, which the pips show. |
 | **v34.1** | Stale copy from before the Sprout replaced: no more plots, carrots, patches or "pack up the kit" on the map-cleared, won and lost screens. Map 1 is The Spiral Lawn (was The Carrot Patch); maps are counted as seasons ("All 3 seasons held"). Copy only, same rules. |
 | **v34** | Look pass, iterated in 19 in-game previews (`versions/sprout-siege-v34-p1.html` to `p19`). Art at 2x (640x288). Native 2x ground painter: calm grass patches, trail with a scalloped grass lip, groves framing the map, props. One season per map (spring, summer, autumn). World kept at P7's size, towers 10% smaller, standing in grass with no soil patch. Level 1 towers redrawn as a canvas reference (36x48). The carrot bed becomes the Great Sprout, a beanstalk with 10 bean pods as lives, the trail opening into a clearing round it. Same rules, same balance. |
 | **v33.2** | No drop shadow under plates (buttons, panels, price chips): on grass it read as a murky green band. |
@@ -123,7 +124,9 @@ Three groups since the 15 Nov 2026 critique:
    Native `<button>` rendering, focus rings and canvas filters put a faint box
    around every dock card that no amount of CSS removed. Drawing solved it.
 2. **Confirm before placing.** Tap to arm a spot, then tick to commit or cross
-   to put it away. You see the range ring before spending.
+   to put it away. You see the range ring before spending. Since v34.2 a tap
+   that misses legal ground by a little arms the nearest legal spot
+   (`SNAP_REACH`, `nearestSpot()`), so near misses are not refused.
 3. **Tick and cross flank the placement**, laid out by a collision resolver
    that tries the preferred side then the others, rejecting anything off-frame
    or overlapping.
@@ -163,7 +166,10 @@ Three groups since the 15 Nov 2026 critique:
     it. A toast takes the plaque's spot for 1.1s.
 12. **Plaques are two lines, no tower picture.** Three lines fit nowhere on
     map 3. Line one is the name plus effects (chain, stun, splash, slow),
-    line two the level or cost plus the numbers. Fork plaques are one line
+    line two the cost (when placing) plus the numbers. Since v34.2 a
+    selected tower's numbers and effects carry a green "+n" for what the
+    next level adds, and level 5 says MAX; the level itself is left to the
+    pips under the tower, because the band has no room for both. Fork plaques are one line
     per path, on the side of its button, with a short role (`desc`) instead
     of the old flavour line.
 13. **Each map is its own shape** (v32). No more shared left-to-right
@@ -330,9 +336,9 @@ can be felt in play first.
    towers. They were unoutlined to read small and quick; re-test in play.
 8. **Tap target** (v34). The smaller footprint (15x13 units) is about 41x35
    points on the iPhone, under the 44 point guideline. Fix with a padded
-   hit area, not a bigger footprint. Not placed in the roadmap order yet;
-   snapping a refused tap to the nearest legal spot (roadmap C3) helps
-   with near misses in the meantime.
+   hit area, not a bigger footprint. Not placed in the roadmap order yet.
+   This is about selecting a built tower; placing is forgiving since the
+   v34.2 snap.
 9. **Winter.** A palette exists (`WINTER_PAL`) but no map. 1.0 has a
    winter map (decision 23); it is built with maps 2 to 4.
 10. **Grub contrast** on late summer and autumn grass is weak. Fix with the

@@ -19,7 +19,8 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const EXPORTS = `window.__SS={ART_RES:(typeof ART_RES==='undefined'?1:ART_RES),G,TOWERS,MAPS,FAMS,placeOK,placeGhost,doAction,
   startWave,step,statsOf,nextCost,get PLACEMENT(){return PLACEMENT},
-  plaqueContent,plaqueW,PLQ_L,PLQ_R,PLQ_H,loadMap,distToPath,TRAIL_CLEAR};`;
+  plaqueContent,plaqueW,PLQ_L,PLQ_R,PLQ_H,loadMap,distToPath,TRAIL_CLEAR,
+  SNAP_REACH:(typeof SNAP_REACH==='undefined'?0:SNAP_REACH)};`;
 
 function instrument(src) {
   const i = src.lastIndexOf('})();');
@@ -111,6 +112,63 @@ function instrument(src) {
   check('dock card tap arms Gnome Post',
     await page.evaluate(() => __SS.G.placing === 'gnome'));
   await page.evaluate(() => { __SS.G.placing = null; });
+
+  // Placement snap (v34.2): a tap that misses legal ground by a little arms
+  // the nearest legal spot; a tap in the middle of the trail is still refused.
+  if (await page.evaluate(() => __SS.SNAP_REACH > 0)) {
+    const toClient = (wx, wy) => page.evaluate(([wx, wy]) => {
+      const c = document.getElementById('cv'), r = c.getBoundingClientRect();
+      const R = __SS.ART_RES, cw = c.width / R, ch = c.height / R, OX = (cw - 320) / 2, OY = (ch - 144) / 2;
+      return { x: r.left + (wx + OX) / cw * r.width, y: r.top + (wy + OY) / ch * r.height };
+    }, [wx, wy]);
+    const spots = await page.evaluate(() => {
+      const S = __SS, R = S.SNAP_REACH;
+      const reach = (x, y) => { let best = 1e9; for (let dy = -R; dy <= R; dy += 2) for (let dx = -R; dx <= R; dx += 2) {
+        const d = Math.hypot(dx, dy); if (d <= R && d < best && S.placeOK(x + dx, y + dy)) best = d; } return best; };
+      let near = null, mid = null;
+      for (let y = 30; y < 112 && !(near && mid); y += 2) for (let x = 20; x < 300; x += 2) {
+        if (S.placeOK(x, y)) continue;
+        const dp = S.distToPath(x, y), r = reach(x, y);
+        if (!near && dp > 8 && dp < 12 && r >= 4 && r <= R) near = { x, y, r };      // on the grass beside the trail
+        if (!mid && dp < 1 && r > R) mid = { x, y };                               // on the middle of the trail
+      }
+      return { near, mid };
+    });
+    await page.evaluate(() => { const G = __SS.G; G.placing = 'gnome'; G.ghost = null; });
+    let pt = await toClient(spots.near.x, spots.near.y);
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(150);
+    const snap = await page.evaluate(n => { const S = __SS, g = S.G.ghost;
+      return g ? { ok: S.placeOK(g.x, g.y), d: Math.hypot(g.x - n.x, g.y - n.y) } : null; }, spots.near);
+    check('a tap just off legal ground slides to the nearest legal spot',
+      !!snap && snap.ok && snap.d > 0 && snap.d <= spots.near.r + 0.01,
+      snap ? `tapped ${spots.near.x},${spots.near.y}, armed ${snap.d.toFixed(1)} units away` : 'nothing armed');
+    await page.waitForTimeout(250);
+    await shot('02a-snapped');
+    await page.evaluate(() => { __SS.G.ghost = null; });
+    pt = await toClient(spots.mid.x, spots.mid.y);
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(150);
+    check('a tap on the middle of the trail is still refused',
+      await page.evaluate(() => { const G = __SS.G; return !G.ghost && !!G.hoverPos && G.hoverPos.ok === false; }));
+    // plant one for real and look at its plaque: level 1, so it shows what level 2 adds
+    pt = await toClient(spots.near.x, spots.near.y);
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(150);
+    await tapAct('ok');
+    const up = await page.evaluate(() => { const S = __SS, G = S.G, t = G.towers[0]; if (!t) return null;
+      G.selected = t; const flat = c => c.lines.map(l => l.map(s => Array.isArray(s) ? s[0] : '').join('|'));
+      const l1 = flat(S.plaqueContent()); t.level = 2; const l2 = flat(S.plaqueContent());
+      t.branch = Object.keys(S.TOWERS.gnome.forks)[0]; t.level = 5; const l5 = flat(S.plaqueContent());
+      t.branch = null; t.level = 1; return { l1, l2, l5 }; });
+    check('upgrade plaque shows what the next level adds',
+      !!up && /DMG 12\|*\+7/.test(up.l1[1]) && /\+/.test(up.l2[1]) && /^MAX/.test(up.l5[1]) && !/\+/.test(up.l5[1]),
+      up ? up.l1[1].replace(/\|/g, '') + '  ...  ' + up.l5[1].replace(/\|/g, '') : 'no tower planted');
+    await page.evaluate(() => { __SS.G.toast = null; });      // the refusal's toast would cover the plaque
+    await page.waitForTimeout(250);
+    await shot('02b-upgrade-plaque');
+    await page.evaluate(() => { const S = __SS; S.G.selected = S.G.towers[0]; S.doAction({ act: 'sell' }); S.G.placing = null; S.G.ghost = null; });
+  }
 
   // Place one of each family, upgrade to 3, fork (alternating A/B), upgrade to 5.
   const build = await page.evaluate(() => window.__buildAll());

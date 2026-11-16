@@ -84,29 +84,12 @@ C0 to C4 were set by Faisal on 15 Nov; the order changed on 16 Nov (C4 on
 hold, the tower session added). One at a time. The numbers for C3 and C4
 (v34.2, v34.3) are Claude's suggestion; C1's is Faisal's.
 
-**Order now:** C3, while Faisal holds the tower session; then the tower
-tryout (v35); then C4 and the full stages for the picks that survive.
+**Order now:** the tower session (Faisal); then the tower tryout (v35);
+then C4 and the full stages for the picks that survive.
 
-**Done:** C0 (docs, 15 Nov), C1 (v34.1, stale copy) and C2 (sprite tools,
-`tools/sprite/`). Their sections are in `docs/roadmap-history.md`.
-
-### C3: v34.2, placement snap and next-level stats [ ]
-
-Feel. Answers: can you place and upgrade without fighting the controls or
-guessing the numbers?
-
-1. **Snap instead of refusing.** When a placement tap lands on a spot that
-   is not legal, move it to the nearest legal spot within a few units and
-   arm that. Only if nothing legal is that close does it refuse. "No room
-   there" goes away for near misses.
-2. **Next-level stats in the upgrade plaque,** so the price buys something
-   you can read before you pay. It must still fit the two-line plaque band
-   (brief decisions 11 and 12) on all three maps.
-
-**Done when:** `npm test` all PASS, with a new check that a tap just
-inside the trail edge arms a legal spot; plaque screenshots for all four
-families checked; **Faisal plays the preview on his iPhone before
-merging.**
+**Done:** C0 (docs, 15 Nov), C1 (v34.1, stale copy), C2 (sprite tools,
+`tools/sprite/`) and C3 (v34.2, placement snap and next-level numbers).
+Their sections are in `docs/roadmap-history.md`.
 
 ### Tower session (Faisal, outside the repo) [ ]
 
