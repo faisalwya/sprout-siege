@@ -46,7 +46,7 @@
 /* ======================================================================
    1. CONSTANTS & ART
    ====================================================================== */
-const VERSION='V34';
+const VERSION='V34.1';
 const TILE=16, COLS=20, ROWS=9, W=COLS*TILE, H=ROWS*TILE;
 // v34 2x pass: the canvas holds ART_RES art pixels per game unit. All game
 // logic, layout and input stay in game units; only drawing gets finer. Art
@@ -405,7 +405,7 @@ const ENEMIES={
 const WAVES_PER_MAP=5;
 const MAPS=[
  {
-  name:'The Carrot Patch',
+  name:'The Spiral Lawn',
   // authored plots: free positions, spaced 26px+ apart, 10px clear of the trail
   plots:[[174,108,1],[39,54,0],[223,68,1],[120,35,0],[247,111,0],[12,42,0],[86,42,1],[224,94,0],[178,75,0],[162,45,0],[240,21,0],[223,124,0],[270,33,0],[206,28,0],[108,70,0],[12,105,0]],
   wp:[[-2.37,4],[1.38,4],[3.25,2],[8.88,1.63],[15.88,2],[18,4],[17.63,6.5],[14.5,7.38],[8.88,7.38],[6.88,5.75],[7.5,4.13],[10.25,4]],
@@ -2871,24 +2871,24 @@ function screenContent(kind){
   if(kind==='rift'){
     const nx=MAPS[G.map], rate=carrotRate(G.map+1);
     const arrive=MAP_BASE_GOLD+rate*G.lives+G.pack, n=G.towers.length;
-    return { title:'Plot held', col:SC_TITLE, shade:'#7a4a12',
+    return { title:'Sprout safe', col:SC_TITLE, shade:'#7a4a12',
       head:M.name+' cleared: '+G.lives+' lives carried',
-      body:[['You pack up the kit and step through: '+G.lives+' lives at '+rate+
+      body:[['The season turns and you move on: '+G.lives+' lives at '+rate+
         ' coins each, plus '+G.pack+' salvaged from '+n+' tower'+(n===1?'':'s')+'. You arrive at '+nx.name+' with',SC_BODY],
         [arrive+'.',SC_GOLD]],
       btns:[{act:'sc_next',label:'On to '+nx.name,skin:'go',arrow:true}] };
   }
-  if(kind==='dead') return { title:'Patch eaten', col:'#ff7b7b', shade:'#5c1f1f',
+  if(kind==='dead') return { title:'Sprout eaten', col:'#ff7b7b', shade:'#5c1f1f',
       head:M.name+', wave '+Math.max(1,G.wave),
       body:[['The bugs got through. Replant and try a different mix of specialties.',SC_BODY]],
       btns:[{act:'sc_again',label:'Plant again',skin:'go'}] };
   const hp=G.lives;
-  const line = hp>=20 ? 'Not one carrot lost.'
+  const line = hp>=20 ? 'Not one bite taken.'
              : hp>=13 ? 'Chewed at the edges, still standing.'
-             : hp>=6  ? 'More stem than carrot now, but it held.'
-             :          'Down to the last row. That was close.';
+             : hp>=6  ? 'More stalk than pod now, but it held.'
+             :          'Down to the last pods. That was close.';
   return { title:'Garden held', col:SC_TITLE, shade:'#7a4a12',
-    head:'All '+MAPS.length+' plots held, '+hp+' lives left',
+    head:'All '+MAPS.length+' seasons held, '+hp+' lives left',
     body:[[line+' Keep going and the swarm stops holding back.',SC_BODY]],
     btns:[{act:'sc_endless',label:'Endless mode',skin:'go'},{act:'sc_again',label:'Start over',skin:'alt'}] };
 }
