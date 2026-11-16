@@ -255,3 +255,45 @@ Found along the way:
 
 Pictures: `labs/c2-sprite-tools/`.
 
+## C3: v34.2, placement snap and next-level stats [x]
+
+Feel. Answers: can you place and upgrade without fighting the controls or
+guessing the numbers?
+
+1. **Snap instead of refusing.** When a placement tap lands on a spot that
+   is not legal, move it to the nearest legal spot within a few units and
+   arm that. Only if nothing legal is that close does it refuse. "No room
+   there" goes away for near misses.
+2. **Next-level stats in the upgrade plaque,** so the price buys something
+   you can read before you pay. It must still fit the two-line plaque band
+   (brief decisions 11 and 12) on all three maps.
+
+**Done when:** `npm test` all PASS, with a new check that a tap just
+inside the trail edge arms a legal spot; plaque screenshots for all four
+families checked; **Faisal plays the preview on his iPhone before
+merging.**
+
+**Shipped** (16 Nov 2026):
+
+- **Snap.** `SNAP_REACH=10` game units, about a fingertip on the phone. A
+  tap on the grass beside the trail, or just clipping another tower or the
+  UI, arms the nearest legal spot. A tap on the middle of the trail has
+  nothing legal that close and is still refused with "No room there". On
+  desktop the hover mark slides the same way, so it shows where a click
+  lands.
+- **Plaque.** A selected tower that can be upgraded shows each number that
+  grows with a green "+n": `DMG 14+6 RNG 3.5+.3 DPS 11+7`. Effects too:
+  `CHAIN 3+1`, `SLOW 25%+5`, and an effect the next level adds appears in
+  green (`+SLOW 20%` on Pollen Bloom). Level 5 says `MAX`.
+- **What it cost:** the plaque no longer writes "LV 2". There is no room
+  for it beside the gains in the 120 unit band, and the pips under the
+  tower already show the level. The widest plaque (Jolt Post, level 4) is
+  exactly 120.
+- The fork plaque at level 3 is unchanged: one line per path with its short
+  role. There is no room there for numbers.
+
+Idea noted, not built: draw the next level's range as a second, fainter
+ring on the field while a tower is selected.
+
+Pictures: `labs/v34.2-plaque/`.
+
