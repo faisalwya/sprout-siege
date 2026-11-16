@@ -69,29 +69,8 @@ Set by Faisal on 15 Nov. One at a time; stop after each and wait for
 "next". The numbers for C3 and C4 (v34.2, v34.3) are Claude's suggestion;
 C1's is Faisal's.
 
-**Done:** C0 (docs, 15 Nov) and C1 (v34.1, stale copy). Their sections are
-in `docs/roadmap-history.md`.
-
-### C2: Sprite tools [ ]
-
-Look, preparation for the pilot. **No game file:** `index.html` is not
-touched, so it does not hold up the queue for the game file.
-
-1. **Cleanup script** (`tools/`): takes an image-model picture and returns
-   a sprite on the true pixel grid. Steps in this order: find and snap to
-   the grid, downscale nearest-neighbour to the tower canvas, quantise to
-   the master palette, remove the background, rebuild the outline. The
-   canvas size is an input, not a constant.
-2. **Contact sheet maker** (`tools/`): the sprite on all four season
-   grounds (spring `#93dcaa`, summer `#7fcf8c`, autumn `#a9b878`, winter
-   `#e3ecf0`) at phone size, plus black silhouettes.
-3. **Master palette**, extracted from the v34 level 1 towers, saved as data
-   and as a swatch image for the reference pack.
-
-**Done when:** the cleanup script, run on a deliberately blurred and
-off-grid copy of a v34 tower, gives back a sprite that passes the
-framework's checklist (section 7: on the grid, palette subset, outline);
-a contact sheet of the four v34 level 1 towers is rendered and looked at.
+**Done:** C0 (docs, 15 Nov), C1 (v34.1, stale copy) and C2 (sprite tools,
+`tools/sprite/`). Their sections are in `docs/roadmap-history.md`.
 
 ### C3: v34.2, placement snap and next-level stats [ ]
 

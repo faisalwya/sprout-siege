@@ -23,6 +23,7 @@ https://sprout-siege.netlify.app (built for iPhone in landscape).
 | `versions/` | Frozen copy of every version, for comparing or reverting. | Both | Every version (one new file) |
 | `labs/` | Throwaway mockups used to settle visual questions. | Both | When a visual question needs a mockup |
 | `tools/smoke.js` | Whether a version is allowed to ship: must print all PASS. | Claude | When the game gains something new to test |
+| `tools/sprite/` | Whether an imported sprite is fit for the game: cleans it to the grid and master palette, checks it, and lays it out on a contact sheet. | Claude and Faisal | When the sprite pipeline changes |
 
 **When files disagree:** Faisal's message in the session wins, then
 `CLAUDE.md` for process, the brief for design, the roadmap for scope.

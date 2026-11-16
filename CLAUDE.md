@@ -20,6 +20,7 @@ build on them without hard-coding them as permanent.
 | `versions/sprout-siege-vN.html` | Every numbered version, kept so any can be reverted to. |
 | `labs/` | Throwaway mockups used to settle visual questions. |
 | `tools/smoke.js` | Headless test: plays all 15 waves in Chromium, fails on any error. |
+| `tools/sprite/` | Sprite pass tools: cleanup, contact sheet, master palette, and their own test (`npm run sprite:test`). See its `README.md`. |
 | `assets/` | Art source as PNG sheets, inlined into `index.html` by the embed script. Arrives with roadmap C4. |
 | `SPROUT-SIEGE-BRIEF.md` | Design brief, decisions, lessons, version map. |
 | `WORKFLOW.md` | Plain-language guide to syncing, branches and avoiding conflicts. |

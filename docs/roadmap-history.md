@@ -207,3 +207,51 @@ screenshots checked; none of the nine strings left in `index.html`.
 "The carrot patch cleared" was the map name plus "cleared", so the new name
 fixes it. Left alone: `'plots'` mode toasts ("Plot taken", "Tap a plot to
 preview", "Overgrown plot"), which only show if that mode returns.
+
+## C2: Sprite tools [x]
+
+Look, preparation for the pilot. **No game file:** `index.html` is not
+touched, so it does not hold up the queue for the game file.
+
+1. **Cleanup script** (`tools/`): takes an image-model picture and returns
+   a sprite on the true pixel grid. Steps in this order: find and snap to
+   the grid, downscale nearest-neighbour to the tower canvas, quantise to
+   the master palette, remove the background, rebuild the outline. The
+   canvas size is an input, not a constant.
+2. **Contact sheet maker** (`tools/`): the sprite on all four season
+   grounds (spring `#93dcaa`, summer `#7fcf8c`, autumn `#a9b878`, winter
+   `#e3ecf0`) at phone size, plus black silhouettes.
+3. **Master palette**, extracted from the v34 level 1 towers, saved as data
+   and as a swatch image for the reference pack.
+
+**Done when:** the cleanup script, run on a deliberately blurred and
+off-grid copy of a v34 tower, gives back a sprite that passes the
+framework's checklist (section 7: on the grid, palette subset, outline);
+a contact sheet of the four v34 level 1 towers is rendered and looked at.
+
+**Shipped** (16 Nov 2026) in `tools/sprite/`, with a short guide in its
+`README.md`:
+
+- `clean.js`: the cleanup. Also splits a strip of several figures
+  (`--strip`) and writes a small report beside each sprite.
+- `sheet.js`: the contact sheet, 2556 pixels wide so the phone-size rows are
+  true size when the sheet fills an iPhone 15 Pro screen sideways.
+- `palette.js`: the master palette (`master-palette.json`, swatch
+  `master-palette.png`) and the four reference towers (`ref/`), read from
+  the frozen `versions/sprout-siege-v34.html`.
+- `test.js` (`npm run sprite:test`): 15 checks. Each v34 tower is blown up
+  with a fake pixel size that is not a whole number, blurred, tinted and
+  given noise on magenta; the cleanup returns it pixel for pixel.
+
+Found along the way:
+
+- The master palette is **73 colours**, not the 32 to 48 the framework hoped
+  for. Left whole: trimming it means redrawing the v34 towers a little.
+  Decide in the pilot.
+- The towers' lowest pixels are on **row 41** (Zap Lamp 42), not 39. Row 39
+  is where the feet meet the ground. The tools use the lowest pixel.
+- The four towers are not centred the same way: by hand they sit up to a
+  pixel right of the canvas middle. The tools centre by the figure's edges.
+
+Pictures: `labs/c2-sprite-tools/`.
+

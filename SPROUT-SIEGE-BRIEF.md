@@ -202,6 +202,8 @@ Three groups since the 15 Nov 2026 critique:
 20. **Proportions** (P9 and P10): the world at P7's size, towers 10%
     smaller than v33. A level 1 tower's canvas is 36x48 art pixels, feet on
     row 39, drawn about 24 to 34 wide and 30 to 37 tall. A pod is 5x8.
+    (Measured for the sprite tools: the art's lowest pixels, the rounded
+    base under the feet, are on row 41, row 42 for the Zap Lamp.)
 21. **Calm ground.** Grass patches sparse and soft, groves framing the edges
     with a back row, props kept off the trail, plots, the Sprout, the HUD
     and the dock.
@@ -293,10 +295,13 @@ can be felt in play first.
    stages, through cleanup, contact sheet and an in-game preview, with a
    fallback of redrawing in code. Settled so far: storage is PNG sheets
    plus the embed script (decision 25); the master palette is extracted
-   from the v34 level 1 towers. Still open, settled at the start of the
-   pilot: whether forks get a taller canvas than 36x48, and which stages
-   get idle motion. Tools and plumbing come first (roadmap C2 and C4). Art
-   queues with everything else (decision 24).
+   from the v34 level 1 towers. The cleanup and contact sheet tools exist
+   (`tools/sprite/`, roadmap C2). Still open, settled at the start of the
+   pilot: whether forks get a taller canvas than 36x48, which stages get
+   idle motion, and whether the master palette stays at 73 colours (the
+   framework hoped for 32 to 48; trimming means touching up the v34
+   towers). Plumbing comes next (roadmap C4). Art queues with everything
+   else (decision 24).
 5. **Plot count**, if `'plots'` mode returns. The authored `plots` arrays
    were made for the v31 maps and do not fit the v32 trails; redo them first. 16 per map reads busy; 12 would
    breathe better, but changes solvability and needs the coverage model rerun.
@@ -414,6 +419,7 @@ before shipping any version.**
 | File | Purpose | Status |
 |---|---|---|
 | `tools/smoke.js` | Drives the real game in Chromium at 852x393 DSF 3: real pointer taps on the canvas for every screen button (title, map cleared, won, lost) and the dock, checks no DOM shows in landscape (v33), builds and forks all four families, sells, plays all 15 waves to the win screen, checks every info plaque fits its band and the band is clear of the trail (v31), fails on any page error, screenshots each stage to `tools/out/`. Run with `npm test`. | Live since setup (25 Oct) |
+| `tools/sprite/` | Sprite pass tools, no game file involved: `clean.js` turns an image-model picture into a sprite on the grid and palette, `sheet.js` makes the contact sheet (four season grounds at phone size, enlarged, silhouettes), `palette.js` extracts the master palette and reference towers from the frozen v34 file, `test.js` proves them on wrecked copies of the v34 towers. Run the test with `npm run sprite:test`. See `tools/sprite/README.md`. | Live since 16 Nov |
 | `tools/sim.js` | Balance simulator: fixed gold budget, greedy placement, lives lost per wave. | Planned, roadmap "Armor and balance" |
 | geometry and coverage checks | The old `geom.js` and `cover.js` (plot clearance, greedy coverage solver). | Lost with the chat sessions; rebuild inside `sim.js` if needed |
 
