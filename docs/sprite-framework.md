@@ -2,6 +2,12 @@
 
 Written by the critique session, 15 Nov 2026. Provisional: the pilot exists to prove or break it. Read with `claude/critique-2026-11-15.md`.
 
+> **Status, 16 Nov 2026.** Faisal's later decisions change four things here (brief decision 26, roadmap). The rest stands as written.
+> 1. The tower characters are open. Today's Gnome, Sprinkler, Zap Lamp and Beehive are placeholders, so "L1: the v34 reference, unchanged" (section 3) and "pilot on the Gnome" (sections 0 and 5) no longer hold. Level 1 ideas for all four jobs are explored first and tried in the game; 7 stages come after.
+> 2. What Faisal takes into the ChatGPT session is the one page `docs/tower-session-kit.md`, not this document. Sections 4 and 8 are superseded by it.
+> 3. One palette for every tower, locked from the picked designs. The 73 colour palette taken from the v34 towers is provisional.
+> 4. Sprites are judged on spring ground for now; the other seasons (sections 2, 5 and 7) are a later pass. Storage is settled: Option A (section 6).
+
 ## 0. The idea in one paragraph
 
 Do not start by generating 28 towers. Run a **pilot on one family (Gnome Post, 7 stages)** through the whole pipeline, from ChatGPT to a build on your phone, and only then scale. Image models produce pictures that look like pixel art but are not on a pixel grid, so the pipeline matters more than the prompts. If the pilot fails its gates, the fallback is the route that already worked in v34: use the generated image as reference and redraw in code.

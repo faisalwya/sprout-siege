@@ -3,7 +3,11 @@
   "private": true,
   "description": "Pixel-art tower defense. One self-contained HTML file.",
   "scripts": {
-    "test": "node tools/smoke.js"
+    "test": "node tools/smoke.js",
+    "sprite:test": "node tools/sprite/test.js",
+    "sprite:clean": "node tools/sprite/clean.js",
+    "sprite:sheet": "node tools/sprite/sheet.js",
+    "sprite:palette": "node tools/sprite/palette.js"
   },
   "devDependencies": {
     "playwright": "1.63.0"

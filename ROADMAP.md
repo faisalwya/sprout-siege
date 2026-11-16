@@ -33,6 +33,21 @@ unless it is placed below before then.
    small script inlines them into `index.html` as data URIs. The shipped
    game stays one self-contained file.
 
+**Added 16 Nov 2026** (pulse check, Faisal):
+
+7. **The tower characters are open.** Gnome, Sprinkler, Zap Lamp and
+   Beehive are placeholders, not the designs to refine. What each tower is
+   gets settled in an external ChatGPT session, from `docs/tower-session-kit.md`.
+8. **The four jobs are fixed:** workhorse, soaker, chainer, swarm, each
+   leveling 1 to 3 and forking to 5. An idea that needs a different power
+   comes back to a Code session first.
+9. **One palette for every tower, on spring ground, for now.** The palette
+   is set from the designs Faisal picks, not from today's towers. Season
+   variations are a later pass.
+10. **Explore first, produce second.** Level 1 ideas for the four jobs,
+    tried in the game on the phone, before anyone draws 7 stages. The
+    sprite plumbing (C4) waits until picks have survived that.
+
 **Faisal's priorities** (15 Nov 2026) still stand and explain the order:
 art, style and design first; UI and UX slight improvements; mechanics and
 story later, with the story growing out of playtesting.
@@ -46,10 +61,10 @@ in its entry and keep it small.
 
 | Pillar | Covers | Open question now | Answered by |
 |---|---|---|---|
-| **Look** | Art rules (references, resolution, palettes, light, outlines, proportions) and all art: towers by stage, bugs, the Sprout, ground and props, UI skin, effects | Can image-model sprites, cleaned to the 2x grid, keep the v34 charm across all 7 stages of a tower? | v35 sprite pilot (C2 and C4 prepare it) |
+| **Look** | Art rules (references, resolution, palettes, light, outlines, proportions) and all art: towers by stage, bugs, the Sprout, ground and props, UI skin, effects | Who are the four towers, and does image-model art of them hold up in the game on the phone? | The tower session, then v35 tower tryout |
 | **Play** | Rules, towers and forks, economy, enemies, waves, map layouts, balance | Is one finished map fun to replay, challenging but fair? | v36 map 1 slice, then v38 balance |
 | **Feel** | Controls, tap targets, feedback, readability, screens and copy, sound | Can you place and upgrade a tower without fighting the controls or guessing the numbers? | C3 |
-| **Tech** | Engine, 2x rendering, art pipeline, file size, save, install, tests, deploy | Can art live as PNG sheets in `assets/` while the game ships as one file inside a size budget? | C4 |
+| **Tech** | Engine, 2x rendering, art pipeline, file size, save, install, tests, deploy | Can art live as PNG sheets in `assets/` while the game ships as one file inside a size budget? | C4, once tower picks exist |
 
 The four questions are worded by Claude from the decisions above. Faisal:
 reword any that miss what you meant.
@@ -63,35 +78,17 @@ Feel; Technical is Tech; World and story is the note in decision 2.
 
 ---
 
-## Now: C0 to C4
+## Now
 
-Set by Faisal on 15 Nov. One at a time; stop after each and wait for
-"next". The numbers for C3 and C4 (v34.2, v34.3) are Claude's suggestion;
-C1's is Faisal's.
+C0 to C4 were set by Faisal on 15 Nov; the order changed on 16 Nov (C4 on
+hold, the tower session added). One at a time. The numbers for C3 and C4
+(v34.2, v34.3) are Claude's suggestion; C1's is Faisal's.
 
-**Done:** C0 (docs, 15 Nov) and C1 (v34.1, stale copy). Their sections are
-in `docs/roadmap-history.md`.
+**Order now:** C3, while Faisal holds the tower session; then the tower
+tryout (v35); then C4 and the full stages for the picks that survive.
 
-### C2: Sprite tools [ ]
-
-Look, preparation for the pilot. **No game file:** `index.html` is not
-touched, so it does not hold up the queue for the game file.
-
-1. **Cleanup script** (`tools/`): takes an image-model picture and returns
-   a sprite on the true pixel grid. Steps in this order: find and snap to
-   the grid, downscale nearest-neighbour to the tower canvas, quantise to
-   the master palette, remove the background, rebuild the outline. The
-   canvas size is an input, not a constant.
-2. **Contact sheet maker** (`tools/`): the sprite on all four season
-   grounds (spring `#93dcaa`, summer `#7fcf8c`, autumn `#a9b878`, winter
-   `#e3ecf0`) at phone size, plus black silhouettes.
-3. **Master palette**, extracted from the v34 level 1 towers, saved as data
-   and as a swatch image for the reference pack.
-
-**Done when:** the cleanup script, run on a deliberately blurred and
-off-grid copy of a v34 tower, gives back a sprite that passes the
-framework's checklist (section 7: on the grid, palette subset, outline);
-a contact sheet of the four v34 level 1 towers is rendered and looked at.
+**Done:** C0 (docs, 15 Nov), C1 (v34.1, stale copy) and C2 (sprite tools,
+`tools/sprite/`). Their sections are in `docs/roadmap-history.md`.
 
 ### C3: v34.2, placement snap and next-level stats [ ]
 
@@ -111,7 +108,21 @@ inside the trail edge arms a legal spot; plaque screenshots for all four
 families checked; **Faisal plays the preview on his iPhone before
 merging.**
 
-### C4: v34.3, sprite plumbing [ ]
+### Tower session (Faisal, outside the repo) [ ]
+
+Look. Not a version. Faisal explores in ChatGPT what each of the four
+towers is, at level 1 only, using `docs/tower-session-kit.md` and the three
+pictures in `docs/tower-kit/`. He brings back up to three PNGs per job, the
+prompts that made them, and which he prefers.
+
+**Done when:** there is at least one candidate picture for each of the four
+jobs in a Code session.
+
+### C4: v34.3, sprite plumbing [ ] (on hold)
+
+**On hold** (16 Nov) until tower picks have survived the phone in the v35
+tryout: if importing fails, most of this would be wasted. The tryout does
+not need it, because the game already has one base sprite per tower.
 
 Tech. Answers: can art live as PNG sheets in `assets/` while the game ships
 as one file inside a size budget?
@@ -140,22 +151,37 @@ its size is reported.
 
 Numbers are provisional and each is written up in full when it is next.
 
-### v35: Sprite pilot, the Gnome family [ ]
+### v35: Tower tryout [ ]
 
-Look. Answers: can image-model sprites keep the v34 charm across all 7
-stages? Follows `docs/sprite-framework.md`: Gnome L1 to L3 static, both
-forks static, gate A in game on the phone, then idle animation for one
-stage, gate B. If gate A fails for the whole family, stop and rethink; the
-fallback is to redraw in code from the generated image.
+Look. Answers: who are the four towers, and does image-model art of them
+hold up in the game on the phone?
 
-Settle at the start (framework section 10): canvas growth for forks, and
-which stages get idle motion. Already settled: storage is PNG sheets plus
-the embed script; the master palette comes from the v34 towers (C2).
+1. Clean Faisal's level 1 candidates with `tools/sprite/clean.js`, palette
+   left loose (no lock yet), and make a contact sheet on spring ground.
+2. Put the picks in as the four base towers, in numbered previews, and
+   Faisal plays them on the phone. Levels 2 and 3 keep the same sprite and
+   the forks keep today's art for now.
+3. Faisal picks one design per job, or sends a job back for more ideas.
+4. Lock the master palette from the picks.
+
+If nothing imports cleanly after three tries on a design, the fallback is
+the v34 route: keep the picture as reference and redraw it in code.
+
+**Done when:** four level 1 towers Faisal is happy with are in a preview he
+has played.
+
+### v35.x: Full stages for the picks [ ]
+
+Look. After C4. For each picked tower, the 7 stages (L1, L2, L3, A4, A5,
+B4, B5) following `docs/sprite-framework.md` sections 3 and 5, one tower at
+a time, each played on the phone before the next. Settle at the start:
+whether forks get a taller canvas than 36x48, and which stages get idle
+motion.
 
 ### v36: Map 1 as a vertical slice [ ]
 
-Play and Look. Map 1 finished to 1.0 quality: all four tower families at
-all 7 stages, the five bugs with walk cycles, the Sprout final. Expected to
+Play and Look. Map 1 finished to 1.0 quality: all four towers at all 7
+stages (done in v35.x), the five bugs with walk cycles, the Sprout final. Expected to
 be a run of numbered versions (v36, v36.1 and so on), one in flight at a
 time. Answers: is one finished map fun to replay?
 
