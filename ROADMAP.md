@@ -230,6 +230,21 @@ Then 1.0.
 
 ---
 
+## Proposed by the 17 Nov review, not decided
+
+From `docs/review-2026-11-17.md`. None of these is scheduled until Faisal
+says yes; a yes moves it into the order above.
+
+| # | Proposal | Pillar | Touches the game file |
+|---|---|---|---|
+| R1 | Faisal plays three full runs now and logs them in `docs/playtest-notes.md`, before the tower session | Play | No |
+| R2 | Build the balance simulator (`tools/sim.js`) now, while the tower session runs, instead of at v38 | Play | No |
+| R3 | After the tower tryout, one version for information and feedback: next wave shown beside GO, bug traits shown, a visible burst on level up, clearer hits and deaths | Play, Feel | Yes |
+| R4 | Bugs redrawn before, or alongside, the first tower's full 7 stages | Look | Yes |
+| R5 | Soften the lives spiral between maps (a coin floor, lives back, or lives reset per map), chosen with the simulator | Play | Yes |
+| R6 | Maps 2 to 4 wait until five people other than Faisal have finished the map 1 slice | Play | No |
+| R7 | Decide after the first full tower whether every tower needs 7 looks, or 3 with small level details | Look | No |
+
 ## Not placed in the order yet
 
 From the old roadmap. Each needs a place (or a no) before 1.0; none starts

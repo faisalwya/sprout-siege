@@ -21,6 +21,8 @@ https://sprout-siege.netlify.app (built for iPhone in landscape).
 | `docs/tower-session-kit.md` | **What to take into the tower design session:** the format a picture must have, the four jobs to cast, the prompt to paste. Pictures in `docs/tower-kit/`. | Faisal | When the format or the jobs change |
 | `docs/sprite-framework.md` | **How image-model sprites get into the game:** the Gnome pilot, cleanup, gates and checklist. Provisional until the pilot proves it. | Claude and Faisal | When the pilot teaches something |
 | `WORKFLOW.md` | **How to sync and avoid conflicts,** in plain language. | Faisal | Rarely |
+| `docs/playtest-notes.md` | **Whether it is fun:** a row per real run, with how it ended and what felt good, annoying or confusing. | Faisal and Claude | After every run worth noting |
+| `docs/review-2026-11-17.md` | A whole-project review: state of each pillar, proposals, best practices, pitfalls. Decides nothing by itself. | Faisal | Not updated; a later review gets its own file |
 | `versions/` | Frozen copy of every version, for comparing or reverting. | Both | Every version (one new file) |
 | `labs/` | Throwaway mockups used to settle visual questions. | Both | When a visual question needs a mockup |
 | `tools/smoke.js` | Whether a version is allowed to ship: must print all PASS. | Claude | When the game gains something new to test |

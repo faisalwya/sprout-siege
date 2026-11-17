@@ -301,6 +301,14 @@ tuned to be, map 3 most of all.** Cheapest levers when it needs fixing: enemy
 HP on maps 2 and 3, or starting gold. Not yet re-tuned, deliberately, so it
 can be felt in play first.
 
+**Caution, 17 Nov 2026:** "easier" was inferred from trail coverage, not
+from play, and a first measurement does not back it. A script playing five
+simple spending strategies never reached map 3: the best kept 9 of 20 lives
+on map 1 and lost on map 2, and every strategy lost 3 lives on the first
+wave. The script is a crude player, so the truth for a person is unknown.
+Treat difficulty as unmeasured until `docs/playtest-notes.md` has real runs
+and the simulator exists. See `docs/review-2026-11-17.md`.
+
 ### Open items
 1. **Balance re-tune** after the placement model settles. This is the live one.
 2. ~~Deploy.~~ Done: GitHub Pages serves `main`. See section 9.
@@ -338,6 +346,16 @@ can be felt in play first.
 10. **Grub contrast** on late summer and autumn grass is weak. Fix with the
     bugs in the map 1 slice.
 11. ~~Stale copy.~~ Done in v34.1.
+12. **The lives spiral** (17 Nov). Lives carry between maps and the coins
+    a map starts with are paid per life kept, so a rough first map leaves
+    the player both weaker and poorer on the second. It rewards protecting
+    the Sprout, as intended, but gives a new player no way back. Options:
+    a floor on arriving coins, a few lives back between maps, or lives
+    reset per map with a score kept. Compare with the simulator first.
+13. **No information to plan with** (17 Nov). Nothing shows what the next
+    wave holds or that a bug is armored or cannot be slowed, so tower
+    choice is a guess. Next-wave preview is in the roadmap's unplaced
+    list; the review proposes doing it with bug traits, earlier.
 
 ---
 
@@ -484,6 +502,9 @@ Mac, run `npm install` and `npx playwright install chromium` once.
 - Review the four pillars (roadmap) before starting a version: name the
   pillar and the open question the version answers, so work stays in order
   and nothing drifts.
+- After a run on the phone, three lines in `docs/playtest-notes.md`: what
+  felt good, what annoyed, what confused, and how the run ended. Fun is
+  judged from runs, not from screenshots.
 
 ---
 
@@ -517,6 +538,8 @@ and `main` on GitHub is the source of truth. See `README.md` for which file
 decides what, `WORKFLOW.md` for syncing, `ROADMAP.md` for what's next,
 `docs/roadmap-history.md` for the shipped roadmap sections,
 `docs/tower-session-kit.md` for the one page Faisal takes to the tower
-design session, and `docs/sprite-framework.md` for the sprite pipeline.
+design session, `docs/sprite-framework.md` for the sprite pipeline,
+`docs/playtest-notes.md` for the log of runs and
+`docs/review-2026-11-17.md` for the last whole-project review.
 Versions v1 to v3 and v6 were never recovered; everything from v4 on is in
 `versions/` and in the git history.

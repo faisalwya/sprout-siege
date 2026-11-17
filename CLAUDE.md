@@ -28,6 +28,8 @@ build on them without hard-coding them as permanent.
 | `docs/roadmap-history.md` | Roadmap sections of shipped versions, moved out of the roadmap. |
 | `docs/tower-session-kit.md` | The one page Faisal takes to the external tower design session, with its pictures in `docs/tower-kit/`. |
 | `docs/sprite-framework.md` | How image-model sprites get into the game: pilot, cleanup, gates, checklist. |
+| `docs/playtest-notes.md` | Log of real runs: how each ended, what felt good, annoyed, confused. When Faisal reports a run, add a row. |
+| `docs/review-2026-11-17.md` | Whole-project review: where each pillar stands, proposals, best practices, pitfalls. A snapshot. |
 
 ## Hard constraints
 
